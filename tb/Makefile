@@ -20,7 +20,11 @@ HERE  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 WORK  ?= $(HERE)/../work
 BUILD ?= $(WORK)/frozen/build
 
-TARGET        ?= i51
+PORT_VERSION  ?= 2.45.1
+PORT_TARBALL  := binutils-$(PORT_VERSION).tar.xz
+PORT_URL      ?= https://ftp.gnu.org/gnu/binutils/$(PORT_TARBALL)
+PORT_SHA256   ?=
+TARGET        ?= i51-elf
 
 PROJECTS := diag ds1620 ds1822 lcd led1 led2 led3 serial welcome wjava
 
@@ -82,21 +86,21 @@ frozen:
 build:
 	rm -rf $(WORK)/modern
 	mkdir -p $(WORK)/modern
-	cd $(WORK)/modern && curl -fsSL -o $(TARBALL) "$(URL)"
-	cd $(WORK)/modern && sha256sum $(TARBALL) | tee sha256.txt
-	@if [ -n "$(EXPECT_SHA256)" ]; then \
-		cd $(WORK)/modern && echo "$(EXPECT_SHA256)  $(TARBALL)" | sha256sum -c -; \
+	cd $(WORK)/modern && curl -fsSL -o $(PORT_TARBALL) "$(PORT_URL)"
+	cd $(WORK)/modern && sha256sum $(PORT_TARBALL) | tee sha256.txt
+	@if [ -n "$(PORT_SHA256)" ]; then \
+		cd $(WORK)/modern && echo "$(PORT_SHA256)  $(PORT_TARBALL)" | sha256sum -c -; \
 	fi
-	cd $(WORK)/modern && tar xzf $(TARBALL)
-	cd $(WORK)/modern && patch --fuzz 5 -p1 -d binutils-$(BINUTILS_VERSION) < $(HERE)/../mcs51/additions.patch
-	cd $(WORK)/modern && patch --fuzz 5 -p1 -d binutils-$(BINUTILS_VERSION) < $(HERE)/../mcs51/modifications.patch
+	cd $(WORK)/modern && tar xf $(PORT_TARBALL)
+	cd $(WORK)/modern && patch --fuzz 3 -p1 -d binutils-$(PORT_VERSION) < $(HERE)/../mcs51/additions.patch
+	cd $(WORK)/modern && patch --fuzz 3 -p1 -d binutils-$(PORT_VERSION) < $(HERE)/../mcs51/modifications.patch
 	mkdir -p $(WORK)/modern/build
-	cd $(WORK)/modern/build && CC="gcc -m32" CFLAGS="-std=gnu89 -fcommon -fpermissive -w" \
-		../binutils-$(BINUTILS_VERSION)/configure \
-			--build=i686-pc-linux-gnu --host=i686-pc-linux-gnu --target=$(TARGET) \
-			--prefix=$(WORK)/modern/toolchain --disable-nls --disable-werror
-	cd $(WORK)/modern/build && $(MAKE) -j1 MAKEINFO=true \
-		all-bfd all-opcodes all-gas all-ld all-binutils
+	cd $(WORK)/modern/build && ../binutils-$(PORT_VERSION)/configure \
+		--target=$(TARGET) --prefix=$(WORK)/modern/toolchain \
+		--disable-nls --disable-werror --disable-gdb
+	cd $(WORK)/modern/build && $(MAKE) -j$$(nproc) MAKEINFO=true
+	# nothing else pulls in the emulation source
+	cd $(WORK)/modern/build/ld && $(MAKE) MAKEINFO=true eelf32i51.c
 	ls -l $(WORK)/modern/build/gas/as-new $(WORK)/modern/build/ld/ld-new
 
 # ------------------------------------------------------------------- testbench

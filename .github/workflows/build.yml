@@ -1,7 +1,7 @@
 name: build
 
-# mcs51/additions.patch and mcs51/modifications.patch applied to
-# binutils, built, then verified against the testbench.
+# mcs51/additions.patch and mcs51/modifications.patch applied to binutils 2.45.1,
+# built, then verified against the testbench.
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib p7zip-full
+          sudo apt-get install -y p7zip-full texinfo
 
       - name: Record environment
         run: |
