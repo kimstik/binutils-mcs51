@@ -51,7 +51,7 @@ new file mode 100644
 index 0000000000..43404ca1f4
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,990 @@
+@@ -0,0 +1,951 @@
 +/* MCS-51 specific support for 32-bit ELF
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -300,9 +300,7 @@ index 0000000000..43404ca1f4
 +};
 +
 +static reloc_howto_type *
-+bfd_elf32_bfd_reloc_type_lookup (abfd, code)
-+     bfd *abfd ATTRIBUTE_UNUSED;
-+     bfd_reloc_code_real_type code;
++bfd_elf32_bfd_reloc_type_lookup (bfd *abfd ATTRIBUTE_UNUSED, bfd_reloc_code_real_type code)
 +{
 +  unsigned int i;
 +
@@ -357,11 +355,7 @@ index 0000000000..43404ca1f4
 +   virtual table relocs for gc.  */
 +
 +static bool
-+elf32_i51_check_relocs (abfd, info, sec, relocs)
-+     bfd *abfd;
-+     struct bfd_link_info *info;
-+     asection *sec;
-+     const Elf_Internal_Rela *relocs;
++elf32_i51_check_relocs (bfd *abfd, struct bfd_link_info *info, asection *sec, const Elf_Internal_Rela *relocs)
 +{
 +  Elf_Internal_Shdr *symtab_hdr;
 +  struct elf_link_hash_entry **sym_hashes, **sym_hashes_end;
@@ -397,14 +391,12 @@ index 0000000000..43404ca1f4
 +   routines, but a few relocs, we have to do them ourselves.  */
 +
 +static bfd_reloc_status_type
-+i51_final_link_relocate (howto, input_bfd, input_section,
-+			 contents, rel, relocation)
-+     reloc_howto_type *  howto;
-+     bfd *               input_bfd;
-+     asection *          input_section;
-+     bfd_byte *          contents;
-+     Elf_Internal_Rela * rel;
-+     bfd_vma             relocation;
++i51_final_link_relocate (reloc_howto_type *howto,
++			 bfd *input_bfd,
++			 asection *input_section,
++			 bfd_byte *contents,
++			 Elf_Internal_Rela *rel,
++			 bfd_vma relocation)
 +{
 +  bfd_reloc_status_type r = bfd_reloc_ok;
 +  bfd_vma               x;
@@ -419,19 +411,10 @@ index 0000000000..43404ca1f4
 +      srel -= rel->r_offset;
 +      srel -= (input_section->output_section->vma +
 +	       input_section->output_offset);
-+      /*
-+      fprintf (stderr, "7PCREL contents: %lx rel->r_offset: %lx relocation: %lx\n",
-+	       contents, rel->r_offset, (bfd_signed_vma)relocation);
-+      fprintf (stderr, "7PCREL rel->r_addend: %lx srel: %lx\n",
-+	       rel->r_addend, srel);
-+      fprintf (stderr, "7PCREL input_section->output_section->vma: %lx input_section->output_offset: %lx\n",
-+	       input_section->output_section->vma, input_section->output_offset);
-+      */
 +      /* Check for overflow.  */
 +      if (srel > ((1 << 7) - 1) || (srel < - (1 << 7)))
 +	return bfd_reloc_overflow;
 +
-+      //      x = bfd_get_8 (input_bfd, contents);
 +      bfd_put_8 (input_bfd, srel, contents);
 +      break;
 +
@@ -439,14 +422,6 @@ index 0000000000..43404ca1f4
 +      contents   += rel->r_offset;
 +      srel = (bfd_signed_vma) relocation;
 +      srel += rel->r_addend;
-+      /*
-+      fprintf (stderr, "R11 contents: %lx rel->r_offset: %lx relocation: %lx\n",
-+	       contents, rel->r_offset, (bfd_signed_vma)relocation);
-+      fprintf (stderr, "R11 rel->r_addend: %lx srel: %lx\n",
-+	       rel->r_addend, srel);
-+      fprintf (stderr, "R11 input_section->output_section->vma: %lx input_section->output_offset: %lx\n",
-+	       input_section->output_section->vma, input_section->output_offset);
-+      */
 +      /* Check for overflow.  */
 +      if (((srel ^ (rel->r_offset + input_section->output_section->vma + input_section->output_offset)) & 0x0000F800l) !=0)
 +	{
@@ -681,8 +656,7 @@ index 0000000000..43404ca1f4
 +/* Set the right machine number.  */
 +
 +static bool
-+elf32_i51_object_p (abfd)
-+     bfd *abfd;
++elf32_i51_object_p (bfd *abfd)
 +{
 +  return 1;
 +}
@@ -747,10 +721,7 @@ index 0000000000..43404ca1f4
 +   index.  */
 +
 +bool
-+elf32_i51_section_from_bfd_section (abfd, sec, retval)
-+     bfd *abfd ATTRIBUTE_UNUSED;
-+     asection *sec;
-+     int *retval;
++elf32_i51_section_from_bfd_section (bfd *abfd ATTRIBUTE_UNUSED, asection *sec, int *retval)
 +{
 +  const char *name;
 +
@@ -835,9 +806,7 @@ index 0000000000..43404ca1f4
 +/* Handle the special I51 section numbers that a symbol may use.  */
 +
 +void
-+elf32_i51_symbol_processing (abfd, asym)
-+     bfd *abfd ATTRIBUTE_UNUSED;
-+     asymbol *asym;
++elf32_i51_symbol_processing (bfd *abfd ATTRIBUTE_UNUSED, asymbol *asym)
 +{
 +  elf_symbol_type *elfsym;
 +
@@ -968,15 +937,7 @@ index 0000000000..43404ca1f4
 +}
 +
 +static bool
-+elf32_i51_add_symbol_hook (abfd, info, sym, namep, flagsp, secp, valp)
-+     bfd *abfd;
-+     struct bfd_link_info *info;
-+     const Elf_Internal_Sym *sym;
-+     const char **namep;
-+     flagword *flagsp ATTRIBUTE_UNUSED;
-+     asection **secp;
-+     bfd_vma *valp;
-+
++elf32_i51_add_symbol_hook (bfd *abfd, struct bfd_link_info *info, const Elf_Internal_Sym *sym, const char **namep, flagword *flagsp ATTRIBUTE_UNUSED, asection **secp, bfd_vma *valp)
 +{
 +  switch (sym->st_shndx)
 +    {
@@ -1047,7 +1008,7 @@ new file mode 100644
 index 0000000000..edeee86421
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2679 @@
+@@ -0,0 +1,2598 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -1481,8 +1442,7 @@ index 0000000000..edeee86421
 +unsigned short decodePcodeOperand (expressionS *, enum PADRMODE *, int);
 +
 +static inline char *
-+skip_space (s)
-+     char *s;
++skip_space (char *s)
 +{
 +  while (*s == ' ' || *s == '\t')
 +    ++s;
@@ -1575,17 +1535,14 @@ index 0000000000..edeee86421
 +}
 +
 +int
-+md_estimate_size_before_relax (fragp, seg)
-+     fragS *fragp ATTRIBUTE_UNUSED;
-+     asection *seg ATTRIBUTE_UNUSED;
++md_estimate_size_before_relax (fragS *fragp ATTRIBUTE_UNUSED, asection *seg ATTRIBUTE_UNUSED)
 +{
 +  abort ();
 +  return 0;
 +}
 +
 +void
-+md_show_usage (stream)
-+     FILE *stream;
++md_show_usage (FILE *stream)
 +{
 +  fprintf (stream,
 +      _("A51 options:\n"
@@ -1601,7 +1558,7 @@ index 0000000000..edeee86421
 +
 +
 +void
-+md_begin ()
++md_begin (void)
 +{
 +  struct i51_opcodes_s *opcode;
 +  struct i51_directop_s *oper;
@@ -1688,8 +1645,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+md_assemble (str)
-+     char *str;
++md_assemble (char *str)
 +{
 +#ifdef ASMDBG
 +  fprintf(stderr, "%s\n",str);
@@ -1801,9 +1757,7 @@ index 0000000000..edeee86421
 +   to permit the CPU backend to adjust the alignment of a section.  */
 +
 +valueT
-+md_section_align (seg, addr)
-+     asection *seg;
-+     valueT addr;
++md_section_align (asection *seg, valueT addr)
 +{
 +  int align = bfd_section_alignment (seg);
 +  return ((addr + (1 << align) - 1) & (-1 << align));
@@ -1816,9 +1770,7 @@ index 0000000000..edeee86421
 +   macro would return the length of an instruction.  */
 +
 +long
-+md_pcrel_from_section (fixp, sec)
-+     fixS *fixp;
-+     segT sec;
++md_pcrel_from_section (fixS *fixp, segT sec)
 +{
 +  if (fixp->fx_addsy != (symbolS *) NULL
 +      && (!S_IS_DEFINED (fixp->fx_addsy)
@@ -1891,7 +1843,6 @@ index 0000000000..edeee86421
 +      switch (fixp->fx_r_type)
 +	{
 +	case BFD_RELOC_I51_8_LOW:
-+	  // bfd_putb8 ((bfd_vma) value, (unsigned char *) where);
 +	  ((bfd_byte *) where)[0] = (bfd_byte) (value & 0xFF);
 +	  break;
 +
@@ -1907,7 +1858,6 @@ index 0000000000..edeee86421
 +	  if (value < -256 || value > 255)
 +	    as_bad_where (fixp->fx_file, fixp->fx_line,
 +			  _("operand out of range: %ld"), value);
-+	  // bfd_putb8 ((bfd_vma) value, (unsigned char *) where);
 +	  ((bfd_byte *) where)[0] = (bfd_byte) (value & 0xFF);
 +	  break;
 +
@@ -1915,7 +1865,6 @@ index 0000000000..edeee86421
 +	  if (value < -128 || value > 127)
 +	    as_bad_where (fixp->fx_file, fixp->fx_line,
 +			  _("operand out of range: %ld"), value);
-+	  // bfd_putb8 ((bfd_vma) value, (unsigned char *) where);
 +	  ((bfd_byte *) where)[0] = (bfd_byte) value;
 +#ifdef ASMDBG
 +	  fprintf(stderr, "fbdreloc7: %lx\n", value);
@@ -2004,8 +1953,7 @@ index 0000000000..edeee86421
 +}
 +
 +static void
-+i51_bit (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_bit (int ignore ATTRIBUTE_UNUSED)
 +{
 +  expressionS exp;
 +
@@ -2078,8 +2026,7 @@ index 0000000000..edeee86421
 +}
 +
 +symbolS *
-+md_undefined_symbol (name)
-+     char *name;
++md_undefined_symbol (char *name)
 +{
 +  extract_op (name, op, sizeof (op));
 +  oper = (struct i51_directop_s *) str_hash_find (i51_operand, op);
@@ -2101,10 +2048,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+md_convert_frag (abfd, sec, fragP)
-+     bfd *abfd ATTRIBUTE_UNUSED;
-+     asection *sec ATTRIBUTE_UNUSED;
-+     fragS *fragP ATTRIBUTE_UNUSED;
++md_convert_frag (bfd *abfd ATTRIBUTE_UNUSED, asection *sec ATTRIBUTE_UNUSED, fragS *fragP ATTRIBUTE_UNUSED)
 +{
 +  abort ();
 +}
@@ -2120,9 +2064,7 @@ index 0000000000..edeee86421
 +   then it is done here.  */
 +
 +arelent *
-+tc_gen_reloc (seg, fixp)
-+     asection *seg ATTRIBUTE_UNUSED;
-+     fixS *fixp;
++tc_gen_reloc (asection *seg ATTRIBUTE_UNUSED, fixS *fixp)
 +{
 +  arelent *reloc;
 +
@@ -2212,7 +2154,7 @@ index 0000000000..edeee86421
 +	}
 +      //PARSE EXPRESION 1
 +      expression (&op_expr1);
-+i51_fold_bit_suffix (&op_expr1);
++      i51_fold_bit_suffix (&op_expr1);
 +      if (op_expr1.X_op == O_absent)
 +	{
 +	  as_bad (_("missing operand 1"));
@@ -2250,7 +2192,6 @@ index 0000000000..edeee86421
 +
 +#ifdef ASMDBG
 +      fprintf(stderr, "op1: %c %s\n", op1mode, op);
-+      //fprintf(stderr, "op1: %c %s %s\n", op1mode, op, S_GET_NAME(op_expr1.X_add_symbol));
 +#endif
 +    }
 +  else
@@ -2335,7 +2276,6 @@ index 0000000000..edeee86421
 +	} 
 +      else
 +	{
-+	  //op2mode = ' ';
 +
 +	  //scan hi/low prefix
 +	  if      (strncmp (input_line_pointer, "HIGH(", 5) == 0)
@@ -2370,7 +2310,7 @@ index 0000000000..edeee86421
 +	{
 +	  op1hlmode = op2hlmode;
 +	  expression (&op_expr1);
-+i51_fold_bit_suffix (&op_expr1);
++	  i51_fold_bit_suffix (&op_expr1);
 +	  if (op_expr1.X_op == O_absent)
 +	    {
 +	      as_bad (_("missing operand 2"));
@@ -2479,11 +2419,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_build_ins (opcode, regnumber, op_expr1, op_expr2)
-+  struct i51_opcodes_s *opcode;
-+  unsigned char regnumber;
-+  expressionS *op_expr1;
-+  expressionS *op_expr2;
++i51_build_ins (struct i51_opcodes_s *opcode, unsigned char regnumber, expressionS *op_expr1, expressionS *op_expr2)
 +{
 +  unsigned char bin_opcode;
 +  char *frag;
@@ -2595,9 +2531,7 @@ index 0000000000..edeee86421
 +
 +/* Checks that the number 'num' fits for a given mode.  */
 +static int
-+check_range (num, mode)
-+     long num;
-+     int mode;
++check_range (long num, int mode)
 +{
 +  switch (mode)
 +    {
@@ -2628,10 +2562,7 @@ index 0000000000..edeee86421
 +/* Put a 1 byte expression described by 'oper'.  If this expression contains
 +   unresolved symbols, generate an 8-bit fixup.  */
 +static void
-+fixup8 (oper, mode, opmode)
-+     expressionS *oper;
-+     int mode;
-+     int opmode;
++fixup8 (expressionS *oper, int mode, int opmode)
 +{
 +  char *f;
 +
@@ -2724,11 +2655,7 @@ index 0000000000..edeee86421
 +/* Put a 11 bit expression described by 'oper'.  If this expression contains
 +   unresolved symbols, generate an 11-bit fixup.  */
 +static void
-+fixup11 (oper, opcode, mode, opmode)
-+     expressionS *oper;
-+     unsigned int opcode;
-+     int mode;
-+     int opmode ATTRIBUTE_UNUSED;
++fixup11 (expressionS *oper, unsigned int opcode, int mode, int opmode ATTRIBUTE_UNUSED)
 +{
 +  char *f;
 +
@@ -2763,10 +2690,7 @@ index 0000000000..edeee86421
 +/* Put a 2 byte expression described by 'oper'.  If this expression contains
 +   unresolved symbols, generate a 16-bit fixup.  */
 +static void
-+fixup16 (oper, mode, opmode)
-+     expressionS *oper;
-+     int mode;
-+     int opmode ATTRIBUTE_UNUSED;
++fixup16 (expressionS *oper, int mode, int opmode ATTRIBUTE_UNUSED)
 +{
 +  char *f;
 +
@@ -2799,10 +2723,7 @@ index 0000000000..edeee86421
 +}
 +
 +int
-+i51_section_flags (flags, attr, type)
-+     int flags;
-+     int attr;
-+     int type ATTRIBUTE_UNUSED;
++i51_section_flags (int flags, int attr, int type ATTRIBUTE_UNUSED)
 +{
 +  if (attr & SHF_REGBANK)
 +    flags |= SEC_IS_COMMON;
@@ -2811,8 +2732,7 @@ index 0000000000..edeee86421
 +}
 +
 +static void
-+i51_using (par)
-+     int par ATTRIBUTE_UNUSED;
++i51_using (int par ATTRIBUTE_UNUSED)
 +{
 +  switch (*input_line_pointer++)
 +    {
@@ -2835,23 +2755,8 @@ index 0000000000..edeee86421
 +  if (regbank > regused) regused = regbank;
 +}
 +
-+/*
 +void
-+i51_set (name)
-+     char *name;
-+{
-+  register symbolS *symbolP;
-+
-+  if ((symbol_find (name) == NULL) && (md_undefined_symbol (name) == NULL))
-+    {
-+	symbolP = symbol_new (name, absolute_section, &zero_address_frag, 0);
-+	symbol_table_insert (symbolP);
-+    }
-+}
-+*/
-+
-+void
-+i51_cleanup ()
++i51_cleanup (void)
 +{
 +  symbolS *symbolP;
 +
@@ -2872,8 +2777,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_common (common_segment)
-+     int common_segment;
++i51_common (int common_segment)
 +{
 +  const char *name;
 +  char c;
@@ -3143,8 +3047,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_rbss (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_rbss (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (rbss_section == NULL)
@@ -3161,8 +3064,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_bss (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_bss (int ignore ATTRIBUTE_UNUSED)
 +{
 +  obj_elf_section_change_hook ();
 +  subseg_set (bss_section, (subsegT) get_absolute_expression ());
@@ -3170,8 +3072,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_bbss (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_bbss (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (bbss_section == NULL)
@@ -3188,8 +3089,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_ibss (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_ibss (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (ibss_section == NULL)
@@ -3206,8 +3106,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_xbss (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_xbss (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (xbss_section == NULL)
@@ -3224,8 +3123,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_ebss (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_ebss (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (ebss_section == NULL)
@@ -3242,8 +3140,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_bitbss (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_bitbss (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (bitbss_section == NULL)
@@ -3260,8 +3157,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_rdata (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_rdata (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (rdata_section == NULL)
@@ -3277,8 +3173,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_bdata (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_bdata (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (bdata_section == NULL)
@@ -3294,8 +3189,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_idata (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_idata (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (idata_section == NULL)
@@ -3311,8 +3205,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_xdata (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_xdata (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (xdata_section == NULL)
@@ -3328,8 +3221,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_edata (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_edata (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (edata_section == NULL)
@@ -3345,8 +3237,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_bitdata (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_bitdata (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (bitdata_section == NULL)
@@ -3362,8 +3253,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_eeprom (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_eeprom (int ignore ATTRIBUTE_UNUSED)
 +{
 +  flagword applicable;
 +  if (eeprom_section == NULL)
@@ -3379,10 +3269,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+pcodeOperand (oper, mode, separator)
-+     expressionS *oper;
-+     enum PADRMODE *mode;
-+     int separator;
++pcodeOperand (expressionS *oper, enum PADRMODE *mode, int separator)
 +{
 +  SKIP_WHITESPACE ();
 +  if ((*input_line_pointer != '\0') && (*input_line_pointer != '\x0D') && (*input_line_pointer != '\x0A') && (*input_line_pointer != ';'))
@@ -3426,10 +3313,7 @@ index 0000000000..edeee86421
 +
 +
 +void
-+writePcodeOperand (oper, mode, swapable)
-+     expressionS *oper;
-+     enum PADRMODE *mode;
-+     int swapable ATTRIBUTE_UNUSED;
++writePcodeOperand (expressionS *oper, enum PADRMODE *mode, int swapable ATTRIBUTE_UNUSED)
 +{
 +  char *f;
 +  fixS *fixp;
@@ -3536,10 +3420,7 @@ index 0000000000..edeee86421
 +}
 +
 +unsigned short
-+decodePcodeOperand (oper, mode, swapable)
-+     expressionS *oper;
-+     enum PADRMODE *mode;
-+     int swapable;
++decodePcodeOperand (expressionS *oper, enum PADRMODE *mode, int swapable)
 +{
 +  unsigned short pflags;
 +
@@ -3661,8 +3542,7 @@ index 0000000000..edeee86421
 +}
 +
 +void
-+i51_pcode (ignore)
-+     int ignore ATTRIBUTE_UNUSED;
++i51_pcode (int ignore ATTRIBUTE_UNUSED)
 +{
 +  char *f;
 +  unsigned short pflags;
@@ -4330,7 +4210,7 @@ new file mode 100644
 index 0000000000..32c0826cee
 --- /dev/null
 +++ b/opcodes/i51-dis.c
-@@ -0,0 +1,282 @@
+@@ -0,0 +1,273 @@
 +/* Disassemble MCS-51 instructions.
 +   Copyright 2001 Free Software Foundation, Inc.
 +
@@ -4375,9 +4255,7 @@ index 0000000000..32c0826cee
 +};
 +
 +static unsigned char
-+i51dis_opcode (addr, info)
-+     bfd_vma addr;
-+     disassemble_info *info;
++i51dis_opcode (bfd_vma addr, disassemble_info *info)
 +{
 +  bfd_byte buffer[1];
 +  int status;
@@ -4391,9 +4269,7 @@ index 0000000000..32c0826cee
 +}
 +
 +static unsigned short
-+i51dis_op16 (addr, info)
-+     bfd_vma addr;
-+     disassemble_info *info;
++i51dis_op16 (bfd_vma addr, disassemble_info *info)
 +{
 +  bfd_byte buffer[2];
 +  int status;
@@ -4407,9 +4283,7 @@ index 0000000000..32c0826cee
 +}
 +
 +int
-+print_insn_i51(addr, info)
-+     bfd_vma addr;
-+     disassemble_info *info;
++print_insn_i51 (bfd_vma addr, disassemble_info *info)
 +{
 +  unsigned int insn;
 +  unsigned int opdata;
@@ -4477,7 +4351,6 @@ index 0000000000..32c0826cee
 +	case 'J':	//jump rel
 +	  opdata = i51dis_opcode (addr, info);
 +	  addr++;
-+//
 +	  rel_addr = opdata+2;
 +	  if (rel_addr & 0x80) {
 +	    sprintf (op1,".-0x%02X",0x100-rel_addr);
@@ -4535,7 +4408,6 @@ index 0000000000..32c0826cee
 +	case 'J':	//jump rel
 +	  opdata = i51dis_opcode (addr, info);
 +	  addr++;
-+//
 +	  rel_addr = opdata+2+offset;
 +	  if (rel_addr & 0x80) {
 +	    sprintf (op2,".-0x%02X",0x100-rel_addr);
@@ -4569,7 +4441,6 @@ index 0000000000..32c0826cee
 +	case 'J':	//jump rel
 +	  opdata = i51dis_opcode (addr, info);
 +	  addr++;
-+//
 +	  rel_addr = opdata+2+offset;
 +	  if (rel_addr & 0x80) {
 +	    sprintf (op3,".-0x%02X",0x100-rel_addr);
