@@ -18,23 +18,10 @@ import subprocess
 import sys
 import tempfile
 
-
-def hex_payload(record):
-    """Bytes carried by one Intel HEX data record."""
-    raw = bytes.fromhex(record[1:])
-    count = raw[0]
-    return raw[4:4 + count]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-def read_table(path):
-    out = []
-    for n, line in enumerate(open(path), 1):
-        line = line.strip()
-        if not line or line.startswith('#') or '|' not in line:
-            continue
-        src, rec = line.split('|', 1)
-        out.append((n, src.strip(), hex_payload(rec.strip())))
-    return out
+import dialect
 
 
 class Tools:
@@ -95,7 +82,8 @@ def main():
     ap.add_argument('--build', required=True, help='binutils build directory')
     ap.add_argument('--table', help='naken_asm style instruction|hex table')
     ap.add_argument('--program', help='assembly program to assemble')
-    ap.add_argument('--sed', help='dialect translation applied to --program first')
+    ap.add_argument('--dialect', action='store_true',
+                    help='rewrite --program from Intel/ASEM-51 spelling first')
     args = ap.parse_args()
 
     tools = Tools(args.build)
@@ -126,9 +114,8 @@ def main():
         if args.program:
             print('== program: %s' % os.path.basename(args.program))
             source = open(args.program, encoding='latin-1').read()
-            if args.sed:
-                source = subprocess.run(['sed', '-f', args.sed], input=source,
-                                        capture_output=True, text=True).stdout
+            if args.dialect:
+                source = dialect.translate(source)
             got = tools.assemble(source, work)
             if isinstance(got, str):
                 print('   FAILED: %s' % got)
