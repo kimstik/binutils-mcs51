@@ -1047,7 +1047,7 @@ new file mode 100644
 index 0000000000..edeee86421
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2641 @@
+@@ -0,0 +1,2679 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -1489,6 +1489,41 @@ index 0000000000..edeee86421
 +  return s;
 +}
 +
++
++/* Fold a `.bit' suffix on a numeric operand into a bit address.
++
++   Named bits (acc.7) resolve through the operand hash table, but a plain
++   number does not: expression () stops at the dot and leaves `.3' behind.
++   MCS-51 maps a byte address and bit number onto a single bit address -
++   0x20..0x2f are the bit-addressable RAM bytes, and an SFR is bit-addressable
++   when its address is a multiple of eight.  */
++
++static void
++i51_fold_bit_suffix (expressionS *exp)
++{
++  valueT addr;
++  int bit;
++
++  if (exp->X_op != O_constant
++      || input_line_pointer[0] != '.'
++      || input_line_pointer[1] < '0' || input_line_pointer[1] > '7')
++    return;
++
++  addr = exp->X_add_number;
++  bit = input_line_pointer[1] - '0';
++
++  if (addr >= 0x20 && addr <= 0x2f)
++    exp->X_add_number = (addr - 0x20) * 8 + bit;
++  else if (addr >= 0x80 && (addr & 7) == 0)
++    exp->X_add_number = addr + bit;
++  else
++    {
++      as_bad (_("0x%lx is not bit addressable"), (unsigned long) addr);
++      return;
++    }
++
++  input_line_pointer += 2;
++}
 +/* Extract one word from FROM and copy it to TO.  */
 +
 +static char *
@@ -2177,6 +2212,7 @@ index 0000000000..edeee86421
 +	}
 +      //PARSE EXPRESION 1
 +      expression (&op_expr1);
++i51_fold_bit_suffix (&op_expr1);
 +      if (op_expr1.X_op == O_absent)
 +	{
 +	  as_bad (_("missing operand 1"));
@@ -2334,6 +2370,7 @@ index 0000000000..edeee86421
 +	{
 +	  op1hlmode = op2hlmode;
 +	  expression (&op_expr1);
++i51_fold_bit_suffix (&op_expr1);
 +	  if (op_expr1.X_op == O_absent)
 +	    {
 +	      as_bad (_("missing operand 2"));
@@ -2369,6 +2406,7 @@ index 0000000000..edeee86421
 +      else
 +	{
 +	  expression (&op_expr2);
++	  i51_fold_bit_suffix (&op_expr2);
 +	  if (op_expr2.X_op == O_absent)
 +	    {
 +	      as_bad (_("missing operand 2"));
