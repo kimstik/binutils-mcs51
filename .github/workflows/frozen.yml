@@ -1,0 +1,41 @@
+name: frozen-2.11.2
+
+# The original port, built unchanged from the patches in tb/ref.7z and run against the testbench.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 1 * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib p7zip-full
+
+      - name: Record environment
+        run: |
+          gcc --version | head -1
+          patch --version | head -1
+          uname -a
+
+      - name: Build binutils 2.11.2 with the 2001 patches
+        run: make -C tb frozen
+
+      - name: Run the testbench
+        run: make -C tb check
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: frozen-2.11.2-results
+          path: |
+            work/tb/reference.md5
+            work/tb/results.md5
+            work/tb/*.log
+            work/frozen/sha256.txt

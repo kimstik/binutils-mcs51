@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.7z binary
+*.zip binary
+*.tar.gz binary
+# The 2001 patches are context diffs with era line endings - leave them byte-exact
+i51.patch.112n -text
+i51.patch.112p -text
+*.patch -text

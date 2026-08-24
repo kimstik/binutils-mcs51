@@ -1,0 +1,52 @@
+name: build
+
+# mcs51/additions.patch and mcs51/modifications.patch applied to
+# binutils, built, then verified against the testbench.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'mcs51/**'
+      - 'tb/**'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib p7zip-full
+
+      - name: Record environment
+        run: |
+          gcc --version | head -1
+          patch --version | head -1
+
+      - name: Build the port
+        run: make -C tb build
+
+      - name: Run the testbench
+        run: make -C tb check BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Collect the toolchain
+        run: |
+          cd work/modern/build
+          tar czf "$GITHUB_WORKSPACE/i51-binutils-linux.tar.gz" \
+            gas/as-new ld/ld-new binutils/objcopy binutils/objdump binutils/ar \
+            binutils/nm-new binutils/strip-new binutils/readelf binutils/size
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: i51-binutils
+          path: |
+            i51-binutils-linux.tar.gz
+            work/tb/reference.md5
+            work/tb/results.md5
+            work/tb/*.log
+            work/modern/sha256.txt

@@ -1,0 +1,5 @@
+# Nothing produced by a build belongs in this repository
+work/
+*.o
+*.obj
+*.lst
