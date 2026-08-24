@@ -145,7 +145,7 @@ check:
 		fi; \
 	done
 	@echo "== disassembler"
-	@obj=$(WORK)/tb/projekt/diag/www8051.obj; \
+	@obj=$(WORK)/tb/projekt/diag/www8051.o; \
 	$(BUILD)/binutils/readelf -h $$obj | grep -q MCS-51 || { echo "readelf does not recognise the machine"; exit 1; }; \
 	$(BUILD)/binutils/objdump -d $$obj | grep -qE '^ *[0-9a-f]+:' || { echo "objdump produced no instructions"; exit 1; }; \
 	echo "readelf names the machine, objdump decodes instructions"
