@@ -937,7 +937,7 @@ index 0000000000..43404ca1f4
 +}
 +
 +static bool
-+elf32_i51_add_symbol_hook (bfd *abfd, struct bfd_link_info *info, const Elf_Internal_Sym *sym, const char **namep, flagword *flagsp ATTRIBUTE_UNUSED, asection **secp, bfd_vma *valp)
++elf32_i51_add_symbol_hook (bfd *abfd, struct bfd_link_info *info, Elf_Internal_Sym *sym, const char **namep, flagword *flagsp ATTRIBUTE_UNUSED, asection **secp, bfd_vma *valp)
 +{
 +  switch (sym->st_shndx)
 +    {
