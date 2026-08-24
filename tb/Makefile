@@ -144,6 +144,11 @@ check:
 			printf '%-8s %5d %s\n' $$p 0 BUILD-FAILED >> $(WORK)/tb/results.md5; \
 		fi; \
 	done
+	@echo "== disassembler"
+	@obj=$(WORK)/tb/projekt/diag/www8051.obj; \
+	$(BUILD)/binutils/readelf -h $$obj | grep -q MCS-51 || { echo "readelf does not recognise the machine"; exit 1; }; \
+	$(BUILD)/binutils/objdump -d $$obj | grep -qE '^ *[0-9a-f]+:' || { echo "objdump produced no instructions"; exit 1; }; \
+	echo "readelf names the machine, objdump decodes instructions"
 	@echo "== comparison"
 	@fail=0; for p in $(PROJECTS); do \
 		want=$$(grep "^$$p " $(WORK)/tb/reference.md5 | tr -s ' ' | cut -d' ' -f2,3); \
