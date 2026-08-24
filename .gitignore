@@ -3,3 +3,6 @@ work/
 *.o
 *.obj
 *.lst
+
+# agent worktrees
+.claude/

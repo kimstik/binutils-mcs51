@@ -167,7 +167,8 @@ check:
 isa:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
 	python3 $(HERE)/isa_check.py --build $(BUILD) \
-		--table $(HERE)/isa/8051.txt --program $(HERE)/isa/testall.asm
+		--table $(HERE)/isa/8051.txt \
+		--program $(HERE)/isa/testall.asm --sed $(HERE)/isa/testall.sed
 
 # ------------------------------------------------------------------------- dist
 

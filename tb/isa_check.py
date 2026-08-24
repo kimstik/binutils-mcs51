@@ -95,6 +95,7 @@ def main():
     ap.add_argument('--build', required=True, help='binutils build directory')
     ap.add_argument('--table', help='naken_asm style instruction|hex table')
     ap.add_argument('--program', help='assembly program to assemble')
+    ap.add_argument('--sed', help='dialect translation applied to --program first')
     args = ap.parse_args()
 
     tools = Tools(args.build)
@@ -124,7 +125,11 @@ def main():
 
         if args.program:
             print('== program: %s' % os.path.basename(args.program))
-            got = tools.assemble(open(args.program).read(), work)
+            source = open(args.program, encoding='latin-1').read()
+            if args.sed:
+                source = subprocess.run(['sed', '-f', args.sed], input=source,
+                                        capture_output=True, text=True).stdout
+            got = tools.assemble(source, work)
             if isinstance(got, str):
                 print('   FAILED: %s' % got)
                 failures += 1
