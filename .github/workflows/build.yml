@@ -74,6 +74,10 @@ jobs:
         if: matrix.check == 'native'
         run: make -C tb check BUILD=$GITHUB_WORKSPACE/work/modern/build
 
+      - name: Instruction gate
+        if: matrix.check == 'native'
+        run: make -C tb isa BUILD=$GITHUB_WORKSPACE/work/modern/build
+
       - name: Smoke test under wine
         if: matrix.check == 'wine'
         run: |
