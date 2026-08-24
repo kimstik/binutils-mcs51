@@ -4,6 +4,8 @@
 #   make build               build the current port from mcs51/*.patch
 #   make check               build the ten projects and compare against the reference
 #   make check BUILD=<dir>   ... using a toolchain built elsewhere
+#   make dist                install the tools, strip them
+#   make refresh             regenerate the patches with current line numbers
 #   make libk80              rebuild libk80.a with uppercased symbols
 #   make clean
 #
@@ -20,11 +22,17 @@ HERE  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 WORK  ?= $(HERE)/../work
 BUILD ?= $(WORK)/frozen/build
 
-PORT_VERSION  ?= 2.45.1
+PORT_VERSION  ?= 2.47
 PORT_TARBALL  := binutils-$(PORT_VERSION).tar.xz
 PORT_URL      ?= https://ftp.gnu.org/gnu/binutils/$(PORT_TARBALL)
 PORT_SHA256   ?=
 TARGET        ?= i51-elf
+
+# Release builds are small: size-optimised, LTO, stripped. HOST empty means native.
+HOST          ?=
+OPTFLAGS      ?= -Os -flto -march=haswell
+AR_WRAP       ?= yes
+TOOLPREFIX    := $(if $(HOST),$(HOST)-,)
 
 PROJECTS := diag ds1620 ds1822 lcd led1 led2 led3 serial welcome wjava
 
@@ -36,7 +44,7 @@ TOOLS := mcs51-as:gas/as-new \
          mcs51-nm:binutils/nm-new \
          mcs51-strip:binutils/strip-new
 
-.PHONY: all frozen build check libk80 clean
+.PHONY: all frozen build check dist refresh libk80 clean
 
 all: frozen check
 
@@ -92,16 +100,19 @@ build:
 		cd $(WORK)/modern && echo "$(PORT_SHA256)  $(PORT_TARBALL)" | sha256sum -c -; \
 	fi
 	cd $(WORK)/modern && tar xf $(PORT_TARBALL)
+	cd $(WORK)/modern/binutils-$(PORT_VERSION) && git init -q && git add -A && \
+		git -c user.name=tb -c user.email=tb@local commit -qm pristine
 	cd $(WORK)/modern && patch --fuzz 3 -p1 -d binutils-$(PORT_VERSION) < $(HERE)/../mcs51/additions.patch
 	cd $(WORK)/modern && patch --fuzz 3 -p1 -d binutils-$(PORT_VERSION) < $(HERE)/../mcs51/modifications.patch
 	mkdir -p $(WORK)/modern/build
 	cd $(WORK)/modern/build && ../binutils-$(PORT_VERSION)/configure \
 		--target=$(TARGET) --prefix=$(WORK)/modern/toolchain \
-		--disable-nls --disable-werror --disable-gdb
+		$(if $(HOST),--host=$(HOST),) \
+		--disable-nls --disable-werror --disable-gdb --disable-shared \
+		CFLAGS="$(OPTFLAGS)" CXXFLAGS="$(OPTFLAGS)" LDFLAGS="-s" \
+		$(if $(AR_WRAP),AR=$(TOOLPREFIX)gcc-ar RANLIB=$(TOOLPREFIX)gcc-ranlib,)
 	cd $(WORK)/modern/build && $(MAKE) -j$$(nproc) MAKEINFO=true
-	# nothing else pulls in the emulation source
-	cd $(WORK)/modern/build/ld && $(MAKE) MAKEINFO=true eelf32i51.c
-	ls -l $(WORK)/modern/build/gas/as-new $(WORK)/modern/build/ld/ld-new
+	ls -l $(WORK)/modern/build/gas/as-new* $(WORK)/modern/build/ld/ld-new*
 
 # ------------------------------------------------------------------- testbench
 
@@ -142,6 +153,28 @@ check:
 	done; \
 	if [ $$fail -ne 0 ]; then echo "$$fail of 10 projects differ from the reference"; exit 1; fi; \
 	echo "all 10 projects match the reference"
+
+# ------------------------------------------------------------------------- dist
+
+# Install only the tools, drop the docs, strip what is left.
+dist:
+	cd $(WORK)/modern/build && $(MAKE) MAKEINFO=true install-gas install-ld install-binutils
+	rm -rf $(WORK)/modern/toolchain/share
+	$(TOOLPREFIX)strip $(WORK)/modern/toolchain/bin/* || true
+	du -sh $(WORK)/modern/toolchain
+	ls -l $(WORK)/modern/toolchain/bin
+
+# ---------------------------------------------------------------------- refresh
+
+# Regenerate the patches against the tree make build just patched, so hunks carry current
+# line numbers instead of accumulating offsets. Writes to work/refreshed, never to mcs51/.
+refresh:
+	@test -d $(WORK)/modern/binutils-$(PORT_VERSION)/.git || { echo "run make build first"; exit 2; }
+	mkdir -p $(WORK)/refreshed
+	cd $(WORK)/modern/binutils-$(PORT_VERSION) && git add -AN
+	cd $(WORK)/modern/binutils-$(PORT_VERSION) && git diff --diff-filter=A -- . > $(WORK)/refreshed/additions.patch
+	cd $(WORK)/modern/binutils-$(PORT_VERSION) && git diff --diff-filter=M -- . > $(WORK)/refreshed/modifications.patch
+	wc -l $(WORK)/refreshed/additions.patch $(WORK)/refreshed/modifications.patch
 
 # ----------------------------------------------------------------- maintenance
 
