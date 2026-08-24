@@ -3,6 +3,7 @@
 #   make frozen              build the original 2001 port from ref.7z
 #   make build               build the current port from mcs51/*.patch
 #   make check               build the ten projects and compare against the reference
+#   make isa                 instruction-level gate against third-party corpora
 #   make check BUILD=<dir>   ... using a toolchain built elsewhere
 #   make dist                install the tools, strip them
 #   make refresh             regenerate the patches with current line numbers
@@ -44,7 +45,7 @@ TOOLS := mcs51-as:gas/as-new \
          mcs51-nm:binutils/nm-new \
          mcs51-strip:binutils/strip-new
 
-.PHONY: all frozen build check dist refresh libk80 clean
+.PHONY: all frozen build check isa dist refresh libk80 clean
 
 all: frozen check
 
@@ -158,6 +159,15 @@ check:
 	done; \
 	if [ $$fail -ne 0 ]; then echo "$$fail of 10 projects differ from the reference"; exit 1; fi; \
 	echo "all 10 projects match the reference"
+
+# ---------------------------------------------------------------------- isa
+
+# Merge gate, not part of a release. 8051.txt carries golden bytes from an
+# unrelated assembler; testall.asm is a real program covering branches and tables.
+isa:
+	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
+	python3 $(HERE)/isa_check.py --build $(BUILD) \
+		--table $(HERE)/isa/8051.txt --program $(HERE)/isa/testall.asm
 
 # ------------------------------------------------------------------------- dist
 

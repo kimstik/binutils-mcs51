@@ -1,0 +1,25 @@
+name: gate
+
+# Instruction-level gate. Green here is the condition for merging into main.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  isa:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full
+
+      - name: Build the port
+        run: make -C tb build
+
+      - name: Instruction gate
+        run: make -C tb isa BUILD=$GITHUB_WORKSPACE/work/modern/build
