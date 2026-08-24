@@ -332,3 +332,74 @@ diff --git a/ld/Makefile.in b/ld/Makefile.in
  	eelf_s390.c \
  	eh8300elf.c \
  	eh8300elf_linux.c \
+diff --git a/opcodes/disassemble.c b/opcodes/disassemble.c
+--- a/opcodes/disassemble.c
++++ b/opcodes/disassemble.c
+@@ -55,6 +55,7 @@
+ #define ARCH_h8300
+ #define ARCH_hppa
+ #define ARCH_i386
++#define ARCH_i51
+ #define ARCH_ip2k
+ #define ARCH_iq2000
+ #define ARCH_kvx
+@@ -214,6 +215,11 @@
+       disassemble = print_insn_i386;
+       break;
+ #endif
++#ifdef ARCH_i51
++    case bfd_arch_i51:
++      disassemble = print_insn_i51;
++      break;
++#endif
+ #ifdef ARCH_ia64
+     case bfd_arch_ia64:
+       disassemble = print_insn_ia64;
+diff --git a/opcodes/disassemble.h b/opcodes/disassemble.h
+--- a/opcodes/disassemble.h
++++ b/opcodes/disassemble.h
+@@ -47,6 +47,7 @@
+ extern int print_insn_i386		(bfd_vma, disassemble_info *);
+ extern int print_insn_i386_att		(bfd_vma, disassemble_info *);
+ extern int print_insn_i386_intel	(bfd_vma, disassemble_info *);
++extern int print_insn_i51		(bfd_vma, disassemble_info *);
+ extern int print_insn_ia64		(bfd_vma, disassemble_info *);
+ extern int print_insn_ip2k		(bfd_vma, disassemble_info *);
+ extern int print_insn_iq2000		(bfd_vma, disassemble_info *);
+diff --git a/binutils/readelf.c b/binutils/readelf.c
+--- a/binutils/readelf.c
++++ b/binutils/readelf.c
+@@ -117,6 +117,7 @@
+ #include "elf/h8.h"
+ #include "elf/hppa.h"
+ #include "elf/i386.h"
++#include "elf/i51.h"
+ #include "elf/i370.h"
+ #include "elf/i860.h"
+ #include "elf/i960.h"
+@@ -1282,6 +1283,7 @@
+     case EM_ARC_COMPACT2:
+     case EM_ARC_COMPACT3:
+     case EM_ARC_COMPACT3_64:
++    case EM_I51:
+     case EM_AVR:
+     case EM_AVR_OLD:
+     case EM_BLACKFIN:
+@@ -2382,6 +2384,9 @@
+ 	case EM_AVR:
+ 	case EM_AVR_OLD:
+ 	  rtype = elf_avr_reloc_type (type);
++	  break;
++	case EM_I51:
++	  rtype = elf_i51_reloc_type (type);
+ 	  break;
+ 
+ 	case EM_OLD_SPARCV9:
+@@ -3671,6 +3676,7 @@
+     case EM_PRISM:		return "Vitesse Prism";
+     case EM_AVR_OLD:
+     case EM_AVR:		return "Atmel AVR 8-bit microcontroller";
++    case EM_I51:		return "MCS-51 8-bit microcontroller";
+     case EM_CYGNUS_FR30:
+     case EM_FR30:		return "Fujitsu FR30";
+     case EM_CYGNUS_D10V:
