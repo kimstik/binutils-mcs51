@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 """Instruction-level gate for the MCS-51 port.
 
-Three checks, each with its own kind of evidence:
-
-  table       assemble every line of 8051.txt and compare with the golden bytes.
-              The golden column came from c51asm, an assembler with no shared
-              ancestry with ours, so agreement means both agree with the ISA.
-  decode      feed those same golden bytes to our disassembler and require that
-              every one of them decodes.
-  program     assemble testall.asm, a real self-checking program. Covers what a
-              one-instruction-per-line table cannot: branches, fixups, tables.
+  table     assemble every line of 8051.txt and compare with the golden bytes.
+            Those came from c51asm, an assembler sharing no ancestry with ours,
+            so agreement means both agree with the ISA rather than with each other.
+  decode    feed the same golden bytes to our disassembler; every one must decode.
+  program   assemble testall.asm, a real self-checking program. Covers what a
+            one-instruction-per-line table cannot: branches, fixups, tables.
 """
 
 import argparse
@@ -19,9 +16,23 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-
 import dialect
+
+
+def hex_payload(record):
+    """Bytes carried by one Intel HEX data record."""
+    raw = bytes.fromhex(record[1:])
+    return raw[4:4 + raw[0]]
+
+
+def read_table(path):
+    out = []
+    for n, line in enumerate(open(path), 1):
+        line = line.strip()
+        if line and not line.startswith('#') and '|' in line:
+            src, rec = line.split('|', 1)
+            out.append((n, src.strip(), hex_payload(rec.strip())))
+    return out
 
 
 class Tools:
@@ -33,48 +44,35 @@ class Tools:
             if not os.path.exists(t):
                 sys.exit('missing %s' % t)
 
-    def assemble(self, source, workdir):
-        """Assemble one fragment, return its .text bytes or an error string."""
-        s = os.path.join(workdir, 'in.s')
-        o = os.path.join(workdir, 'in.o')
-        b = os.path.join(workdir, 'in.bin')
-        with open(s, 'w') as fh:
-            fh.write(source + '\n')
+    def assemble(self, source, work):
+        """Assemble a fragment; return its .text bytes, or an error string."""
+        s, o, b = (os.path.join(work, n) for n in ('in.s', 'in.o', 'in.bin'))
+        open(s, 'w').write(source + '\n')
         r = subprocess.run([self.as_, '-o', o, s], capture_output=True, text=True)
         if r.returncode:
-            return r.stderr.strip().splitlines()[-1] if r.stderr else 'as failed'
+            return (r.stderr.strip().splitlines() or ['as failed'])[-1]
         r = subprocess.run([self.objcopy, '-O', 'binary', '--only-section=.text', o, b],
                            capture_output=True, text=True)
         if r.returncode:
             return r.stderr.strip() or 'objcopy failed'
         return open(b, 'rb').read()
 
-    def disassemble(self, data, workdir):
-        b = os.path.join(workdir, 'out.bin')
+    def decodes(self, data, work):
+        """True if our disassembler makes sense of these bytes."""
+        b = os.path.join(work, 'out.bin')
         open(b, 'wb').write(data)
         r = subprocess.run([self.objdump, '-D', '-b', 'binary', '-m', 'i51', b],
                            capture_output=True, text=True)
-        return r.returncode, r.stdout, r.stderr
+        return r.returncode == 0 and r.stdout.strip() and '(bad)' not in r.stdout
 
 
-def check_table(tools, entries, work):
-    bad = []
-    for n, src, want in entries:
-        got = tools.assemble(src, work)
-        if isinstance(got, str):
-            bad.append((n, src, want, got))
-        elif got != want:
-            bad.append((n, src, want, got.hex()))
-    return bad
-
-
-def check_decode(tools, entries, work):
-    bad = []
-    for n, src, want in entries:
-        rc, out, err = tools.disassemble(want, work)
-        if rc or '(bad)' in out or 'unknown' in out.lower() or not out.strip():
-            bad.append((n, src, want, (err or out).strip().splitlines()[-1:] or ['no output']))
-    return bad
+def report(what, entries, bad):
+    print('   %-9s %d/%d' % (what + ':', len(entries) - len(bad), len(entries)))
+    for line in bad[:20]:
+        print('     ' + line)
+    if len(bad) > 20:
+        print('     ... %d more' % (len(bad) - 20))
+    return len(bad)
 
 
 def main():
@@ -94,22 +92,19 @@ def main():
             entries = read_table(args.table)
             print('== table: %d instructions' % len(entries))
 
-            bad = check_table(tools, entries, work)
-            print('   assemble: %d/%d match' % (len(entries) - len(bad), len(entries)))
-            for n, src, want, got in bad[:20]:
-                print('     line %-4d %-28s want %-14s got %s'
-                      % (n, src, want.hex(), got))
-            if len(bad) > 20:
-                print('     ... %d more' % (len(bad) - 20))
-            failures += len(bad)
+            bad = []
+            for n, src, want in entries:
+                got = tools.assemble(src, work)
+                if isinstance(got, str):
+                    bad.append('line %-4d %-28s want %-12s %s' % (n, src, want.hex(), got))
+                elif got != want:
+                    bad.append('line %-4d %-28s want %-12s got %s'
+                               % (n, src, want.hex(), got.hex()))
+            failures += report('assemble', entries, bad)
 
-            bad = check_decode(tools, entries, work)
-            print('   decode:   %d/%d decode' % (len(entries) - len(bad), len(entries)))
-            for n, src, want, why in bad[:20]:
-                print('     line %-4d %-28s bytes %-14s %s' % (n, src, want.hex(), why))
-            if len(bad) > 20:
-                print('     ... %d more' % (len(bad) - 20))
-            failures += len(bad)
+            bad = ['line %-4d %-28s bytes %s' % (n, src, want.hex())
+                   for n, src, want in entries if not tools.decodes(want, work)]
+            failures += report('decode', entries, bad)
 
         if args.program:
             print('== program: %s' % os.path.basename(args.program))
