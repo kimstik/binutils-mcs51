@@ -51,7 +51,7 @@ new file mode 100644
 index 0000000000..43404ca1f4
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1033 @@
+@@ -0,0 +1,990 @@
 +/* MCS-51 specific support for 32-bit ELF
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -81,10 +81,9 @@ index 0000000000..43404ca1f4
 +
 +static reloc_howto_type *bfd_elf32_bfd_reloc_type_lookup (bfd *abfd, bfd_reloc_code_real_type code);
 +static bool i51_info_to_howto_rela (bfd *, arelent *, Elf_Internal_Rela *);
-+static asection *elf32_i51_gc_mark_hook (asection *, struct bfd_link_info *, Elf_Internal_Rela *, struct elf_link_hash_entry *, Elf_Internal_Sym *);
 +static bool elf32_i51_check_relocs (bfd *, struct bfd_link_info *, asection *, const Elf_Internal_Rela *);
 +static bfd_reloc_status_type i51_final_link_relocate (reloc_howto_type *, bfd *, asection *, bfd_byte *, Elf_Internal_Rela *, bfd_vma);
-+static int elf32_i51_relocate_section (bfd *, struct bfd_link_info *, bfd *, asection *, bfd_byte *, Elf_Internal_Rela *, Elf_Internal_Sym *, asection **);
++static int elf32_i51_relocate_section (struct bfd_link_info *, bfd *, asection *, bfd_byte *, Elf_Internal_Rela *, Elf_Internal_Sym *, asection **);
 +static bool bfd_elf_i51_final_write_processing (bfd *);
 +static bool elf32_i51_object_p (bfd *);
 +void elf32_i51_symbol_processing (bfd *, asymbol *);
@@ -353,46 +352,6 @@ index 0000000000..43404ca1f4
 +  return 1;
 +}
 +
-+static asection *
-+elf32_i51_gc_mark_hook (sec, info, rel, h, sym)
-+     asection *sec;
-+     struct bfd_link_info *info ATTRIBUTE_UNUSED;
-+     Elf_Internal_Rela *rel;
-+     struct elf_link_hash_entry *h;
-+     Elf_Internal_Sym *sym;
-+{
-+  if (h != NULL)
-+    {
-+      switch (ELF32_R_TYPE (rel->r_info))
-+	{
-+	default:
-+	  switch (h->root.type)
-+	    {
-+	    case bfd_link_hash_defined:
-+	    case bfd_link_hash_defweak:
-+	      return h->root.u.def.section;
-+
-+	    case bfd_link_hash_common:
-+	      return h->root.u.c.p->section;
-+
-+	    default:
-+	      break;
-+	    }
-+	}
-+    }
-+  else
-+    {
-+      if (!(elf_bad_symtab (sec->owner)
-+	    && ELF_ST_BIND (sym->st_info) != STB_LOCAL)
-+	  && !((sym->st_shndx <= 0 || sym->st_shndx >= SHN_LORESERVE)
-+	       && sym->st_shndx != SHN_COMMON))
-+	{
-+	  return bfd_section_from_elf_index (sec->owner, sym->st_shndx);
-+	}
-+    }
-+  return NULL;
-+}
-+
 +/* Look through the relocs for a section during the first phase.
 +   Since we don't do .gots or .plts, we just need to consider the
 +   virtual table relocs for gc.  */
@@ -556,8 +515,7 @@ index 0000000000..43404ca1f4
 +
 +/* Relocate an I51 ELF section.  */
 +static int
-+elf32_i51_relocate_section (bfd *output_bfd ATTRIBUTE_UNUSED,
-+			     struct bfd_link_info *info,
++elf32_i51_relocate_section (struct bfd_link_info *info,
 +			     bfd *input_bfd,
 +			     asection *input_section,
 +			     bfd_byte *contents,
@@ -1071,7 +1029,6 @@ index 0000000000..43404ca1f4
 +#define elf_info_to_howto	             i51_info_to_howto_rela
 +#define elf_info_to_howto_rel	             NULL
 +#define elf_backend_relocate_section         elf32_i51_relocate_section
-+#define elf_backend_gc_mark_hook             elf32_i51_gc_mark_hook
 +#define elf_backend_check_relocs             elf32_i51_check_relocs
 +#define elf_backend_can_gc_sections          1
 +#define elf_backend_final_write_processing \
@@ -1090,7 +1047,7 @@ new file mode 100644
 index 0000000000..edeee86421
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2642 @@
+@@ -0,0 +1,2641 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -1228,8 +1185,8 @@ index 0000000000..edeee86421
 +
 +struct i51_opcodes_s
 +{
-+  char *name;
-+  char *args;
++  const char *name;
++  const char *args;
 +  int insn_size;		/* In bytes  */
 +  unsigned char mreloc;         /* modify & reloc mode */
 +  unsigned char bin_opcode;
@@ -1237,7 +1194,7 @@ index 0000000000..edeee86421
 +
 +struct i51_directop_s
 +{
-+  char *op;
++  const char *op;
 +  char ref;
 +  unsigned char value;
 +};
@@ -1955,7 +1912,6 @@ index 0000000000..edeee86421
 +	}
 +      fixp->fx_addnumber = value;
 +    }
-+  return 0;
 +}
 +
 +/* Turn a string in input_line_pointer into a floating point constant
@@ -2049,7 +2005,7 @@ index 0000000000..edeee86421
 +static void
 +i51_local (int ignore ATTRIBUTE_UNUSED)
 +{
-+  char *name;
++  const char *name;
 +  char c;
 +  char opname[256];
 +
@@ -2095,7 +2051,7 @@ index 0000000000..edeee86421
 +  if (oper == NULL) return 0;
 +  if ((oper->ref == 'D') || (oper->ref == 'B'))
 +    {
-+      return (symbol_new (name, absolute_section, oper->value, &zero_address_frag));
++      return (symbol_new (name, absolute_section, &zero_address_frag, oper->value));
 +    }
 +  else if (oper->ref == 'U')
 +    {
@@ -2104,7 +2060,7 @@ index 0000000000..edeee86421
 +	  as_bad (_("missing .using"));
 +	  return 0;
 +	}
-+      return (symbol_new (name, absolute_section, regbank + oper->value, &zero_address_frag));
++      return (symbol_new (name, absolute_section, &zero_address_frag, regbank + oper->value));
 +    }
 +  else return 0;
 +}
@@ -2697,7 +2653,7 @@ index 0000000000..edeee86421
 +	/* Now create an 8-bit fixup.  If there was some %hi or %lo
 +	 modifier, generate the reloc accordingly.  */
 +	fix_new_exp (frag_now, f - frag_now->fr_literal, 1,
-+		     oper, FALSE,
++		     oper, false,
 +		     ((opmode & I51_OP_HIGH_ADDR)
 +		      ? BFD_RELOC_I51_8_HIGH
 +		      : ((opmode & I51_OP_LOW_ADDR)
@@ -2707,13 +2663,13 @@ index 0000000000..edeee86421
 +      case I51_OP_JUMP_REL:
 +	/* Now create an 8-bit relative jump fixup */
 +	fix_new_exp (frag_now, f - frag_now->fr_literal, 1,
-+		     oper, TRUE, BFD_RELOC_I51_7_PCREL);
++		     oper, true, BFD_RELOC_I51_7_PCREL);
 +	number_to_chars_bigendian (f, 0, 1);
 +	break;
 +      case I51_OP_BIT:
 +	/* Now create an 8-bit bit B2B area fixup */
 +	fix_new_exp (frag_now, f - frag_now->fr_literal, 1,
-+		     oper, FALSE,
++		     oper, false,
 +		     (opmode & I51_OP_B2B 
 +		      ? BFD_RELOC_I51_8_B2B : BFD_RELOC_I51_8_BIT));
 +	number_to_chars_bigendian (f, (opmode & I51_OP_B2B
@@ -2755,7 +2711,7 @@ index 0000000000..edeee86421
 +      case I51_OP_JUMP_INPAGE:
 +	/* Now create an 11-bit inpage jump fixup */
 +	fix_new_exp (frag_now, f - frag_now->fr_literal, 1,
-+		     oper, FALSE,BFD_RELOC_I51_11);
++		     oper, false,BFD_RELOC_I51_11);
 +	number_to_chars_bigendian (f, (opcode << 8), 2);
 +	break;
 +      }
@@ -2794,7 +2750,7 @@ index 0000000000..edeee86421
 +      /* Now create a 16-bit fixup.  */
 +      fixp = fix_new_exp (frag_now, f - frag_now->fr_literal, 2,
 +			  oper,
-+			  FALSE,
++			  false,
 +			  BFD_RELOC_16);
 +      number_to_chars_bigendian (f, 0, 2);
 +    }
@@ -2850,7 +2806,7 @@ index 0000000000..edeee86421
 +
 +  if ((symbol_find (name) == NULL) && (md_undefined_symbol (name) == NULL))
 +    {
-+	symbolP = symbol_new (name, absolute_section, 0, &zero_address_frag);
++	symbolP = symbol_new (name, absolute_section, &zero_address_frag, 0);
 +	symbol_table_insert (symbolP);
 +    }
 +}
@@ -2881,7 +2837,7 @@ index 0000000000..edeee86421
 +i51_common (common_segment)
 +     int common_segment;
 +{
-+  char *name;
++  const char *name;
 +  char c;
 +  char *p;
 +  int temp, size;
@@ -3460,7 +3416,7 @@ index 0000000000..edeee86421
 +	  /* Now create a 8-bit fixup. */
 +	  fixp = fix_new_exp (frag_now, f - frag_now->fr_literal, 1,
 +			      oper,
-+			      FALSE,
++			      false,
 +			      BFD_RELOC_8);
 +	  number_to_chars_bigendian (f, 0, 1);
 +	}
@@ -3481,7 +3437,7 @@ index 0000000000..edeee86421
 +	  /* Now create a 8-bit fixup. */
 +	  fixp = fix_new_exp (frag_now, f - frag_now->fr_literal, 1,
 +			      oper,
-+			      FALSE,
++			      false,
 +			      BFD_RELOC_8);
 +	  number_to_chars_bigendian (f, -1, 1);
 +	}
@@ -3507,7 +3463,7 @@ index 0000000000..edeee86421
 +	/* Now create a 16-bit fixup. */
 +	fixp = fix_new_exp (frag_now, f - frag_now->fr_literal, 2,
 +			    oper,
-+			    FALSE,
++			    false,
 +			    BFD_RELOC_16);
 +	number_to_chars_bigendian (f, 0, 2);
 +      }
@@ -3533,7 +3489,7 @@ index 0000000000..edeee86421
 +	/* Now create a 16-bit fixup. */
 +	fixp = fix_new_exp (frag_now, f - frag_now->fr_literal, 2,
 +			    oper,
-+			    FALSE,
++			    false,
 +			    BFD_RELOC_16);
 +	number_to_chars_bigendian (f, 0, 2);
 +      }
@@ -3714,7 +3670,7 @@ index 0000000000..edeee86421
 +      /* Now create a 13-bit fixup.  */
 +      fixp = fix_new_exp (frag_now, f - frag_now->fr_literal, 2,
 +			  &op_expr1,
-+			  FALSE,
++			  false,
 +			  BFD_RELOC_I51_13_PCODE);
 +      number_to_chars_bigendian (f, temppflags, 2);
 +    }
@@ -4364,8 +4320,8 @@ index 0000000000..32c0826cee
 +
 +struct i51_opcodes_s
 +{
-+  char *name;
-+  char *args;
++  const char *name;
++  const char *args;
 +  int insn_size;		/* in bytes */
 +  unsigned char bin_opcode;
 +  unsigned char bin_mask;

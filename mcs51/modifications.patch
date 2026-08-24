@@ -321,3 +321,14 @@ index e31ddde9e5..9b80e815be 100644
  	bfd_ia64_arch)		ta="$ta ia64-dis.lo ia64-opc.lo" ;;
  	bfd_ip2k_arch)		ta="$ta ip2k-asm.lo ip2k-desc.lo ip2k-dis.lo ip2k-ibld.lo ip2k-opc.lo" using_cgen=yes ;;
  	bfd_epiphany_arch)	ta="$ta epiphany-asm.lo epiphany-desc.lo epiphany-dis.lo epiphany-ibld.lo epiphany-opc.lo" using_cgen=yes ;;
+diff --git a/ld/Makefile.in b/ld/Makefile.in
+--- a/ld/Makefile.in
++++ b/ld/Makefile.in
+@@ -797,6 +797,7 @@
+ 	eelf_i386_sol2.c \
+ 	eelf_i386_vxworks.c \
+ 	eelf_iamcu.c \
++	eelf32i51.c \
+ 	eelf_s390.c \
+ 	eh8300elf.c \
+ 	eh8300elf_linux.c \
