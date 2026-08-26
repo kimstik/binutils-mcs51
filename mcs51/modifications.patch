@@ -1,8 +1,16 @@
 diff --git a/bfd/Makefile.am b/bfd/Makefile.am
-index 4987ac9ccc..9cba52af2c 100644
+index e4df0544..590f079c 100644
 --- a/bfd/Makefile.am
 +++ b/bfd/Makefile.am
-@@ -200,6 +200,7 @@ ALL_MACHINES_CFILES = \
+@@ -117,6 +117,7 @@ ALL_MACHINES = \
+ 	cpu-h8300.lo \
+ 	cpu-hppa.lo \
+ 	cpu-i386.lo \
++	cpu-i51.lo \
+ 	cpu-ia64.lo \
+ 	cpu-iamcu.lo \
+ 	cpu-ip2k.lo \
+@@ -200,6 +201,7 @@ ALL_MACHINES_CFILES = \
  	cpu-h8300.c \
  	cpu-hppa.c \
  	cpu-i386.c \
@@ -10,7 +18,15 @@ index 4987ac9ccc..9cba52af2c 100644
  	cpu-ia64.c \
  	cpu-iamcu.c \
  	cpu-ip2k.c \
-@@ -448,6 +449,7 @@ BFD32_BACKENDS_CFILES = \
+@@ -315,6 +317,7 @@ BFD32_BACKENDS = \
+ 	elf32-h8300.lo \
+ 	elf32-hppa.lo \
+ 	elf32-i386.lo \
++	elf32-i51.lo \
+ 	elf32-ip2k.lo \
+ 	elf32-iq2000.lo \
+ 	elf32-lm32.lo \
+@@ -450,6 +453,7 @@ BFD32_BACKENDS_CFILES = \
  	elf32-h8300.c \
  	elf32-hppa.c \
  	elf32-i386.c \
@@ -18,8 +34,60 @@ index 4987ac9ccc..9cba52af2c 100644
  	elf32-ip2k.c \
  	elf32-iq2000.c \
  	elf32-lm32.c \
+diff --git a/bfd/Makefile.in b/bfd/Makefile.in
+index 14512cf6..fdebc811 100644
+--- a/bfd/Makefile.in
++++ b/bfd/Makefile.in
+@@ -585,6 +585,7 @@ ALL_MACHINES = \
+ 	cpu-h8300.lo \
+ 	cpu-hppa.lo \
+ 	cpu-i386.lo \
++	cpu-i51.lo \
+ 	cpu-ia64.lo \
+ 	cpu-iamcu.lo \
+ 	cpu-ip2k.lo \
+@@ -668,6 +669,7 @@ ALL_MACHINES_CFILES = \
+ 	cpu-h8300.c \
+ 	cpu-hppa.c \
+ 	cpu-i386.c \
++	cpu-i51.c \
+ 	cpu-ia64.c \
+ 	cpu-iamcu.c \
+ 	cpu-ip2k.c \
+@@ -784,6 +786,7 @@ BFD32_BACKENDS = \
+ 	elf32-h8300.lo \
+ 	elf32-hppa.lo \
+ 	elf32-i386.lo \
++	elf32-i51.lo \
+ 	elf32-ip2k.lo \
+ 	elf32-iq2000.lo \
+ 	elf32-lm32.lo \
+@@ -919,6 +922,7 @@ BFD32_BACKENDS_CFILES = \
+ 	elf32-h8300.c \
+ 	elf32-hppa.c \
+ 	elf32-i386.c \
++	elf32-i51.c \
+ 	elf32-ip2k.c \
+ 	elf32-iq2000.c \
+ 	elf32-lm32.c \
+@@ -1497,6 +1501,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-h8300.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-hppa.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-i386.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-i51.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-ia64.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-iamcu.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-ip2k.Plo@am__quote@
+@@ -1592,6 +1597,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-h8300.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-hppa.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-i386.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-i51.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-ia64.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-ip2k.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-iq2000.Plo@am__quote@
 diff --git a/bfd/archures.c b/bfd/archures.c
-index fd22c94d6d..4efb255af4 100644
+index 0e919246..a17bc3d0 100644
 --- a/bfd/archures.c
 +++ b/bfd/archures.c
 @@ -210,6 +210,7 @@ DESCRIPTION
@@ -30,7 +98,7 @@ index fd22c94d6d..4efb255af4 100644
  .  bfd_arch_romp,      {* IBM ROMP PC/RT.  *}
  .  bfd_arch_convex,    {* Convex.  *}
  .  bfd_arch_m98k,      {* Motorola 98xxx.  *}
-@@ -649,6 +650,7 @@ extern const bfd_arch_info_type bfd_h8300_arch;
+@@ -665,6 +666,7 @@ extern const bfd_arch_info_type bfd_h8300_arch;
  extern const bfd_arch_info_type bfd_hppa_arch;
  extern const bfd_arch_info_type bfd_i386_arch;
  extern const bfd_arch_info_type bfd_iamcu_arch;
@@ -38,7 +106,7 @@ index fd22c94d6d..4efb255af4 100644
  extern const bfd_arch_info_type bfd_ia64_arch;
  extern const bfd_arch_info_type bfd_ip2k_arch;
  extern const bfd_arch_info_type bfd_iq2000_arch;
-@@ -737,6 +739,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
+@@ -753,6 +755,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
      &bfd_hppa_arch,
      &bfd_i386_arch,
      &bfd_iamcu_arch,
@@ -47,10 +115,10 @@ index fd22c94d6d..4efb255af4 100644
      &bfd_ip2k_arch,
      &bfd_iq2000_arch,
 diff --git a/bfd/bfd-in2.h b/bfd/bfd-in2.h
-index bcff44a0f4..c708ee7568 100644
+index e49d6731..e760b812 100644
 --- a/bfd/bfd-in2.h
 +++ b/bfd/bfd-in2.h
-@@ -1431,6 +1431,7 @@ enum bfd_architecture
+@@ -1467,6 +1467,7 @@ enum bfd_architecture
  #define bfd_mach_iamcu                 (1 << 8)
  #define bfd_mach_i386_iamcu            (bfd_mach_i386_i386 | bfd_mach_iamcu)
  #define bfd_mach_i386_iamcu_intel_syntax (bfd_mach_i386_iamcu | bfd_mach_i386_intel_syntax)
@@ -58,7 +126,7 @@ index bcff44a0f4..c708ee7568 100644
    bfd_arch_romp,      /* IBM ROMP PC/RT.  */
    bfd_arch_convex,    /* Convex.  */
    bfd_arch_m98k,      /* Motorola 98xxx.  */
-@@ -5265,6 +5266,39 @@ enum bfd_reloc_code_real
+@@ -5190,6 +5191,39 @@ enum bfd_reloc_code_real
       as a global register.  It does not modify contents.  */
    BFD_RELOC_MMIX_LOCAL,
  
@@ -99,49 +167,49 @@ index bcff44a0f4..c708ee7568 100644
       short offset into 7 bits.  */
    BFD_RELOC_AVR_7_PCREL,
 diff --git a/bfd/config.bfd b/bfd/config.bfd
-index 4e5a838fe4..e50b2d6371 100644
+index 02a1a685..3259c8e3 100644
 --- a/bfd/config.bfd
 +++ b/bfd/config.bfd
-@@ -349,6 +349,10 @@ case "${targ}" in
+@@ -644,6 +644,10 @@ case "${targ}" in
+     targ_underscore=yes
      ;;
- #endif /* BFD64 */
  
 +  i51-*-*)
-+    targ_defvec=bfd_elf32_i51_vec
++    targ_defvec=i51_elf32_vec
 +    ;;
 +
-   am33_2.0-*-linux*)
-     targ_defvec=am33_elf32_linux_vec
-     ;;
+   ia16-*-elf)
+     targ_defvec=i386_elf32_vec
+     targ_selvecs="i386_msdos_vec i386_aout_vec"
 diff --git a/bfd/configure b/bfd/configure
-index 435b8e2071..49754952ec 100755
+index 1b829384..45bd29fd 100755
 --- a/bfd/configure
 +++ b/bfd/configure
-@@ -15568,6 +15568,7 @@ do
+@@ -15940,6 +15940,7 @@ do
      i386_pe_big_vec)		 tb="$tb pe-i386.lo peigen.lo $coff" ;;
      i386_pei_vec)		 tb="$tb pei-i386.lo peigen.lo $coff" ;;
      iamcu_elf32_vec)		 tb="$tb elf32-i386.lo $elfxx_x86 elf32.lo $elf" ;;
-+    bfd_elf32_i51_vec)		 tb="$tb elf32-i51.lo elf32.lo $elf" ;;
++    i51_elf32_vec)		 tb="$tb elf32-i51.lo elf32.lo $elf" ;;
      ia64_elf32_be_vec)		 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
      ia64_elf32_hpux_be_vec)	 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
      ia64_elf64_be_vec)		 tb="$tb elf64-ia64.lo elfxx-ia64.lo elf64.lo $elf"; target_size=64 ;;
 diff --git a/bfd/configure.ac b/bfd/configure.ac
-index 5879a04785..c79f691940 100644
+index c30a75ba..0c628f12 100644
 --- a/bfd/configure.ac
 +++ b/bfd/configure.ac
-@@ -493,6 +493,7 @@ do
+@@ -481,6 +481,7 @@ do
      i386_pe_big_vec)		 tb="$tb pe-i386.lo peigen.lo $coff" ;;
      i386_pei_vec)		 tb="$tb pei-i386.lo peigen.lo $coff" ;;
      iamcu_elf32_vec)		 tb="$tb elf32-i386.lo $elfxx_x86 elf32.lo $elf" ;;
-+    bfd_elf32_i51_vec)		 tb="$tb elf32-i51.lo elf32.lo $elf" ;;
++    i51_elf32_vec)		 tb="$tb elf32-i51.lo elf32.lo $elf" ;;
      ia64_elf32_be_vec)		 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
      ia64_elf32_hpux_be_vec)	 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
      ia64_elf64_be_vec)		 tb="$tb elf64-ia64.lo elfxx-ia64.lo elf64.lo $elf"; target_size=64 ;;
 diff --git a/bfd/libbfd.h b/bfd/libbfd.h
-index bab1f71f7e..4bd2372ecc 100644
+index 27bc0875..1f476b07 100644
 --- a/bfd/libbfd.h
 +++ b/bfd/libbfd.h
-@@ -2383,6 +2383,17 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
+@@ -2252,6 +2252,17 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
    "BFD_RELOC_MMIX_REG",
    "BFD_RELOC_MMIX_BASE_PLUS_OFFSET",
    "BFD_RELOC_MMIX_LOCAL",
@@ -159,11 +227,31 @@ index bab1f71f7e..4bd2372ecc 100644
    "BFD_RELOC_AVR_7_PCREL",
    "BFD_RELOC_AVR_13_PCREL",
    "BFD_RELOC_AVR_16_PM",
+diff --git a/bfd/po/SRC-POTFILES.in b/bfd/po/SRC-POTFILES.in
+index 40632924..da8a9f21 100644
+--- a/bfd/po/SRC-POTFILES.in
++++ b/bfd/po/SRC-POTFILES.in
+@@ -64,6 +64,7 @@ cpu-h8300.c
+ cpu-h8300.h
+ cpu-hppa.c
+ cpu-i386.c
++cpu-i51.c
+ cpu-ia64.c
+ cpu-iamcu.c
+ cpu-ip2k.c
+@@ -176,6 +177,7 @@ elf32-h8300.c
+ elf32-hppa.c
+ elf32-hppa.h
+ elf32-i386.c
++elf32-i51.c
+ elf32-ip2k.c
+ elf32-iq2000.c
+ elf32-lm32.c
 diff --git a/bfd/reloc.c b/bfd/reloc.c
-index c9d53bb9e1..283624bf20 100644
+index 6b9e00da..d689e2c4 100644
 --- a/bfd/reloc.c
 +++ b/bfd/reloc.c
-@@ -4769,6 +4769,51 @@ ENUMDOC
+@@ -4484,6 +4484,51 @@ ENUMDOC
    This relocation is an assertion that the expression is not allocated
    as a global register.  It does not modify contents.
  
@@ -216,14 +304,14 @@ index c9d53bb9e1..283624bf20 100644
    BFD_RELOC_AVR_7_PCREL
  ENUMDOC
 diff --git a/bfd/targets.c b/bfd/targets.c
-index 23333701ec..a344f9ee87 100644
+index fcf65041..3e7e30c6 100644
 --- a/bfd/targets.c
 +++ b/bfd/targets.c
-@@ -757,6 +757,7 @@ extern const bfd_target i386_pe_vec;
+@@ -759,6 +759,7 @@ extern const bfd_target i386_pe_vec;
  extern const bfd_target i386_pe_big_vec;
  extern const bfd_target i386_pei_vec;
  extern const bfd_target iamcu_elf32_vec;
-+extern const bfd_target bfd_elf32_i51_vec;
++extern const bfd_target i51_elf32_vec;
  extern const bfd_target ia64_elf32_be_vec;
  extern const bfd_target ia64_elf32_hpux_be_vec;
  extern const bfd_target ia64_elf64_be_vec;
@@ -231,12 +319,52 @@ index 23333701ec..a344f9ee87 100644
  	&i386_pei_vec,
  
  	&iamcu_elf32_vec,
-+	&bfd_elf32_i51_vec,
++	&i51_elf32_vec,
  
  #ifdef BFD64
  	&bpf_elf64_be_vec,
+diff --git a/binutils/readelf.c b/binutils/readelf.c
+index 1f7a90e7..b0055624 100644
+--- a/binutils/readelf.c
++++ b/binutils/readelf.c
+@@ -117,6 +117,7 @@
+ #include "elf/h8.h"
+ #include "elf/hppa.h"
+ #include "elf/i386.h"
++#include "elf/i51.h"
+ #include "elf/i370.h"
+ #include "elf/i860.h"
+ #include "elf/i960.h"
+@@ -1282,6 +1283,8 @@ guess_is_rela (unsigned int e_machine)
+     case EM_ARC_COMPACT2:
+     case EM_ARC_COMPACT3:
+     case EM_ARC_COMPACT3_64:
++    case EM_8051:
++    case EM_I51_OLD:
+     case EM_AVR:
+     case EM_AVR_OLD:
+     case EM_BLACKFIN:
+@@ -2383,6 +2386,10 @@ dump_relocations (Filedata *          filedata,
+ 	case EM_AVR_OLD:
+ 	  rtype = elf_avr_reloc_type (type);
+ 	  break;
++	case EM_8051:
++	case EM_I51_OLD:
++	  rtype = elf_i51_reloc_type (type);
++	  break;
+ 
+ 	case EM_OLD_SPARCV9:
+ 	case EM_SPARC32PLUS:
+@@ -3671,6 +3678,7 @@ get_machine_name (unsigned e_machine)
+     case EM_PRISM:		return "Vitesse Prism";
+     case EM_AVR_OLD:
+     case EM_AVR:		return "Atmel AVR 8-bit microcontroller";
++    case EM_I51_OLD:	return "MCS-51 8-bit microcontroller (legacy web51 value)";
+     case EM_CYGNUS_FR30:
+     case EM_FR30:		return "Fujitsu FR30";
+     case EM_CYGNUS_D10V:
 diff --git a/config.sub b/config.sub
-index 4aaae46f6f..41f155cb41 100755
+index 3d35cde1..3872bd70 100755
 --- a/config.sub
 +++ b/config.sub
 @@ -1317,6 +1317,7 @@ case $cpu-$vendor in
@@ -247,8 +375,48 @@ index 4aaae46f6f..41f155cb41 100755
  			| i860 \
  			| i960 \
  			| ia16 \
+diff --git a/gas/Makefile.am b/gas/Makefile.am
+index 9f90a1de..cdda0c90 100644
+--- a/gas/Makefile.am
++++ b/gas/Makefile.am
+@@ -164,6 +164,7 @@ TARGET_CPU_CFILES = \
+ 	config/tc-hppa.c \
+ 	config/tc-ia64.c \
+ 	config/tc-i386.c \
++	config/tc-i51.c \
+ 	config/tc-ip2k.c \
+ 	config/tc-iq2000.c \
+ 	config/tc-kvx.c \
+@@ -239,6 +240,7 @@ TARGET_CPU_HFILES = \
+ 	config/tc-hppa.h \
+ 	config/tc-ia64.h \
+ 	config/tc-i386.h \
++	config/tc-i51.h \
+ 	config/tc-ip2k.h \
+ 	config/tc-iq2000.h \
+ 	config/tc-kvx.h \
+diff --git a/gas/Makefile.in b/gas/Makefile.in
+index b2bb505c..7dcf6914 100644
+--- a/gas/Makefile.in
++++ b/gas/Makefile.in
+@@ -666,6 +666,7 @@ TARGET_CPU_CFILES = \
+ 	config/tc-hppa.c \
+ 	config/tc-ia64.c \
+ 	config/tc-i386.c \
++	config/tc-i51.c \
+ 	config/tc-ip2k.c \
+ 	config/tc-iq2000.c \
+ 	config/tc-kvx.c \
+@@ -741,6 +742,7 @@ TARGET_CPU_HFILES = \
+ 	config/tc-hppa.h \
+ 	config/tc-ia64.h \
+ 	config/tc-i386.h \
++	config/tc-i51.h \
+ 	config/tc-ip2k.h \
+ 	config/tc-iq2000.h \
+ 	config/tc-kvx.h \
 diff --git a/gas/configure.tgt b/gas/configure.tgt
-index 7c81bffa16..417dc1685c 100644
+index 7a5645fd..07546d74 100644
 --- a/gas/configure.tgt
 +++ b/gas/configure.tgt
 @@ -225,6 +225,8 @@ case ${generic_target} in
@@ -260,33 +428,78 @@ index 7c81bffa16..417dc1685c 100644
    i386-*-beospe*)			fmt=coff em=pe ;;
    i386-*-beos*)				fmt=elf ;;
    i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
+diff --git a/gas/po/POTFILES.in b/gas/po/POTFILES.in
+index c0ce2661..2df5eee5 100644
+--- a/gas/po/POTFILES.in
++++ b/gas/po/POTFILES.in
+@@ -82,6 +82,8 @@ config/tc-hppa.c
+ config/tc-hppa.h
+ config/tc-i386.c
+ config/tc-i386.h
++config/tc-i51.c
++config/tc-i51.h
+ config/tc-ia64.c
+ config/tc-ia64.h
+ config/tc-ip2k.c
 diff --git a/ld/Makefile.am b/ld/Makefile.am
-index ccff928992..c6ee2620be 100644
+index 3ae3d7f1..7d57bef0 100644
 --- a/ld/Makefile.am
 +++ b/ld/Makefile.am
-@@ -284,6 +284,7 @@ ALL_EMULATION_SOURCES = \
- 	eelf_i386_sol2.c \
- 	eelf_i386_vxworks.c \
- 	eelf_iamcu.c \
+@@ -235,6 +235,7 @@ ALL_EMULATION_SOURCES = \
+ 	eelf32frv.c \
+ 	eelf32frvfd.c \
+ 	eelf32ft32.c \
 +	eelf32i51.c \
- 	eelf_s390.c \
- 	eh8300elf.c \
- 	eh8300elf_linux.c \
+ 	eelf32ip2k.c \
+ 	eelf32iq10.c \
+ 	eelf32iq2000.c \
+diff --git a/ld/Makefile.in b/ld/Makefile.in
+index d879f04a..ae282e3e 100644
+--- a/ld/Makefile.in
++++ b/ld/Makefile.in
+@@ -750,6 +750,7 @@ ALL_EMULATION_SOURCES = \
+ 	eelf32frv.c \
+ 	eelf32frvfd.c \
+ 	eelf32ft32.c \
++	eelf32i51.c \
+ 	eelf32ip2k.c \
+ 	eelf32iq10.c \
+ 	eelf32iq2000.c \
+@@ -1376,6 +1377,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32frv.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32frvfd.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32ft32.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32i51.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32ip2k.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32iq10.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32iq2000.Po@am__quote@
 diff --git a/ld/configure.tgt b/ld/configure.tgt
-index ea01ccf9a1..a612f23771 100644
+index 60b62e69..699e1838 100644
 --- a/ld/configure.tgt
 +++ b/ld/configure.tgt
-@@ -337,6 +337,8 @@ h8300-*-linux*)
- 			targ_emul=h8300elf_linux;
- 			targ_extra_emuls="h8300helf_linux h8300self_linux h8300sxelf_linux"
+@@ -320,6 +320,8 @@ h8300-*-linux*)
+ 			targ_emul=h8300helf_linux;
+ 			targ_extra_emuls="h8300self_linux h8300sxelf_linux h8300elf_linux"
  			;;
 +i51-*-*)		targ_emul=elf32i51
 +			;;
  hppa*64*-*-linux-*)	targ_emul=hppa64linux
  			;;
  hppa*64*-hpux*)		targ_emul=elf64hppa
+diff --git a/ld/po/BLD-POTFILES.in b/ld/po/BLD-POTFILES.in
+index d7d0c517..133990ff 100644
+--- a/ld/po/BLD-POTFILES.in
++++ b/ld/po/BLD-POTFILES.in
+@@ -110,6 +110,7 @@ eelf32fr30.c
+ eelf32frv.c
+ eelf32frvfd.c
+ eelf32ft32.c
++eelf32i51.c
+ eelf32ip2k.c
+ eelf32iq10.c
+ eelf32iq2000.c
 diff --git a/opcodes/Makefile.am b/opcodes/Makefile.am
-index ef4b0dfb01..29a9fb914b 100644
+index a0fcf4d5..183b4d80 100644
 --- a/opcodes/Makefile.am
 +++ b/opcodes/Makefile.am
 @@ -156,6 +156,7 @@ TARGET32_LIBOPCODES_CFILES = \
@@ -297,11 +510,31 @@ index ef4b0dfb01..29a9fb914b 100644
  	ip2k-asm.c \
  	ip2k-desc.c \
  	ip2k-dis.c \
+diff --git a/opcodes/Makefile.in b/opcodes/Makefile.in
+index c5449beb..64d1ce68 100644
+--- a/opcodes/Makefile.in
++++ b/opcodes/Makefile.in
+@@ -562,6 +562,7 @@ TARGET32_LIBOPCODES_CFILES = \
+ 	h8300-dis.c \
+ 	hppa-dis.c \
+ 	i386-dis.c \
++	i51-dis.c \
+ 	ip2k-asm.c \
+ 	ip2k-desc.c \
+ 	ip2k-dis.c \
+@@ -933,6 +934,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/h8300-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hppa-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i386-dis.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i51-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ia64-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ia64-opc.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ip2k-asm.Plo@am__quote@
 diff --git a/opcodes/configure b/opcodes/configure
-index 210ec0741d..4b740f5cc7 100755
+index 8299ef7e..0db2cc72 100755
 --- a/opcodes/configure
 +++ b/opcodes/configure
-@@ -13971,6 +13971,7 @@ if test x${all_targets} = xfalse ; then
+@@ -14345,6 +14345,7 @@ if test x${all_targets} = xfalse ; then
  	bfd_hppa_arch)		ta="$ta hppa-dis.lo" ;;
  	bfd_i386_arch|bfd_iamcu_arch)
  				ta="$ta i386-dis.lo" ;;
@@ -310,10 +543,10 @@ index 210ec0741d..4b740f5cc7 100755
  	bfd_ip2k_arch)		ta="$ta ip2k-asm.lo ip2k-desc.lo ip2k-dis.lo ip2k-ibld.lo ip2k-opc.lo" using_cgen=yes ;;
  	bfd_epiphany_arch)	ta="$ta epiphany-asm.lo epiphany-desc.lo epiphany-dis.lo epiphany-ibld.lo epiphany-opc.lo" using_cgen=yes ;;
 diff --git a/opcodes/configure.ac b/opcodes/configure.ac
-index e31ddde9e5..9b80e815be 100644
+index 2c255659..025e1b8c 100644
 --- a/opcodes/configure.ac
 +++ b/opcodes/configure.ac
-@@ -285,6 +285,7 @@ if test x${all_targets} = xfalse ; then
+@@ -284,6 +284,7 @@ if test x${all_targets} = xfalse ; then
  	bfd_hppa_arch)		ta="$ta hppa-dis.lo" ;;
  	bfd_i386_arch|bfd_iamcu_arch)
  				ta="$ta i386-dis.lo" ;;
@@ -321,18 +554,8 @@ index e31ddde9e5..9b80e815be 100644
  	bfd_ia64_arch)		ta="$ta ia64-dis.lo ia64-opc.lo" ;;
  	bfd_ip2k_arch)		ta="$ta ip2k-asm.lo ip2k-desc.lo ip2k-dis.lo ip2k-ibld.lo ip2k-opc.lo" using_cgen=yes ;;
  	bfd_epiphany_arch)	ta="$ta epiphany-asm.lo epiphany-desc.lo epiphany-dis.lo epiphany-ibld.lo epiphany-opc.lo" using_cgen=yes ;;
-diff --git a/ld/Makefile.in b/ld/Makefile.in
---- a/ld/Makefile.in
-+++ b/ld/Makefile.in
-@@ -797,6 +797,7 @@
- 	eelf_i386_sol2.c \
- 	eelf_i386_vxworks.c \
- 	eelf_iamcu.c \
-+	eelf32i51.c \
- 	eelf_s390.c \
- 	eh8300elf.c \
- 	eh8300elf_linux.c \
 diff --git a/opcodes/disassemble.c b/opcodes/disassemble.c
+index 77d44bb0..eaedf137 100644
 --- a/opcodes/disassemble.c
 +++ b/opcodes/disassemble.c
 @@ -55,6 +55,7 @@
@@ -343,7 +566,7 @@ diff --git a/opcodes/disassemble.c b/opcodes/disassemble.c
  #define ARCH_ip2k
  #define ARCH_iq2000
  #define ARCH_kvx
-@@ -214,6 +215,11 @@
+@@ -214,6 +215,11 @@ disassembler (enum bfd_architecture a,
        disassemble = print_insn_i386;
        break;
  #endif
@@ -356,9 +579,10 @@ diff --git a/opcodes/disassemble.c b/opcodes/disassemble.c
      case bfd_arch_ia64:
        disassemble = print_insn_ia64;
 diff --git a/opcodes/disassemble.h b/opcodes/disassemble.h
+index 2157790c..0ec448a6 100644
 --- a/opcodes/disassemble.h
 +++ b/opcodes/disassemble.h
-@@ -47,6 +47,7 @@
+@@ -47,6 +47,7 @@ extern int print_insn_hppa		(bfd_vma, disassemble_info *);
  extern int print_insn_i386		(bfd_vma, disassemble_info *);
  extern int print_insn_i386_att		(bfd_vma, disassemble_info *);
  extern int print_insn_i386_intel	(bfd_vma, disassemble_info *);
@@ -366,40 +590,15 @@ diff --git a/opcodes/disassemble.h b/opcodes/disassemble.h
  extern int print_insn_ia64		(bfd_vma, disassemble_info *);
  extern int print_insn_ip2k		(bfd_vma, disassemble_info *);
  extern int print_insn_iq2000		(bfd_vma, disassemble_info *);
-diff --git a/binutils/readelf.c b/binutils/readelf.c
---- a/binutils/readelf.c
-+++ b/binutils/readelf.c
-@@ -117,6 +117,7 @@
- #include "elf/h8.h"
- #include "elf/hppa.h"
- #include "elf/i386.h"
-+#include "elf/i51.h"
- #include "elf/i370.h"
- #include "elf/i860.h"
- #include "elf/i960.h"
-@@ -1282,6 +1283,7 @@
-     case EM_ARC_COMPACT2:
-     case EM_ARC_COMPACT3:
-     case EM_ARC_COMPACT3_64:
-+    case EM_I51:
-     case EM_AVR:
-     case EM_AVR_OLD:
-     case EM_BLACKFIN:
-@@ -2382,6 +2384,9 @@
- 	case EM_AVR:
- 	case EM_AVR_OLD:
- 	  rtype = elf_avr_reloc_type (type);
-+	  break;
-+	case EM_I51:
-+	  rtype = elf_i51_reloc_type (type);
- 	  break;
- 
- 	case EM_OLD_SPARCV9:
-@@ -3671,6 +3676,7 @@
-     case EM_PRISM:		return "Vitesse Prism";
-     case EM_AVR_OLD:
-     case EM_AVR:		return "Atmel AVR 8-bit microcontroller";
-+    case EM_I51:		return "MCS-51 8-bit microcontroller";
-     case EM_CYGNUS_FR30:
-     case EM_FR30:		return "Fujitsu FR30";
-     case EM_CYGNUS_D10V:
+diff --git a/opcodes/po/POTFILES.in b/opcodes/po/POTFILES.in
+index c8f83622..4cd83ae1 100644
+--- a/opcodes/po/POTFILES.in
++++ b/opcodes/po/POTFILES.in
+@@ -66,6 +66,7 @@ ft32-opc.c
+ h8300-dis.c
+ hppa-dis.c
+ i386-dis.c
++i51-dis.c
+ i386-opc.h
+ ia64-asmtab.h
+ ia64-dis.c
