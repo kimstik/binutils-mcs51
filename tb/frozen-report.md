@@ -9,6 +9,15 @@ current port on binutils 2.47.
 
 Run 32857320527 on `work/frozen-data`, ubuntu-24.04.
 
+**The sizes in the two tables below are the reference ROMs as they stood
+before `*(reset_network)` was restored in `lib/www51.sc`.** They are three
+bytes short in eight projects and 34 bytes short in `lcd`, and they were left
+unchanged when `base.7z` was repacked with the restored script (commit
+93270ae, which changed `tb/base.7z` and `tb/reference.md5` and touched neither
+this file nor `tb/frozen.expect`). The tables are kept as those runs reported
+them; "Re-derived" at the end of this file carries the numbers as they stand,
+measured here rather than copied.
+
 ## Result
 
 | project | reference | frozen 2.11.2 | differing bytes |
@@ -142,9 +151,11 @@ reproduce base.7z's diag ROM by replaying base.7z's own command line.
 
 ## Status
 
-`frozen.yml` runs the check with `continue-on-error: true` and writes the table
-above into the job summary, so the workflow reports this without going red on
-every run. The reference ROMs were not adjusted and no failure is suppressed.
+`frozen.yml` still runs the testbench step with `continue-on-error: true` -
+the 2001 toolchain is not expected to reproduce the reference ROMs - but the
+comparison step after it does not: `romdiff.py --expect tb/frozen.expect` exits
+nonzero on any movement and that is the job's failure. The reference ROMs were
+not adjusted and no failure is suppressed.
 
 Reconciliation is deferred. The choice is between rebuilding base.7z's three
 re-assembled inputs so they carry the 2001 storage classes, accepting two
@@ -300,3 +311,84 @@ Closing the last 8 bytes therefore means deciding whether the port should carry
 that patch, which is a decision about how the port allocates RAM and not a bug
 to be fixed on the way past. It is left open here, and the reference ROMs were
 not adjusted to hide it.
+
+---
+
+# Re-derived, 2026-08-26
+
+Everything above was written against a tree in which `lib/www51.sc` still had
+`*(reset_network)` commented out. Both of its inputs have changed since:
+`tb/base.7z` carries the restored script and new reference ROMs, and the port
+itself has moved. `tb/frozen.expect` and this file were not touched, so they
+were describing a tree that no longer existed.
+
+They are not corrected by copying what the tree prints. The 2.11.2 toolchain
+was rebuilt and the comparison re-run:
+
+```
+$ gcc -m32 --version | head -1
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+$ make -C tb frozen                 # binutils 2.11.2 + tb/ref.7z, 32-bit
+$ make -C tb check-frozen           # ten projects, tb/base2001.7z overlay
+$ python3 tb/romdiff.py --reference work/refrom --produced work/tb \
+      --projects "$PROJECTS" --expect tb/frozen.expect
+```
+
+## What the rebuild produced
+
+| project | reference | frozen 2.11.2 | differing bytes | first |
+|---------|-----------|---------------|-----------------|-------|
+| diag    | 1267 B    | does not link | -               | -     |
+| ds1620  | 6284 B    | 6284 B        | 217             | 0x40  |
+| ds1822  | 6078 B    | 6078 B        | 225             | 0x40  |
+| lcd     | 5754 B    | 5754 B        | 214             | 0x40  |
+| led1    | 5173 B    | 5173 B        | 213             | 0x40  |
+| led2    | 5010 B    | 5010 B        | 214             | 0x40  |
+| led3    | 5200 B    | 5200 B        | 214             | 0x40  |
+| serial  | 8128 B    | 8128 B        | 325             | 0x40  |
+| welcome | 4812 B    | 4812 B        | 213             | 0x40  |
+| wjava   | 4812 B    | 4812 B        | 213             | 0x40  |
+
+Nine of ten still link and still produce a ROM of exactly the reference length.
+`diag` still fails on `_reti_` for the reason given above.
+
+The differing-byte counts came out byte for byte the ones already recorded -
+217/225/214/213/214/214/325/213/213 - and that is the expected result rather
+than a coincidence: `reset_network` is three bytes of `LCALL network_init` that
+both toolchains now emit identically, so both ROMs grew by the same three bytes
+in the same place and nothing new diverged. What moved is the length, and the
+length was the one number `frozen.expect` did not record.
+
+`frozen.expect` therefore now carries a third column, the ROM size, and
+`romdiff.py` rejects a line with fewer than three columns instead of defaulting
+the missing one. Against the pre-restore sizes it goes red on nine projects:
+
+```
+FAIL ds1620   differ 217 bytes differ, 6284 B ROM; recorded differ 217 6281
+FAIL lcd      differ 214 bytes differ, 5754 B ROM; recorded differ 214 5720
+...
+**9 project(s) moved away from the recorded frozen outcome.**
+```
+
+## The layout difference is unchanged
+
+Both maps re-read, frozen against the current port, all nine projects that
+link. `.text`, `.reg`, `.rbss`, `.bdata`, `.bbss`, `.bit`, `.bitbss`, `.data`,
+`.ibss` and `.eeprom` are identical in address and size on both sides. Two
+columns still move, and by the same amounts as before:
+
+| project | .bss size, frozen -> current | .idata address, frozen -> current |
+|---------|------------------------------|-----------------------------------|
+| ds1620  | 0x28 -> 0x30                 | 0x62 -> 0x6a                      |
+| ds1822  | 0x32 -> 0x3b                 | 0x6c -> 0x75                      |
+| lcd     | 0x27 -> 0x2f                 | 0x61 -> 0x69                      |
+| led1    | 0x27 -> 0x2f                 | 0x61 -> 0x69                      |
+| led2    | 0x27 -> 0x2f                 | 0x61 -> 0x69                      |
+| led3    | 0x27 -> 0x2f                 | 0x61 -> 0x69                      |
+| serial  | 0x27 -> 0x30                 | 0x65 -> 0x6e                      |
+| welcome | 0x27 -> 0x2f                 | 0x61 -> 0x69                      |
+| wjava   | 0x27 -> 0x2f                 | 0x61 -> 0x69                      |
+
+That is the common-alignment difference of "Why .bss is still bigger", intact.
+Nothing in this re-derivation closes it and nothing here was adjusted to hide
+it.

@@ -13,8 +13,9 @@ zero, so a plain cmp against it is worthless.  What it still pins exactly is the
 code layout: the length of every instruction, the low byte of every code address,
 and the size of .text.  This script compares against it structurally - it
 classifies every differing byte into one of the known 2001 relocation defects and
-fails when a byte fits none of them, or when a count moves away from what is
-recorded here.
+fails when a byte fits none of them, or when the size delta or ANY of the six
+byte-class counts moves away from what is recorded here - addr16, acall11,
+word16, pcode13, zero8 and residual alike, not the residual one alone.
 
 Classes, every one of them a 2001-side defect unless said otherwise:
 
@@ -68,26 +69,51 @@ import sys
 PROJECTS = ["diag", "ds1620", "ds1822", "lcd", "led1", "led2", "led3",
             "serial", "welcome", "wjava"]
 
-# oracle : size of the 2001 ROM decoded from www8051.hex.  A change here means
-#          the oracle itself was touched, which must never happen.
-# delta  : produced size minus oracle size.  Zero for the eight projects that
-#          share the 2001 layout; nonzero only where `reason` explains it.
-# res    : residual bytes - the common-alignment layout difference.  None where
-#          a nonzero delta makes a byte comparison meaningless.
+# Every column the table prints is pinned here, and every one of them is
+# gated.  The script used to compute addr16/acall11/word16/pcode13/zero8 and
+# then print them without comparing them against anything, so a fault that
+# moves bytes from one class into another - a 16-bit relocation written
+# little-endian moves them out of `addr16' and into `zero8' - left the verdict
+# at "all 10 projects agree" while `make check' went red on all ten projects.
+#
+# oracle   : size of the 2001 ROM decoded from www8051.hex.  A change here
+#            means the oracle itself was touched, which must never happen.
+# delta    : produced size minus oracle size.  Zero for the eight projects
+#            that share the 2001 layout; nonzero only where `reason'
+#            explains it.
+# counts   : the classification of every differing byte, all six buckets,
+#            exactly as a clean run produces them.  None where a nonzero
+#            delta makes a byte-for-byte walk meaningless, and then the
+#            buckets are not computed at all.
+#
+# These numbers come from a clean run of `make -C tb oracle'.  They are not to
+# be refreshed to whatever the tree currently prints: each is a joint property
+# of the frozen 2001 image on one side and of a correct port on the other, so
+# a moved count is a finding, not a stale expectation.
+
+
+def _c(addr16, acall11, word16, pcode13, zero8, residual):
+    return {"addr16": addr16, "acall11": acall11, "word16": word16,
+            "pcode13": pcode13, "zero8": zero8, "residual": residual}
+
+
+# The buckets, in the order the table prints them.  `residual' is one of them.
+CLASSES = ["addr16", "acall11", "word16", "pcode13", "zero8", "residual"]
+
 EXPECT = {
-    #           oracle  delta   res   reason
+    #           oracle  delta   every differing byte, by class          reason
     "diag":    (1264,      3,  None,
                 "2001 linked diag with ld's built-in i51 script, not www51.sc, "
                 "so its orphan reset_network never reached .text and objcopy -j "
                 ".text dropped it; base.7z's diag/Makefile adds --script.  diag "
                 "is the one project that calls network_init from its own main, "
                 "so the 2001 diag ROM works without those 3 bytes."),
-    "ds1620":  (6284,      0,    25, None),
-    "ds1822":  (6078,      0,    28, None),
-    "lcd":     (5754,      0,    27, None),
-    "led1":    (5173,      0,    25, None),
-    "led2":    (5010,      0,    25, None),
-    "led3":    (5200,      0,    25, None),
+    "ds1620":  (6284,      0,  _c(308, 1, 137, 25, 400, 25), None),
+    "ds1822":  (6078,      0,  _c(357, 1, 141, 22, 427, 28), None),
+    "lcd":     (5754,      0,  _c(321, 2, 137, 25, 422, 27), None),
+    "led1":    (5173,      0,  _c(279, 1, 133, 25, 398, 25), None),
+    "led2":    (5010,      0,  _c(281, 1, 135, 25, 422, 25), None),
+    "led3":    (5200,      0,  _c(283, 1, 137, 25, 444, 25), None),
     "serial":  (9647,  -1519,  None,
                 "2001 built index.html and setup.html with html2db.pl -cpurom "
                 "and without -index 0: 1530 bytes of HTML in the ROM, 8 bytes of "
@@ -95,8 +121,8 @@ EXPECT = {
                 "region www51.sc declares for the AT89S8252.  base.7z's "
                 "serial/Makefile moved them to -cpueeprom, which is why ours "
                 "fits and the 2001 image does not."),
-    "welcome": (4812,      0,    25, None),
-    "wjava":   (4812,      0,    25, None),
+    "welcome": (4812,      0,  _c(264, 1, 131, 25, 402, 25), None),
+    "wjava":   (4812,      0,  _c(264, 1, 131, 25, 402, 25), None),
 }
 
 
@@ -192,7 +218,7 @@ def main():
         oracle = read_ihex(hexpath)
         produced = open(rompath, "rb").read()
         delta = len(produced) - len(oracle)
-        want_oracle, want_delta, want_res, reason = EXPECT[p]
+        want_oracle, want_delta, want_counts, reason = EXPECT[p]
 
         if len(oracle) != want_oracle:
             failures.append("%s: the 2001 oracle decodes to %d bytes, recorded "
@@ -200,7 +226,7 @@ def main():
                             % (p, len(oracle), want_oracle))
 
         verdict = "ok"
-        counts = {k: 0 for k in ("addr16", "acall11", "word16", "pcode13", "zero8")}
+        counts = {k: 0 for k in CLASSES}
         residual = []
 
         if delta != want_delta:
@@ -208,20 +234,26 @@ def main():
             failures.append("%s: produced %d bytes against the 2001 oracle's %d "
                             "(delta %+d, recorded %+d)"
                             % (p, len(produced), len(oracle), delta, want_delta))
-        elif want_res is None:
+        elif want_counts is None:
             verdict = "explained %+d" % delta
             notes.append("%s: %+d bytes, explained - %s" % (p, delta, reason))
         else:
             counts, residual = classify(oracle, produced)
-            if len(residual) != want_res:
-                verdict = "RESIDUAL %+d" % (len(residual) - want_res)
-                failures.append("%s: %d residual bytes, recorded %d"
-                                % (p, len(residual), want_res))
+            counts["residual"] = len(residual)
+            # Every bucket is gated, not just the residual one.  A byte that
+            # moves from one class to another is a change in what the port
+            # emits even when the totals still add up.
+            moved = ["%s %d (recorded %d)" % (k, counts[k], want_counts[k])
+                     for k in CLASSES if counts[k] != want_counts[k]]
+            if moved:
+                first = [k for k in CLASSES if counts[k] != want_counts[k]][0]
+                verdict = "%s %+d" % (first, counts[first] - want_counts[first])
+                failures.append("%s: %s" % (p, ", ".join(moved)))
 
         print("%-8s %6d %6d %6d  %6d  %6d  %6d  %6d  %6d  %8d  %s"
               % (p, len(oracle), len(produced), delta, counts["addr16"],
                  counts["acall11"], counts["word16"], counts["pcode13"],
-                 counts["zero8"], len(residual), verdict))
+                 counts["zero8"], counts["residual"], verdict))
 
         if args.verbose:
             for off, a, b in residual:
@@ -241,7 +273,8 @@ def main():
               % (bad, len(projects)))
         return 1
     print("all %d projects agree with the 2001 oracle: recorded size delta, "
-          "every differing byte accounted for" % len(projects))
+          "and every one of %s at its recorded count"
+          % (len(projects), "/".join(CLASSES)))
     return 0
 
 

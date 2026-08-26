@@ -7,15 +7,21 @@ name: frozen-2.11.2
 # continue-on-error, the comparison was written into the job summary and never
 # checked, the verdict step only raised a ::warning, and it ran once a month. A
 # divergence could sit in the ROMs indefinitely without the workflow list showing
-# anything but green. It now runs on every branch push and gates the comparison
-# against tb/frozen.expect, which records what the 2001 toolchain actually produces.
-# Any movement in that - a project that stops linking, one that starts, a
-# differing-byte count that shifts - fails the job.
+# anything but green. It now runs on every push, on main, and on every pull
+# request, and gates the comparison against tb/frozen.expect, which records what
+# the 2001 toolchain actually produces. Any movement in that - a project that
+# stops linking, one that starts, a differing-byte count that shifts, a ROM that
+# changes length - fails the job.
+#
+# tb/frozen.expect requires three columns per project and romdiff.py refuses a
+# line with fewer instead of defaulting the missing one, so an expectation file
+# written before the ROM-size column fails the job loudly rather than gating on
+# half of itself.
 
 on:
   workflow_dispatch:
   push:
-    branches-ignore: [main]
+  pull_request:
   schedule:
     - cron: '0 3 * * 1'
 

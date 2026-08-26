@@ -14,6 +14,7 @@
 #   make sim                 execute testall in ucsim, judge by the P1 verdict
 #   make defaultlink         link a probe with ld's built-in script, check the layout
 #   make commons             memory-space commons keep their address space
+#   make script              every *(...) arm of both linker scripts, fed and placed
 #   make gate                everything the merge gate runs, in order
 #   make mutants             inject single faults into the port, measure what the
 #                            gate catches (needs a tree built by make build)
@@ -66,23 +67,26 @@ TOOLS := mcs51-as:gas/as-new \
          mcs51-nm:binutils/nm-new \
          mcs51-strip:binutils/strip-new
 
-.PHONY: all frozen build check check-frozen oracle check-canary isa roundtrip branch bits reloc sim defaultlink commons gate mutants dist refresh libk80 clean
+.PHONY: all frozen build check check-frozen oracle check-canary isa roundtrip branch bits reloc sim defaultlink commons script gate mutants dist refresh libk80 clean
 
 # The merge gate, in one list, so the workflow and the mutation harness cannot
 # drift apart from it.
 #
 # TOOLGATE is everything that judges the toolchain from its own inputs: no
-# project sources, no reference ROM. GATE adds oracle, which builds the ten
-# projects and compares them against the 2001 www8051.hex base.7z ships.
+# project sources, no reference ROM.
 #
-# MUTGATE is what a mutant has to survive. It takes TOOLGATE and adds check -
-# the ten projects against the reference ROMs, which build.yml runs rather than
-# gate.yml: a mutant has to get past everything the repository runs anywhere,
-# not just past one workflow. It does not also add oracle: oracle builds the
-# same ten projects with the same tools, and unlike check it does not fail a
-# project that will not build, so it can only be the weaker of the two.
-TOOLGATE := isa roundtrip branch bits reloc sim defaultlink commons
-GATE     := $(TOOLGATE) oracle
+# GATE adds the two stages that use the ten projects: check, which compares
+# every www8051.rom against the reference base.7z ships, and oracle, which
+# compares it against the 2001 www8051.hex. gate.yml used to run oracle alone,
+# which meant the merge gate never once hashed a produced ROM against the
+# reference; check is in the list now and gate.yml runs the list.
+#
+# MUTGATE is what a mutant has to survive: TOOLGATE and check. It does not also
+# add oracle - oracle builds the same ten projects with the same tools and,
+# unlike check, does not fail a project that will not build, so it can only be
+# the weaker of the two.
+TOOLGATE := isa roundtrip branch bits reloc sim defaultlink commons script
+GATE     := $(TOOLGATE) check oracle
 MUTGATE  := $(TOOLGATE) check
 
 all: frozen check
@@ -388,6 +392,17 @@ defaultlink:
 commons:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
 	sh $(HERE)/sim/run-commons.sh $(BUILD)
+
+# Every `*(...)' arm of the default script and of base.7z's lib/www51.sc gets
+# an input section of its own carrying one identifiable byte, and the run
+# asserts the whole .text image and the address of every RAM-space marker. A
+# dropped arm leaves its input an orphan: the section still exists and the
+# symbol still resolves, but the byte falls out of `objcopy -j .text'. That is
+# how `*(reset_network)' stayed commented out in www51.sc for the life of this
+# repository with every gate stage green.
+script:
+	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
+	python3 $(HERE)/sim/run-script.py --build $(BUILD) --base $(HERE)/base.7z
 
 # ---------------------------------------------------------------- gate
 

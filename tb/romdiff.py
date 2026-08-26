@@ -48,19 +48,19 @@ def main():
         g = os.path.join(args.produced, 'projekt', p, 'www8051.rom')
         if not os.path.exists(r):
             rows.append((p, '-', 'no reference', '', ''))
-            outcome[p] = ('no-reference', 0)
+            outcome[p] = ('no-reference', 0, 0)
             missing += 1
             continue
         rb = load(r)
         if not os.path.exists(g):
             rows.append((p, '%d B' % len(rb), 'not produced', '', ''))
-            outcome[p] = ('not-produced', 0)
+            outcome[p] = ('not-produced', 0, 0)
             missing += 1
             continue
         gb = load(g)
         if rb == gb:
             rows.append((p, '%d B' % len(rb), 'identical', '0', md5(r)))
-            outcome[p] = ('identical', 0)
+            outcome[p] = ('identical', 0, len(gb))
             same += 1
             continue
         differ += 1
@@ -68,7 +68,7 @@ def main():
         offs = [i for i in range(n) if rb[i] != gb[i]]
         first = hex(offs[0]) if offs else 'length only'
         ndiff = len(offs) + abs(len(rb) - len(gb))
-        outcome[p] = ('differ', ndiff)
+        outcome[p] = ('differ', ndiff, len(gb))
         rows.append((p, '%d B' % len(rb), '%d B' % len(gb),
                      '%d, from %s' % (ndiff, first),
                      '%s vs %s' % (md5(r), md5(g))))
@@ -123,16 +123,31 @@ def gate(outcome, path):
     The 2001 toolchain does not reproduce the reference ROMs and is not expected
     to; what must not change silently is *how far* it is from them. Every project
     has one recorded line here, and any movement - a project that stops linking,
-    one that starts, a differing-byte count that shifts - is a failure that has to
-    be explained and then re-recorded.
+    one that starts, a differing-byte count that shifts, a ROM that changes
+    length - is a failure that has to be explained and then re-recorded.
+
+    Three columns are required per project: outcome, differing bytes, and the
+    size of the ROM the frozen toolchain produced. The size column is what makes
+    a stale expectation impossible to sit on: when *(reset_network) was restored
+    in lib/www51.sc every ROM on both sides grew, and a file that recorded only
+    the differing-byte count went on passing because that count did not move. A
+    line with fewer than three columns is rejected rather than defaulted, so an
+    old two-column file fails loudly instead of gating on half of itself.
     """
     expect = {}
     with open(path) as fh:
-        for line in fh:
+        for n, line in enumerate(fh, 1):
             line = line.split('#', 1)[0].split()
             if not line:
                 continue
-            expect[line[0]] = (line[1], int(line[2]) if len(line) > 2 else 0)
+            if len(line) < 4:
+                print('FAIL %s:%d: %r gives %d column(s) after the project '
+                      'name, 3 required (outcome, differing bytes, ROM size) - '
+                      'this expectation file predates the size column and '
+                      'cannot be trusted'
+                      % (path, n, ' '.join(line), len(line) - 1))
+                return 1
+            expect[line[0]] = (line[1], int(line[2]), int(line[3]))
 
     print('\n## outcome against %s\n' % path)
     print('```')
@@ -147,10 +162,11 @@ def gate(outcome, path):
             print('FAIL %-8s not compared, recorded %s' % (p, want))
             bad += 1
         elif got != want:
-            print('FAIL %-8s %s %d, recorded %s %d' % (p, got[0], got[1], want[0], want[1]))
+            print('FAIL %-8s %s %d bytes differ, %d B ROM; recorded %s %d %d'
+                  % (p, got[0], got[1], got[2], want[0], want[1], want[2]))
             bad += 1
         else:
-            print('PASS %-8s %s %d' % (p, got[0], got[1]))
+            print('PASS %-8s %s %d %d' % (p, got[0], got[1], got[2]))
     print('```')
     if bad:
         print('\n**%d project(s) moved away from the recorded frozen outcome.**' % bad)
