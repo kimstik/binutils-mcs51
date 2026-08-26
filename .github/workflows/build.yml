@@ -56,7 +56,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y p7zip-full texinfo
           if [ -n "${{ matrix.host }}" ]; then sudo apt-get install -y mingw-w64; fi
-          if [ "${{ matrix.check }}" = wine ]; then sudo apt-get install -y wine64; fi
+          if [ "${{ matrix.check }}" = wine ]; then
+            if [ "${{ matrix.host }}" = i686-w64-mingw32 ]; then
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+              sudo apt-get install -y wine64 wine32:i386
+            else
+              sudo apt-get install -y wine64
+            fi
+          fi
 
       - name: Install build dependencies (macos)
         if: runner.os == 'macOS'
@@ -64,7 +72,7 @@ jobs:
           HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
           HOMEBREW_NO_INSTALL_UPGRADE: 1
         run: |
-          brew install --quiet coreutils
+          brew install --quiet coreutils p7zip
           echo "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
 
       - name: Build
@@ -74,6 +82,13 @@ jobs:
         if: matrix.check == 'native'
         run: make -C tb check BUILD=$GITHUB_WORKSPACE/work/modern/build
 
+      # Runs whatever the testbench reported: it checks that a broken toolchain
+      # makes the testbench go red, which is only worth knowing when the testbench
+      # has just been run.
+      - name: Testbench canary
+        if: always() && matrix.check == 'native'
+        run: make -C tb check-canary
+
       - name: Instruction gate
         if: matrix.check == 'native'
         run: make -C tb isa BUILD=$GITHUB_WORKSPACE/work/modern/build
@@ -81,6 +96,7 @@ jobs:
       - name: Smoke test under wine
         if: matrix.check == 'wine'
         run: |
+          set -o pipefail
           wine work/modern/build/gas/as-new.exe --version | head -2
           wine work/modern/build/ld/ld-new.exe --version | head -2
 
@@ -98,9 +114,11 @@ jobs:
         if: always()
         with:
           name: i51-binutils-${{ matrix.name }}
-          if-no-files-found: ignore
+          if-no-files-found: warn
           path: |
             i51-binutils-${{ matrix.name }}.tar.gz
             work/refreshed/*.patch
             work/tb/results.md5
+            work/tb/projekt/*/www8051.rom
+            work/tb/projekt/*/map
             work/tb/*.log

@@ -6,3 +6,6 @@ work/
 
 # agent worktrees
 .claude/
+
+# python bytecode from the testbench helpers
+__pycache__/

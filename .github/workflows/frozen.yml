@@ -1,11 +1,26 @@
 name: frozen-2.11.2
 
-# The original port, built unchanged from the patches in tb/ref.7z and run against the testbench.
+# The original port, built unchanged from the patches in tb/ref.7z and run against the
+# testbench with the 2001 precompiled objects from tb/base2001.7z.
+#
+# This workflow used to be unable to fail: the testbench step carried
+# continue-on-error, the comparison was written into the job summary and never
+# checked, the verdict step only raised a ::warning, and it ran once a month. A
+# divergence could sit in the ROMs indefinitely without the workflow list showing
+# anything but green. It now runs on every branch push and gates the comparison
+# against tb/frozen.expect, which records what the 2001 toolchain actually produces.
+# Any movement in that - a project that stops linking, one that starts, a
+# differing-byte count that shifts - fails the job.
 
 on:
   workflow_dispatch:
+  push:
+    branches-ignore: [main]
   schedule:
-    - cron: '0 3 1 * *'
+    - cron: '0 3 * * 1'
+
+env:
+  PROJECTS: diag ds1620 ds1822 lcd led1 led2 led3 serial welcome wjava
 
 jobs:
   build:
@@ -27,8 +42,83 @@ jobs:
       - name: Build binutils 2.11.2 with the 2001 patches
         run: make -C tb frozen
 
-      - name: Run the testbench
-        run: make -C tb check
+      # The 2001 toolchain does not reproduce base.7z's reference ROMs and is not
+      # expected to, so this step is allowed to end nonzero. HOW FAR it is from them
+      # is what the next step gates on, and that one is not allowed to.
+      - name: Run the testbench on the 2001 objects
+        id: check
+        continue-on-error: true
+        run: make -C tb check-frozen
+
+      # base.7z is unpacked a second time, into a directory of its own, because check
+      # deletes the reference ROMs it ships as soon as it has hashed them.
+      #
+      # No continue-on-error, no `if: always()` swallowing the status: romdiff.py
+      # --expect exits nonzero when any project moves away from tb/frozen.expect, and
+      # that failure is the job's failure.
+      - name: Compare the produced ROMs against the reference
+        id: compare
+        if: always()
+        run: |
+          set -u
+          rm -rf work/refrom
+          mkdir -p work/refrom
+          7z x -owork/refrom -y tb/base.7z > /dev/null
+          if python3 tb/romdiff.py --reference work/refrom --produced work/tb \
+                 --projects "$PROJECTS" --expect tb/frozen.expect > work/rom-compare.md
+          then status=0; else status=$?; fi
+          cat work/rom-compare.md
+          cat work/rom-compare.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
+      # www8051.rom is `objcopy -j .text -O binary` of www8051.o, so a ROM offset is a
+      # .text address and objdump can be pointed straight at it.
+      - name: Disassemble the divergence
+        if: always()
+        run: |
+          set -u
+          od=work/frozen/build/binutils/objdump
+          if [ ! -x "$od" ]; then echo "no objdump from the frozen build"; exit 0; fi
+          for p in $PROJECTS; do
+            r=work/refrom/projekt/$p/www8051.rom
+            g=work/tb/projekt/$p/www8051.rom
+            o=work/tb/projekt/$p/www8051.o
+            if [ ! -f "$g" ]; then continue; fi
+            if [ ! -f "$o" ]; then continue; fi
+            if cmp -s "$r" "$g"; then continue; fi
+            off=$(cmp "$r" "$g" 2>&1 | sed -n 's/.*differ: byte \([0-9]*\).*/\1/p')
+            if [ -z "$off" ]; then continue; fi
+            start=$(( (off - 1) / 16 * 16 - 16 ))
+            if [ "$start" -lt 0 ]; then start=0; fi
+            echo "==== $p, .text 0x$(printf '%x' $start) onward"
+            "$od" -d --start-address="$start" --stop-address="$((start + 64))" "$o" || true
+          done
+
+      # The testbench step is the one allowed to end nonzero, so its outcome is
+      # restated here where it can be read from the workflow list. It is not a
+      # warning any more: an outcome other than the recorded `failure` means the
+      # frozen line moved and the job goes red with it.
+      - name: Verdict
+        if: always()
+        run: |
+          set -u
+          outcome='${{ steps.check.outcome }}'
+          compare='${{ steps.compare.outcome }}'
+          counts=$(grep -h '^identical ' work/rom-compare.md 2>/dev/null | tail -1)
+          printf '\ntestbench step: **%s** (recorded: failure) - comparison gate: **%s** - %s\n' \
+              "$outcome" "$compare" "${counts:-no comparison}" >> "$GITHUB_STEP_SUMMARY"
+          printf 'testbench step: %s (recorded: failure), comparison gate: %s - %s\n' \
+              "$outcome" "$compare" "${counts:-no comparison}"
+          rc=0
+          if [ "$outcome" != failure ]; then
+            echo "::error title=frozen testbench::testbench step ended '$outcome', tb/frozen.expect records 'failure' - the frozen line moved"
+            rc=1
+          fi
+          if [ "$compare" != success ]; then
+            echo "::error title=frozen comparison::ROM comparison deviated from tb/frozen.expect"
+            rc=1
+          fi
+          exit $rc
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -38,4 +128,9 @@ jobs:
             work/tb/reference.md5
             work/tb/results.md5
             work/tb/*.log
+            work/tb/projekt/*/www8051.rom
+            work/tb/projekt/*/www8051.hex
+            work/tb/projekt/*/www8051.o
+            work/tb/projekt/*/map
+            work/rom-compare.md
             work/frozen/sha256.txt

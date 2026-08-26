@@ -16,10 +16,46 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y p7zip-full
+          sudo apt-get install -y p7zip-full sdcc-ucsim
 
       - name: Build the port
         run: make -C tb build
 
       - name: Instruction gate
         run: make -C tb isa BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Disassembler round-trip
+        if: always()
+        run: make -C tb roundtrip BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Literal-branch gate
+        if: always()
+        run: make -C tb branch BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Bit-address boundaries
+        if: always()
+        run: make -C tb bits BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Relocations end to end
+        if: always()
+        run: make -C tb reloc BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Simulator oracle
+        if: always()
+        run: make -C tb sim BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Default-script link
+        if: always()
+        run: make -C tb defaultlink BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Memory-space commons
+        if: always()
+        run: make -C tb commons BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      # The ten ROMs against projekt/*/www8051.hex, the 2001 output base.7z ships
+      # and that nothing in this repository can regenerate. Every differing byte
+      # has to fall into one of the recorded 2001 relocation defects, and the
+      # size delta has to be the recorded one. See ROOTCAUSE-rom-delta.md.
+      - name: 2001 .hex oracle
+        if: always()
+        run: make -C tb oracle BUILD=$GITHUB_WORKSPACE/work/modern/build
