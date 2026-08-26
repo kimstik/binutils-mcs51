@@ -1,0 +1,19 @@
+Corrections to defects in testall.asm itself, applied before assembly.
+The vendored file stays byte-identical to upstream; see PROVENANCE.
+
+Instruction test 29, second case: the check `subb a,#24h` (with the carry
+DA leaves set) passes only when DA yields A=0x25, the BCD sum 58+67=125.
+The operand as written is 56h, whose BCD sum with 67h is 123 - the test
+can never pass on a correct implementation of DA A.
+
+--- a/testall.asm
++++ b/testall.asm
+@@ -987,7 +987,7 @@
+ tst2:
+ 	mov psw, #00h
+ 	mov r3, #67h
+-	mov a, #56h
++	mov a, #58h
+ 	addc a, r3
+ 	da  a
+ 	subb a, #24h

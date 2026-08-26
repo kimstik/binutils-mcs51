@@ -1,0 +1,29 @@
+# Recorded outcome of `make -C tb frozen && make -C tb check-frozen`, i.e. the 2001
+# port of binutils 2.11.2 (tb/ref.7z) built on a current host, linking the 2001
+# precompiled objects (tb/base2001.7z), against the reference ROMs base.7z ships.
+#
+# The 2001 toolchain does not reproduce those ROMs and is not expected to: it does
+# not carry the stock 2.47 `lang_one_common` alignment, so every internal-RAM
+# address after .bss sits 8 bytes lower. What must not change unnoticed is HOW FAR
+# it is. `tb/romdiff.py --expect` reads this file and exits nonzero on any movement,
+# which is what makes .github/workflows/frozen.yml able to go red.
+#
+# Reproduced here on ubuntu-24.04 / gcc 13.3.0-m32, byte-for-byte the counts in
+# tb/frozen-report.md, "Convergence" (GitHub run 32878917600).
+#
+# diag does not link under 2.11.2: `lib/www51.sc:266: undefined symbol `_reti_'
+# referenced in expression`. 2.11.2 folds a PROVIDE's right-hand side before it
+# consults the destination, so the ten unused interrupt trampolines have to resolve
+# even though diag references none of them. A linker difference, not an object one.
+#
+# project  outcome       differing bytes
+diag       not-produced
+ds1620     differ        217
+ds1822     differ        225
+lcd        differ        214
+led1       differ        213
+led2       differ        214
+led3       differ        214
+serial     differ        325
+welcome    differ        213
+wjava      differ        213

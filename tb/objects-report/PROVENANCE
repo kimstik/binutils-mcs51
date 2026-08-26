@@ -1,0 +1,214 @@
+PROVENANCE - staged objects in tb/objects-report/staged/
+==========================================================
+
+Chosen source: NOT one of the six rar (A) variants. It is source C:
+  git blob "mcs51-2.11.2-original:gnu13.tar.gz" in the backup mirror
+  L:/ai/binutils-mcs51/backup/binutils-mcs51.git
+See REPORT.md for why (rar variants A do not come close; C reproduces
+26/26 cgi objects and 27/27 libk80.a members byte-exact, and matches all
+program-content sections of web51_80/23.obj and 36/37 libw80.a members'
+.text exactly).
+
+Retrieval (read-only):
+  git fetch --depth=1 L:/ai/binutils-mcs51/backup/binutils-mcs51.git mcs51-2.11.2-original
+  git show FETCH_HEAD:gnu13.tar.gz > gnu13.tar.gz
+  tar xzf gnu13.tar.gz
+  # -> gnu13/cgi/*.obj, gnu13/lib/web51_80.obj, gnu13/lib/web51_23.obj,
+  #    gnu13/lib/libk80.a, gnu13/lib/libw80.a
+
+Conversion pipeline (both steps, in order, per file):
+  python tb/i51elf_le2be.py <src.obj> <mid.obj>
+  python tb/i51elf_sym_uc.py <mid.obj> <out.obj>
+
+------------------------------------------------------------------------
+1. SOURCE FILES (source C, gnu13/, sha256 + size in bytes)
+------------------------------------------------------------------------
+7743860006d699fbe6d8a7df1af7de9797b608efe316097a529a12c60afda0d6    2788  gnu13/cgi/bd.obj
+9235a1842fce5b865ee31ea576640787312f241b1ec54f5a4a63f259f04625b7    2716  gnu13/cgi/bdc.obj
+5a8d4d284d215e56044c25ce37ddda3cdac7918002bb48f91a4f643e6d018f9b    1676  gnu13/cgi/disp.obj
+87c40d5d55b30dd802faece4025a6f818fe0151ad22b128c6c3c38e9a4f41c36    1012  gnu13/cgi/egrapht.obj
+6b39a87126fbc2ea1ed51e1d78aa498c050d61b6a9318896dee29e1ccbec3b57    2636  gnu13/cgi/fl.obj
+39d1a8d8691c04f4d3d0f1eb10a9d5dc58e00a4be5ab9a017d6abe57b41850af    1000  gnu13/cgi/grapht.obj
+2bd79fb82c90bde4356823cc5ef325fdf3bf3f4a4dea976751f7594416f5f7fc    1052  gnu13/cgi/inCOM.obj
+fba2752d7d3b1ae75403aa5cb154c2a1029f62f066d81ddf9cfb29ff1ce5e2f4    1084  gnu13/cgi/inComH.obj
+1315bd7331d0cdb08581d4266a29699ce155746c29dff92dff44f1098194e573     948  gnu13/cgi/inP1.obj
+4443f5bd850cec426e0bafd72539f1694de241442bb55acc37ec48f6f354dd10     948  gnu13/cgi/inP3.obj
+11cd3d5f4cbe84f5ecda280776c1231e3666cad738d811fcd9cef5bb996cd792    7420  gnu13/cgi/ip.obj
+9379c7a5a0b34f50c59d92f8b004aa4500356512a0040219ce78caa12ea47752    1092  gnu13/cgi/lcd1.obj
+04f2088c90162d3e3e1b103230199b4d21f4b132d01731a26d937bc82c7f4435    1092  gnu13/cgi/lcd2.obj
+0969e7ae5d70234f4119a0f9dc5cd096cf0fa7831e2e756a6bb6226ac334da49    7468  gnu13/cgi/mac.obj
+0f6a740ec77211410084f3264bb12ab0d11db3f8fc3a474f6ddece7b0893a475    1428  gnu13/cgi/outCom.obj
+68d426827bc68ece6c71818138bfca148b8bde71674195a623356b2200c5c5cd    1432  gnu13/cgi/outP1.obj
+a759d60178b5717efe7de2e3727b73aae977b8bcc139658a1ce756f0429d1f20    1564  gnu13/cgi/outP13.obj
+aa4f3f5bdf2a5a911c80b209c94350adc0c19f669fda14df9a7a22e878e56584    1440  gnu13/cgi/outP3.obj
+6abf5d363e4ce8994067edd303956f32ecda87022eddf4be5a5f74239e06685b    1248  gnu13/cgi/passwd.obj
+2616f31343048f8af80091e6ac0b082a0ddf13d7be46b8fcfd520d6b26d00f02    2608  gnu13/cgi/rts.obj
+a7c8de270a279fc7d3dde4837acad3c31d4e015a6bc8ad4e3f0abcb6c86e666e    2996  gnu13/cgi/shcl.obj
+12ce038e8a3f5ea6252a18cd88f6ddebb2a61b3601614a3d64eae938d40e4498    2696  gnu13/cgi/shreg.obj
+3457def11121ea8f534e982fe43c2463a89ddf67d408bc82c44458c0cdcf215e     840  gnu13/cgi/shtemp.obj
+642e34be251ae1a2c069f7ca3dff6a990c2d0f5f37fee6af61d3abb6f6ab00c2    1004  gnu13/cgi/testP1.obj
+9f8c1536e53ebc2ce9c837190020da4b4d28b317117ae75312c7cdb5fd925f86    1004  gnu13/cgi/testP3.obj
+21bb0c3be49b44a6e7df2c1e0865028d8bb566a3efe531f7179114b85a18728d    2612  gnu13/cgi/xon.obj
+b26decc8fe62dfb7faf931b396acab0d1cf2872e6577b8bc30ae5d61ba684503   10280  gnu13/lib/web51_80.obj
+b1afe3c8a6ae9f9bb259befa2f2e099cc2200f6ec204417c128e5f5cb91b3ea8   10708  gnu13/lib/web51_23.obj
+4e91513944cb82c3d90a04544378746953876781b6448d06cac09836e178cbd7   42638  gnu13/lib/libk80.a   (archive, 27 real members - see section 3)
+b8971f02b9ac5fa1231ce09a9e2fa002db65fc2008da7fb802f84d8780f3c3ca   78576  gnu13/lib/libw80.a   (archive, 37 real members - see section 3)
+
+------------------------------------------------------------------------
+2. STAGED OUTPUTS (tb/objects-report/staged/, sha256) - all verified
+   byte-identical to source B EXCEPT the two web51 lib objects (marked)
+------------------------------------------------------------------------
+c313caf86766597a0319303b4a1885985a68795aeca3fde550870f13b979ff20  staged/cgi/bd.obj
+29d8627dcd3b11962a328be17933256749bef03866086260be9daff920de97f6  staged/cgi/bdc.obj
+2e3f187e31d297dbe592ecb00fa1264467bbaf557517a1dc8822a0d2ed691d87  staged/cgi/disp.obj
+f9b3e4a754a72328fe2e9a5c3433a2785528038583492835a7070e6eca97ba64  staged/cgi/egrapht.obj
+70dd50b7a79f743dfcf87b818fcbce397af2a1492ab5b397e727be1e901ce5c2  staged/cgi/fl.obj
+e84b1ed599c6e325ed3d84e3a0f66493fa65a7e4f6ce16cc38c9e94a908b8726  staged/cgi/grapht.obj
+c324b4c083de11e756cb744a49e8bfe1d25843b61733abf52f25681e8a1602ea  staged/cgi/inCOM.obj
+98fee51a52573d18034b56601dc3823f560281b6ab67aefa78e0fe26349d20f2  staged/cgi/inComH.obj
+d075e2a24c4e18c009ec5a3ecc70ecfa4ad376b76ce6b3471a24f1fbf2099143  staged/cgi/inP1.obj
+af709b24dee6d4aa6d199a4aa454574a2f026167341926a23f30004d3643b96a  staged/cgi/inP3.obj
+09a1b6562e8618e23e6cd817f173570214e031ec1a338194a6552998368d93d4  staged/cgi/ip.obj
+da2d7ea0fdab869957d84bc4161c4851ed986b2c0ebd5ab2e6a74b0db12979da  staged/cgi/lcd1.obj
+972b65076eb18a0f8a84f63b82de0cea5b09afd95d5e57e76d0d08770b593695  staged/cgi/lcd2.obj
+e13ddb7cfaf9ac8f5edd28e0593b3963256f41c9474cf63910838970d6fd6798  staged/cgi/mac.obj
+198327972fd5affff061fff44542a9ce20007c412e9e4b7787e9bdd0007db2b7  staged/cgi/outCom.obj
+549182cb6e528b122f710fca2344bf57b60d654cf6edb0bacef6ffe5ed973545  staged/cgi/outP1.obj
+51d3ea0b737655c1684506b775dc12cd5619f6a3658ce064b369ec77e0a01791  staged/cgi/outP13.obj
+4156d59d50e7bc4fab461d31cf38ae44ac030beacad5f48da8a5a344445ca13f  staged/cgi/outP3.obj
+0d6bbd4e2252eed255790c8b6edb88df67154f127d540583fcef58e09ca7aadb  staged/cgi/passwd.obj
+8c8b937886d380629f4a8a174b56fc42fa74c3955c55a8d295c81c21b882964a  staged/cgi/rts.obj
+d2f8d22cdeab697b058fd7140069edd2ddb7b570a2801dcc2ae77b6d6c04718e  staged/cgi/shcl.obj
+9b4a7a0565bed6e09028e31c7c9079768fb4b8d601611bf93dd1d0f79fb14ab7  staged/cgi/shreg.obj
+b3dabaa8ddb9d1f5fbd66785748fbdfbdb160360bd6f4e0efb130e4eaff8d64a  staged/cgi/shtemp.obj
+707411a768ee5cefa6935adb3919de76fb5c84f5871c4e92b4485d89a4ff2d63  staged/cgi/testP1.obj
+864bc5845ed0df2445fa517611046ac3dd324b6f679f043af2e928c4b6f3d211  staged/cgi/testP3.obj
+f2eb3b2a8e5069205c64136c11cf5fd68c346ae331bc849cfd19e88900b7017d  staged/cgi/xon.obj
+ff0c60de66ebcd6a08ab7346039f1499fa5dcc29edb365213298065ca0e4b0a1  staged/lib/web51_80.obj   ** NOT byte-identical to B (see REPORT.md) **
+a00bb9ecd9ad9e7c58d9f9c4efa407b92ba129d0535c80aef7f13a840b09b71e  staged/lib/web51_23.obj   ** NOT byte-identical to B (see REPORT.md) **
+
+All 26 staged/cgi/*.obj hashes above were diffed byte-for-byte against
+source B's gnu13/cgi/*.obj and matched exactly (0 mismatches, confirmed
+programmatically).
+
+------------------------------------------------------------------------
+3. TARGET (source B) HASHES, for reference / re-verification
+------------------------------------------------------------------------
+2f2191c2c7d82cd2ed3b4484a1366a00172dc9a656a38a8055360a48c08239e7   10172  gnu13/lib/web51_80.obj
+fe00ff2afd04f193ee45c5b0317b01fc7a08e0f9771516700ae3f5e572342588   10604  gnu13/lib/web51_23.obj
+6c16cb145933d2ac1030f860473e5cc04213ec96ce4e5f2c8faae7db22ddeaa2   42638  gnu13/lib/libk80.a
+71fce8d09538a06e823d47deaafc0b228eeb7488bf6eeb4b5365a64acb70caed   77790  gnu13/lib/libw80.a
+
+libk80.a and libw80.a member-level results are in REPORT.md (27/27 and
+36/37 `.text`-identical respectively); per-member sha256 pairs were not
+transcribed here since the archives are not staged (task only requires
+staging web51_80/23.obj + cgi/*.obj) - regenerate with the ar-extraction
+recipe in REPORT.md if needed.
+
+------------------------------------------------------------------------
+4. EXACT COMMAND TO REGENERATE THE STAGED SET
+------------------------------------------------------------------------
+for f in gnu13/cgi/*.obj; do
+  python tb/i51elf_le2be.py "$f" "$f.le2be"
+  python tb/i51elf_sym_uc.py "$f.le2be" "staged/cgi/$(basename "$f")"
+done
+python tb/i51elf_le2be.py gnu13/lib/web51_80.obj web51_80.le2be
+python tb/i51elf_sym_uc.py web51_80.le2be staged/lib/web51_80.obj
+python tb/i51elf_le2be.py gnu13/lib/web51_23.obj web51_23.le2be
+python tb/i51elf_sym_uc.py web51_23.le2be staged/lib/web51_23.obj
+
+reference ROMs (projekt/*/www8051.rom in base.7z)
+  produced by the toolchain built from mcs51/*.patch on binutils 2.47,
+  taken from CI run 32847895655; byte-identical across linux-x86_64,
+  linux-arm64 and macos-arm64. That toolchain passed, in the same run:
+  280/280 opcode encodings against c51asm goldens, 280/280 decode,
+  24/24 hand-derived literal-branch cases, and testall executed in
+  ucsim with the all-tests-passed verdict (P1=127).
+
+------------------------------------------------------------------------
+5. REPAIR OF THE THREE RE-ASSEMBLED INPUTS IN tb/base.7z
+------------------------------------------------------------------------
+base.7z shipped re-assembled copies of lib/web51_80.obj, lib/web51_23.obj
+and lib/libw80.a. A re-assembly by the port's own gas could not write the
+processor-specific section index of an external memory-space common, so
+each of those symbols came out as a plain SHN_COMMON and the linker then
+allocated it in byte-addressed .bss. Symbol-table census, 2001 original
+against the copy base.7z carried:
+
+  lib/web51_80.obj  0xff02 x1, 0xff06 x6            ->  SHN_COMMON x9
+  lib/web51_23.obj  0xff02 x1, 0xff06 x8            ->  SHN_COMMON x12
+  lib/libw80.a      0xff00 x11, 0xff02 x2,
+                    0xff03 x2, 0xff06 x21           ->  SHN_COMMON x46
+
+The three were replaced by conversions of the 2001 originals, which
+tb/base2001.7z carries and whose hashes are the section 1 block above.
+Loose objects go through the two-step pipeline; the archive goes through
+tb/i51elf_ar.py, which runs the same two steps on every member and then
+uppercases the armap and writes deterministic ar headers.
+
+  py tb/i51elf_le2be.py  <2001>/lib/web51_80.obj  w80.le2be
+  py tb/i51elf_sym_uc.py w80.le2be               lib/web51_80.obj
+  py tb/i51elf_le2be.py  <2001>/lib/web51_23.obj  w23.le2be
+  py tb/i51elf_sym_uc.py w23.le2be               lib/web51_23.obj
+  py tb/i51elf_ar.py     <2001>/lib/libw80.a      lib/libw80.a
+
+Conversion carries every index through unchanged, verified by re-running
+the census on the output. The pipeline is checked against the three
+archives base.7z already held in converted form: tb/i51elf_ar.py
+reproduces lib/libk80.a, lib/libk23.a and lib/libw23.a from their
+base2001.7z originals byte-for-byte. The two loose objects come out
+byte-identical to staged/lib/web51_80.obj and staged/lib/web51_23.obj
+recorded in section 2.
+
+Repaired inputs now in tb/base.7z (sha256, size):
+
+ff0c60de66ebcd6a08ab7346039f1499fa5dcc29edb365213298065ca0e4b0a1   10280  lib/web51_80.obj
+a00bb9ecd9ad9e7c58d9f9c4efa407b92ba129d0535c80aef7f13a840b09b71e   10708  lib/web51_23.obj
+8065c61fdeef0bab337aef57014bffbfe1a8ecf472f6da1f6a14204ff456b8a6   78576  lib/libw80.a
+
+What they replaced (the re-assembled copies, section 3 hashes):
+
+2f2191c2c7d82cd2ed3b4484a1366a00172dc9a656a38a8055360a48c08239e7   10172  lib/web51_80.obj
+fe00ff2afd04f193ee45c5b0317b01fc7a08e0f9771516700ae3f5e572342588   10604  lib/web51_23.obj
+71fce8d09538a06e823d47deaafc0b228eeb7488bf6eeb4b5365a64acb70caed   77790  lib/libw80.a
+
+lib/web51.obj and lib/libw.a are byte-copies of the two _80 inputs from
+before the repair and no project links either, so both were left as they
+were rather than converted along with the files that are actually read.
+
+------------------------------------------------------------------------
+6. REFERENCE ROMs AFTER THE REPAIR
+------------------------------------------------------------------------
+Every project's www8051.rom changed once the toolchain kept the
+memory-space commons and the repaired inputs carried them: the code is
+the same length, the operands that name RAM are not. The replacements
+come from CI run 32876629391, taken from the linux-x86_64, linux-arm64
+and macos-arm64 jobs and byte-identical across the three.
+
+project   size   md5 (was)                          md5 (now)
+diag      1264   ade88d9d8fd5d3838c541b192ed149f9   c3ba924a3c3b39f0818f0d6114e3c126
+ds1620    6281   ad375c7f36cb7c838833801d4403579d   87082cbd4c11b70f99b8144ce3986648
+ds1822    6075   6bf7b426ea2e78ce06d407c979df697a   e8ff5320cff95371eec5ea48b7a72662
+lcd       5720   5098d488fcc4b700b9ac040bb9168c3e   52fc462c9ab1b3f8711a730456967d02
+led1      5170   fcdde0d16b837d5db86f1d22d057d4ba   61bb6a21acddeff991c8a1ab2fe0a9e5
+led2      5007   7738957658852c53d9f9b02af850d087   15b65478e586d7a77bd38407d2696436
+led3      5197   0c3188d6a3800a1f4d00c97813e1dd92   e94a53c5587266e22fc8701c9caf03d9
+serial    8125   c8088fce5fb31fb3f18aebe151f07aca   63c123d76b07bd145af0112db96c883c
+welcome   4809   b79a4d69ccb400e92d910f6ef4f67ca3   a2052d0f39802e5ccb9ccb49900446bc
+wjava     4809   f1e13bb165c1add7587637e67bd52585   eb2f09a9cab0b35740172a240bf1a9c0
+
+Only www8051.rom is refreshed, because that is the file the testbench
+hashes. The www8051.hex, www8051.eep and map next to it are 2001-era
+leftovers that no run reads.
+
+CORRECTION (audit, branch claude/audit-green-honesty). An earlier revision
+of this paragraph claimed that "decoding the shipped .hex has never
+reproduced the shipped .rom, for any project, at any point in this
+archive's history". That is false. In base.7z as first committed (1563588)
+the shipped www8051.hex decodes byte-for-byte to the shipped www8051.rom
+for all ten projects - the 2001 .hex/.rom pair is one self-consistent
+artifact set, and it is the only reference in this repository that the
+current port did not produce itself. The .hex stopped matching the .rom
+only from 91a9476 onward, i.e. once the .rom files were overwritten with
+the port's own output. Those 2001 hashes are recorded in
+AUDIT-green-honesty.md so the oracle is not lost again.
