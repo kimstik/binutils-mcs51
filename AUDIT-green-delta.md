@@ -99,11 +99,24 @@ $ grep -n "^@@" add.delta | head -4
 175:@@ -1040,7 +1046,7 @@    (tc-i51.c line count 2644 -> 2568)
 ```
 
-The last hunk ends at outer line 3336. `gas/config/tc-i51.c` ends at 3617. So
-`gas/config/tc-i51.h`, `include/elf/i51.h`, `include/opcode/i51.h`,
-`ld/emulparams/elf32i51.sh`, `ld/scripttempl/elf32i51.sc`, `opcodes/i51-dis.c` and
-`bfd/cpu-i51.c` are **byte-identical** between round2 and green. Fixes 1-8 and 10-12
-live in those files or in untouched regions of the two edited ones.
+The last hunk ends at outer line 3336. `gas/config/tc-i51.c` ends at 3617. So the
+other seven embedded files are untouched — extracted from both patches and hashed,
+they are **byte-identical**:
+
+```
+4f2d06e246dec876490f7221f2176046  cpu-i51.c        ed59971b44dca9ad14628e9480a3589e  tc-i51.h
+76c3acb27c61b156f3fd74dd1179bf98  elf/i51.h        bde2ce60e97aa44db8634639bc50fcf1  opcode/i51.h
+8d33af01781268c8e4a12eda75eac3b2  elf32i51.sh      c172d686084d5f7ece0aa4b4aad8084f  elf32i51.sc
+a3122136a4630e7bc81ba40d5365ba65  i51-dis.c
+```
+
+Same seven md5s on both branches. Fixes 1-8 and 10-12 live in those files or in
+untouched regions of the two edited ones.
+
+`mcs51/modifications.patch`, `tb/hexoracle.py`, `tb/isa_check.py`, `tb/isa/bits.py`
+and all of `.github/` are likewise unchanged — including round2's `7f1df07`
+(`tb/isa/bits.py`: link-offchip expects the refusal review-newcode added), which
+therefore survives intact.
 
 Classification of every hunk:
 
