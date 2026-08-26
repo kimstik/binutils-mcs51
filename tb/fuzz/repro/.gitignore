@@ -1,0 +1,2 @@
+# The two crash reproducers are test fixtures, not build products.
+!*.o
