@@ -48,10 +48,10 @@ index 00000000..ab3d9f53
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..8b350c88
+index 00000000..c2d3a7fc
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,989 @@
+@@ -0,0 +1,1004 @@
 +/* MCS-51 specific support for 32-bit ELF
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -379,6 +379,21 @@ index 00000000..8b350c88
 +  bfd_reloc_status_type r = bfd_reloc_ok;
 +  bfd_vma               x;
 +  bfd_signed_vma	srel;
++
++  /* Sanity check the address.  r_offset comes straight out of the object
++     file, and the five relocations below index CONTENTS with it and then
++     read and write there.  Everything that falls through to the default
++     case is checked by _bfd_final_link_relocate (); nothing checks these,
++     so the same check has to be made here.  Without it an object with a
++     crafted r_offset makes the linker read and write at an arbitrary
++     distance from the section contents - bfd_getb16 () past the end of
++     the buffer for R_I51_11 and R_I51_13_PCODE, bfd_put_8 () and
++     bfd_putb16 () past it for the rest.  */
++  if (!bfd_reloc_offset_in_range (howto, input_bfd, input_section,
++				  rel->r_offset
++				  * bfd_octets_per_byte (input_bfd,
++							 input_section)))
++    return bfd_reloc_outofrange;
 +
 +  switch (howto->type)
 +    {
