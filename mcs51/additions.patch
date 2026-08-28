@@ -48,7 +48,7 @@ index 00000000..ab3d9f53
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..6908bb26
+index 00000000..8b350c88
 --- /dev/null
 +++ b/bfd/elf32-i51.c
 @@ -0,0 +1,989 @@
@@ -1043,10 +1043,10 @@ index 00000000..6908bb26
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..00684525
+index 00000000..0e9af500
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2568 @@
+@@ -0,0 +1,2621 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -1510,17 +1510,17 @@ index 00000000..00684525
 +  addr = exp->X_add_number;
 +  bit = input_line_pointer[1] - '0';
 +
++  /* Step over the `.N' either way.  Leaving it behind on the error path
++     turned one bad bit address into three diagnostics, the last of them
++     against a line number past the end of the file.  */
++  input_line_pointer += 2;
++
 +  if (addr >= 0x20 && addr <= 0x2f)
 +    exp->X_add_number = (addr - 0x20) * 8 + bit;
 +  else if (addr >= 0x80 && addr <= 0xF8 && (addr & 7) == 0)
 +    exp->X_add_number = addr + bit;
 +  else
-+    {
-+      as_bad (_("0x%lx is not bit addressable"), (unsigned long) addr);
-+      return;
-+    }
-+
-+  input_line_pointer += 2;
++    as_bad (_("0x%lx is not bit addressable"), (unsigned long) addr);
 +}
 +/* Extract one word from FROM and copy it to TO.  */
 +
@@ -1592,6 +1592,19 @@ index 00000000..00684525
 +  return 0;
 +}
 +
++/* MCS-51 symbols are case insensitive (acc.7 is the same as Acc.7 and
++   ACC.7), which gas implements by folding every symbol name to upper case
++   as it is created.  This has to be turned on from tc_init_after_args
++   rather than from md_begin: gas_init () defines the --defsym symbols
++   before md_begin () runs, so setting it any later leaves those names
++   unfolded and unreachable from the source.  */
++
++void
++i51_init_after_args (void)
++{
++  symbols_case_sensitive = 0;
++}
++
 +
 +void
 +md_begin (void)
@@ -1600,10 +1613,6 @@ index 00000000..00684525
 +  struct i51_directop_s *dop;
 +  i51_hash = str_htab_create ();
 +  i51_operand = str_htab_create ();
-+
-+  /* MCS-51 uses case-insensitive symbols (acc.7 same as Acc.7 same as ACC.7) */
-+  extern int symbols_case_sensitive;
-+  symbols_case_sensitive = 0;
 +
 +  /* Insert unique names into hash table.  This hash table then provides a
 +     quick index to the first opc with a particular name in the opc
@@ -1683,6 +1692,8 @@ index 00000000..00684525
 +void
 +md_assemble (char *str)
 +{
++  int errors_before = had_errors ();
++
 +#ifdef ASMDBG
 +  fprintf(stderr, "%s\n",str);
 +#endif
@@ -1774,6 +1785,16 @@ index 00000000..00684525
 +	      return;
 +	    }
 +	}
++      /* i51_parse_operand1 / 2 report their own errors and return with the
++	 operand expressions left as they found them - op_expr1 and op_expr2
++	 still carry the O_max marker set above.  Handing one of those to
++	 i51_build_ins reaches fix_new_exp with an expression gas cannot
++	 make a symbol out of, and gas dies with an internal error instead
++	 of the diagnostic already printed.  Emit nothing once the line has
++	 gone wrong.  */
++      if (had_errors () != errors_before)
++	return;
++
 +      if ((op1mode == opcode->args[0]) && (op2mode == opcode->args[1]))
 +	{
 +	  i51_build_ins (opcode, regno, &op_expr1, &op_expr2);
@@ -2630,7 +2651,10 @@ index 00000000..00684525
 +    {
 +    case I51_OP_IMM8:
 +    case I51_OP_BIT:
-+      return (((num & 0xFFFFFF00) == 0) || ((num & 0xFFFFFF00) == 0xFFFFFF00)) ? 1 : 0;
++      /* One byte holds -128..255.  The old test asked only that the top 24
++	 bits were all clear or all set, which let -129..-256 through and
++	 truncated them without a word.  */
++      return (num >= -128 && num <= 255) ? 1 : 0;
 +
 +    case I51_OP_JUMP_REL:
 +      return (num >= -128 && num <= 127) ? 1 : 0;
@@ -2825,7 +2849,7 @@ index 00000000..00684525
 +i51_using (int par ATTRIBUTE_UNUSED)
 +{
 +  SKIP_WHITESPACE ();
-+  switch (*input_line_pointer++)
++  switch (*input_line_pointer)
 +    {
 +    case '0':  /* Reg bank 0 */
 +      regbank = 0;
@@ -2840,10 +2864,17 @@ index 00000000..00684525
 +      regbank = 24;
 +      break;
 +    default:
-+      as_bad ("unsupported register bank");
++      /* Do not step over the character: at end of line that would be the
++	 newline, and the rest of the file would shift by a line.  */
++      as_bad (_("expected a register bank number 0, 1, 2 or 3"));
++      ignore_rest_of_line ();
 +      return;
 +    }
++  input_line_pointer++;
 +  if (regbank > regused) regused = regbank;
++  /* Without this anything after the bank number is handed back to the
++     reader as a statement of its own: `.using 1 nop' assembled a nop.  */
++  demand_empty_rest_of_line ();
 +}
 +
 +void
@@ -2908,7 +2939,7 @@ index 00000000..00684525
 +{
 +  char *name;
 +  char c;
-+  int temp, size;
++  int temp, size, alignment;
 +  symbolS *symbolP;
 +  int align;
 +
@@ -2966,6 +2997,10 @@ index 00000000..00684525
 +	  as_warn (_("Common alignment negative; 0 assumed"));
 +	}
 +    }
++  /* The loop below consumes TEMP, so keep the alignment the line asked for:
++     S_SET_ALIGN wants the byte alignment, and handing it the leftover 1
++     recorded every explicitly aligned common as unaligned.  */
++  alignment = temp;
 +  if (temp)
 +    {
 +      /* convert to a power of 2 alignment */
@@ -3108,7 +3143,7 @@ index 00000000..00684525
 +  else
 +    {
 +      S_SET_VALUE (symbolP, (valueT) size);
-+      S_SET_ALIGN (symbolP, temp);
++      S_SET_ALIGN (symbolP, alignment);
 +      S_SET_EXTERNAL (symbolP);
 +      switch (common_segment) {
 +      case 0: //comm
@@ -3279,6 +3314,24 @@ index 00000000..00684525
 +  demand_empty_rest_of_line ();
 +}
 +
++/* Match one pcode operand keyword at input_line_pointer and step over it.
++   The keyword has to end where it ends: plain strncmp took the BYTE out of
++   a symbol called BYTECOUNT and assembled the rest, COUNT, as the operand,
++   silently relocating against a symbol the source never mentions.  */
++
++static int
++pcode_keyword (const char *kw)
++{
++  size_t len = strlen (kw);
++
++  if (strncmp (input_line_pointer, kw, len) != 0)
++    return 0;
++  if (is_part_of_name (input_line_pointer[len]))
++    return 0;
++  input_line_pointer += len;
++  return 1;
++}
++
 +void
 +pcodeOperand (expressionS *ex, enum PADRMODE *mode, int separator)
 +{
@@ -3297,18 +3350,18 @@ index 00000000..00684525
 +	  SKIP_WHITESPACE ();
 +	}
 +      //search #, #BYTE, #SWAP, #SHL8, BYTE, SWAP, SHL8, @BYTE, @SWAP, @
-+      if      (strncmp (input_line_pointer, "#BYTE", 5) == 0) { *mode = DIRECTBYTE; input_line_pointer += 5; }
-+      else if (strncmp (input_line_pointer, "#SWAP", 5) == 0) { *mode = DIRECTSWAP; input_line_pointer += 5; }
-+      else if (strncmp (input_line_pointer, "#SHL8", 5) == 0) { *mode = DIRECTSHL8; input_line_pointer += 5; }
-+      else if (strncmp (input_line_pointer, "#WORD", 5) == 0) { *mode = DIRECTWORD; input_line_pointer += 5; }
++      if      (pcode_keyword ("#BYTE")) { *mode = DIRECTBYTE; }
++      else if (pcode_keyword ("#SWAP")) { *mode = DIRECTSWAP; }
++      else if (pcode_keyword ("#SHL8")) { *mode = DIRECTSHL8; }
++      else if (pcode_keyword ("#WORD")) { *mode = DIRECTWORD; }
 +      else if (strncmp (input_line_pointer, "#",     1) == 0) { *mode = DIRECTWORD; input_line_pointer += 1; }
-+      else if (strncmp (input_line_pointer, "BYTE",  4) == 0) { *mode = DIRECTBYTE; input_line_pointer += 4; }
-+      else if (strncmp (input_line_pointer, "SWAP",  4) == 0) { *mode = DIRECTSWAP; input_line_pointer += 4; }
-+      else if (strncmp (input_line_pointer, "SHL8",  4) == 0) { *mode = DIRECTSHL8; input_line_pointer += 4; }
-+      else if (strncmp (input_line_pointer, "WORD",  4) == 0) { *mode = DIRECTWORD; input_line_pointer += 4; }
-+      else if (strncmp (input_line_pointer, "@BYTE", 5) == 0) { *mode = INDIRECTBYTE; input_line_pointer += 5; }
-+      else if (strncmp (input_line_pointer, "@SWAP", 5) == 0) { *mode = INDIRECTSWAP; input_line_pointer += 5; }
-+      else if (strncmp (input_line_pointer, "@WORD", 5) == 0) { *mode = INDIRECTWORD; input_line_pointer += 5; }
++      else if (pcode_keyword ("BYTE"))  { *mode = DIRECTBYTE; }
++      else if (pcode_keyword ("SWAP"))  { *mode = DIRECTSWAP; }
++      else if (pcode_keyword ("SHL8"))  { *mode = DIRECTSHL8; }
++      else if (pcode_keyword ("WORD"))  { *mode = DIRECTWORD; }
++      else if (pcode_keyword ("@BYTE")) { *mode = INDIRECTBYTE; }
++      else if (pcode_keyword ("@SWAP")) { *mode = INDIRECTSWAP; }
++      else if (pcode_keyword ("@WORD")) { *mode = INDIRECTWORD; }
 +      else if (strncmp (input_line_pointer, "@",     1) == 0) { *mode = INDIRECTWORD; input_line_pointer += 1; }
 +      else                                                    { *mode = DIRECTWORD; }
 +      SKIP_WHITESPACE ();
@@ -3617,10 +3670,10 @@ index 00000000..00684525
 +}
 diff --git a/gas/config/tc-i51.h b/gas/config/tc-i51.h
 new file mode 100644
-index 00000000..4848a100
+index 00000000..92ab4679
 --- /dev/null
 +++ b/gas/config/tc-i51.h
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,167 @@
 +/* This file is tc-i51.h
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +
@@ -3782,6 +3835,12 @@ index 00000000..4848a100
 +extern void i51_cleanup (void);
 +#define md_cleanup() i51_cleanup()
 +#define md_after_pass_hook() i51_cleanup()
++
++/* Turn on case folding of symbol names.  Called from gas_init (), which is
++   early enough for the --defsym names to be folded the same way as the
++   names read from the source.  */
++extern void i51_init_after_args (void);
++#define tc_init_after_args() i51_init_after_args ()
 diff --git a/include/elf/i51.h b/include/elf/i51.h
 new file mode 100644
 index 00000000..89d0944e
