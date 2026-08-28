@@ -4348,10 +4348,10 @@ index 00000000..fbe9a587
 +EOF
 diff --git a/opcodes/i51-dis.c b/opcodes/i51-dis.c
 new file mode 100644
-index 00000000..43beef98
+index 00000000..c035f4ab
 --- /dev/null
 +++ b/opcodes/i51-dis.c
-@@ -0,0 +1,319 @@
+@@ -0,0 +1,395 @@
 +/* Disassemble MCS-51 instructions.
 +   Copyright 2001 Free Software Foundation, Inc.
 +
@@ -4424,6 +4424,57 @@ index 00000000..43beef98
 +  return bfd_getb16(buffer);
 +}
 +
++/* Which symbols may name an address in disassembly.
++
++   The MCS-51 has five address spaces that all start at zero, and a
++   symbol carries no note of which one it belongs to beyond the section
++   it sits in.  A consumer looking for the symbol nearest a code address
++   will therefore find SFR equates - ACC, P1, TCON, thousands of them,
++   all absolute and all below 0x100 - and data symbols from IDATA, XDATA,
++   the bit space and the EEPROM image, and name a subroutine after one of
++   them.  While a section carrying code is being disassembled, only a
++   symbol from a section carrying code may name an address in it.
++
++   Elsewhere - `objdump -D' walking .rbss, .xbss and the rest - every
++   symbol is let through again, so those sections keep their labels.  */
++
++bool
++i51_symbol_is_valid (asymbol *sym, struct disassemble_info *info)
++{
++  if (sym == NULL || sym->section == NULL)
++    return false;
++
++  if (info == NULL
++      || info->section == NULL
++      || (info->section->flags & SEC_CODE) == 0)
++    return true;
++
++  /* An absolute symbol belongs to no space at all.  */
++  if (bfd_is_abs_section (sym->section))
++    return false;
++
++  return (sym->section->flags & SEC_CODE) != 0;
++}
++
++/* The style an operand string is printed in.  The operand syntax is
++   self-describing: `#' starts an immediate, `0x' a direct byte or bit
++   address, `.' a branch displacement, `/' a complemented bit address,
++   and everything else names a register - A, AB, C, DPTR, R0..R7, @R0,
++   @DPTR, @A+DPTR, @A+PC.  */
++
++static enum disassembler_style
++i51_operand_style (const char *op)
++{
++  switch (op[0])
++    {
++    case '#':	return dis_style_immediate;
++    case '.':	return dis_style_address_offset;
++    case '/':	return dis_style_address;
++    case '0':	return dis_style_address;
++    default:	return dis_style_register;
++    }
++}
++
 +int
 +print_insn_i51 (bfd_vma addr, disassemble_info *info)
 +{
@@ -4433,11 +4484,16 @@ index 00000000..43beef98
 +  int rel_addr;
 +  struct i51_opcodes_s *opcode;
 +  void *stream = info->stream;
-+  fprintf_ftype prin = info->fprintf_func;
++  fprintf_styled_ftype prin = info->fprintf_styled_func;
 +  int ok = 0;
 +  int offset = 0;
 +  char op1[16], op2[16], op3[16], comment1[40], comment2[40];
 +  int inslen = 1;
++  /* An absolute code address in op1 is handed to print_address_func so
++     the consumer can name it: `lcall 0x1a <helper>'.  The string built
++     in op1 is the fallback for a consumer that supplies no such hook.  */
++  bfd_vma code_target = 0;
++  int op1_is_code_addr = 0;
 +
 +  insn = i51dis_opcode (addr, info);
 +  if (insn < 0)
@@ -4517,14 +4573,17 @@ index 00000000..43beef98
 +	  if (opdata < 0)
 +	    return -1;
 +	  addr++;
-+	  sprintf (op1,"0x%04lX",
-+		   (unsigned long) ((addr&0xF800)+(((insn>>5)&0x07)<<8)+opdata));
++	  code_target = (addr & 0xF800) + (((insn >> 5) & 0x07) << 8) + opdata;
++	  op1_is_code_addr = 1;
++	  sprintf (op1,"0x%04lX", (unsigned long) code_target);
 +	  break;
 +	case '6':	//jump addr 16
 +	  opdata = i51dis_op16 (addr, info);
 +	  if (opdata < 0)
 +	    return -1;
 +	  addr += 2;
++	  code_target = (bfd_vma) (unsigned) opdata;
++	  op1_is_code_addr = 1;
 +	  sprintf (op1,"0x%04X",(unsigned) opdata);
 +	  break;
 +      }
@@ -4646,28 +4705,45 @@ index 00000000..43beef98
 +      sprintf (op1, "0x%02X", insn);
 +      sprintf (comment1, "????");
 +      comment2[0] = 0;
++      op1_is_code_addr = 0;
 +    }
 +
-+  (*prin) (stream, "%s", ok ? opcode->name : ".byte");
++  (*prin) (stream, ok ? dis_style_mnemonic : dis_style_assembler_directive,
++	   "%s", ok ? opcode->name : ".byte");
 +
 +  if (*op1)
-+    (*prin) (stream, "\t%s", op1);
++    {
++      (*prin) (stream, dis_style_text, "\t");
++      /* An absolute code address goes through print_address_func, which
++	 is what lets a consumer print the symbol it lands on.  Older
++	 callers may leave the hook unset, so fall back to the string.  */
++      if (op1_is_code_addr && info->print_address_func != NULL)
++	(*info->print_address_func) (code_target, info);
++      else
++	(*prin) (stream, i51_operand_style (op1), "%s", op1);
++    }
 +
 +  if (*op2)
-+    (*prin) (stream, ", %s", op2);
++    {
++      (*prin) (stream, dis_style_text, ", ");
++      (*prin) (stream, i51_operand_style (op2), "%s", op2);
++    }
 +
 +  if (*op3)
-+    (*prin) (stream, ", %s", op3);
++    {
++      (*prin) (stream, dis_style_text, ", ");
++      (*prin) (stream, i51_operand_style (op3), "%s", op3);
++    }
 +
 +  if (*comment1) {
 +    if (*op2)
-+      (*prin) (stream, "\t; %s", comment1);
++      (*prin) (stream, dis_style_comment_start, "\t; %s", comment1);
 +    else
-+      (*prin) (stream, "\t\t; %s", comment1);
++      (*prin) (stream, dis_style_comment_start, "\t\t; %s", comment1);
 +  }
 +
 +  if (*comment2)
-+    (*prin) (stream, " %s", comment2);
++    (*prin) (stream, dis_style_comment_start, " %s", comment2);
 +
 +  return inslen;
 +}
