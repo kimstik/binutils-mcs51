@@ -1,0 +1,103 @@
+name: gate
+
+# Instruction-level gate. Green here is the condition for merging into main.
+#
+# It runs on every branch, on main, and on every pull request. It used to carry
+# `branches-ignore: [main]' and no `pull_request' trigger at all, which meant the
+# gate never ran on the branch it gates and never ran on the change being merged
+# - only on the pushes to the topic branch beforehand.
+#
+# The stage list is tb/Makefile's $(GATE) and is kept in the same order. `check'
+# is one of them: before this branch the merge gate's only contact with the ten
+# projects was `oracle', which does not fail a project that will not build, so
+# the gate never once hashed a produced ROM against the reference base.7z ships.
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  isa:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full sdcc-ucsim
+
+      - name: Build the port
+        run: make -C tb build
+
+      - name: Instruction gate
+        run: make -C tb isa BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Disassembler round-trip
+        if: always()
+        run: make -C tb roundtrip BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Literal-branch gate
+        if: always()
+        run: make -C tb branch BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Bit-address boundaries
+        if: always()
+        run: make -C tb bits BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Relocations end to end
+        if: always()
+        run: make -C tb reloc BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Simulator oracle
+        if: always()
+        run: make -C tb sim BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Default-script link
+        if: always()
+        run: make -C tb defaultlink BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Memory-space commons
+        if: always()
+        run: make -C tb commons BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      # Every `*(...)' arm of the default script and of base.7z's lib/www51.sc
+      # gets an input of its own and has to place it at the recorded address. A
+      # dropped arm keeps its section and its symbol and loses only the bytes,
+      # which is how `*(reset_network)' hid in www51.sc for the life of the repo.
+      - name: Linker-script arms
+        if: always()
+        run: make -C tb script BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      # The ten projects against the reference ROMs base.7z ships, hashed after
+      # extraction and deleted before anything is built. A project that fails to
+      # build is a failure here; oracle below would let it pass.
+      - name: Testbench against the reference ROMs
+        if: always()
+        run: make -C tb check BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - name: Testbench canary
+        if: always()
+        run: make -C tb check-canary
+
+      # The ten ROMs against projekt/*/www8051.hex, the 2001 output base.7z ships
+      # and that nothing in this repository can regenerate. Every differing byte
+      # has to fall into one of the recorded 2001 relocation defects, each of the
+      # six counts has to be the recorded one, and the size delta has to be the
+      # recorded one.
+      - name: 2001 .hex oracle
+        if: always()
+        run: make -C tb oracle BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gate-results
+          if-no-files-found: warn
+          path: |
+            work/tb/results.md5
+            work/tb/reference.md5
+            work/tb/*.log
+            work/tb/projekt/*/www8051.rom
+            work/tb/projekt/*/map

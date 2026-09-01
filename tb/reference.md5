@@ -1,0 +1,21 @@
+# The immovable reference: md5 of projekt/<p>/www8051.rom inside tb/base.7z.
+#
+# Anchored to the ORIGINAL inputs - the 2001 sources and lib/www51.sc with
+# *(reset_network) live, as gnu13 shipped it - built by the ported toolchain.
+# make check verifies the shipped ROMs against this list before using them,
+# so no repack of base.7z can move the reference without changing this file
+# in the same commit, where the diff is visible.
+#
+# The relation of these images to the 2001 binaries is pinned separately:
+# make oracle explains every differing byte against the untouched
+# projekt/*/www8051.hex, and tb/frozen.expect records the 2.11.2 rebuild.
+diag      1267 84779b2386ba64a0347e227ac09cf18a
+ds1620    6284 5bd93daf7609853f6c3db6541060c420
+ds1822    6078 733b5d0483c7cd324156cd36da1743a6
+lcd       5754 7c0f4fccb4e9ee7305c1f8c8fe7bee1e
+led1      5173 bd336522c8c54be539f2e45d5bbe7888
+led2      5010 97e9cf0cf06ebf6ff10e98a6420f6f63
+led3      5200 470097b25def9f33cde74fdb4c6264f1
+serial    8128 94c14915a302c599ff91b88244319f4d
+welcome   4812 0244913c2585c0dc9995a5e6a2e95d6d
+wjava     4812 bbdbcb2b80d62a384aa8f3ec9d407315

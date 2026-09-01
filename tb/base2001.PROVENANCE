@@ -1,0 +1,210 @@
+PROVENANCE - tb/base2001.7z
+===========================
+
+base2001.7z is an overlay for tb/base.7z: 33 precompiled inputs in the object
+format the 2001 port emits - big-endian ELF, e_machine 0x7262, symbol case as
+written in the source. base.7z ships the same 33 paths in the format the current
+port emits - little-endian ELF, e_machine 0x1051, symbols uppercased by the
+assembler. `make check DATA_OVERLAY=.../base2001.7z` unpacks base.7z and then
+this archive over it, so the 2.11.2 toolchain links inputs it can read.
+
+A 34th file, lib/www51.sc, rides along because the linker script names one of
+those symbols; section 6 says what was done to it and why.
+
+What a run with this overlay produces, and how it compares to the reference
+ROMs base.7z ships, is recorded in the frozen report, kept with the project
+documentation outside this repository.
+
+Archive sha256: 03399d746b3909d471548fefc7b4f3b66341c32521c2d5d4133e7f27bdf3ea13
+Archive size:   27907 bytes
+
+
+------------------------------------------------------------------------
+1. SINGLE SOURCE
+------------------------------------------------------------------------
+Every file comes from ONE place - the 2001 testbench archive, git blob
+
+  mcs51-2.11.2-original:gnu13.tar.gz
+
+in the backup mirror L:/ai/binutils-mcs51/backup/binutils-mcs51.git
+(blob size 132303 bytes). Retrieval, read-only:
+
+  git fetch --depth=1 L:/ai/binutils-mcs51/backup/binutils-mcs51.git \
+      mcs51-2.11.2-original
+  git cat-file blob FETCH_HEAD:gnu13.tar.gz > gnu13.tar.gz
+  tar xzf gnu13.tar.gz
+
+Files are copied out of gnu13/lib and gnu13/cgi byte-for-byte. No conversion,
+no repacking, no re-assembly: the tarball already holds them in the old format,
+which is what the 2001 toolchain reads.
+
+precompiled_gnu114.rar was NOT used. It is a 2002-09-15 snapshot, a year later
+than gnu13; its libk80.a is 48912 bytes against gnu13's 42638, and
+the objects report (kept outside this repository) shows it is missing modules (http, makeipreply,
+smtp, udpchecksum in libk80.a; mul2x2, fsearch, fsend, eewrite in libw80.a)
+that both gnu13 and the current base.7z contain. gnu13 supplies all 33 files
+the overlay needs, including web51_80.obj and web51_23.obj, so nothing has to
+be filled in from the rar.
+
+
+------------------------------------------------------------------------
+2. CONTENTS - sha256, size, path inside the archive
+------------------------------------------------------------------------
+The 33 objects, straight out of gnu13:
+
+8a36508f4ada15b510a6af08d70d4a80c4e33e3c489dc1cfc249f8ac3bc6c38f   45166  lib/libk23.a
+4e91513944cb82c3d90a04544378746953876781b6448d06cac09836e178cbd7   42638  lib/libk80.a
+2189cf4f0fcc3042dcda0797d8bff35749c93e73cf9d6d014a5930c96892f59e   78576  lib/libw23.a
+b8971f02b9ac5fa1231ce09a9e2fa002db65fc2008da7fb802f84d8780f3c3ca   78576  lib/libw80.a
+b1afe3c8a6ae9f9bb259befa2f2e099cc2200f6ec204417c128e5f5cb91b3ea8   10708  lib/web51_23.obj
+b26decc8fe62dfb7faf931b396acab0d1cf2872e6577b8bc30ae5d61ba684503   10280  lib/web51_80.obj
+7743860006d699fbe6d8a7df1af7de9797b608efe316097a529a12c60afda0d6    2788  cgi/bd.obj
+9235a1842fce5b865ee31ea576640787312f241b1ec54f5a4a63f259f04625b7    2716  cgi/bdc.obj
+5a8d4d284d215e56044c25ce37ddda3cdac7918002bb48f91a4f643e6d018f9b    1676  cgi/disp.obj
+87c40d5d55b30dd802faece4025a6f818fe0151ad22b128c6c3c38e9a4f41c36    1012  cgi/egrapht.obj
+6b39a87126fbc2ea1ed51e1d78aa498c050d61b6a9318896dee29e1ccbec3b57    2636  cgi/fl.obj
+39d1a8d8691c04f4d3d0f1eb10a9d5dc58e00a4be5ab9a017d6abe57b41850af    1000  cgi/grapht.obj
+2bd79fb82c90bde4356823cc5ef325fdf3bf3f4a4dea976751f7594416f5f7fc    1052  cgi/inCOM.obj
+fba2752d7d3b1ae75403aa5cb154c2a1029f62f066d81ddf9cfb29ff1ce5e2f4    1084  cgi/inComH.obj
+1315bd7331d0cdb08581d4266a29699ce155746c29dff92dff44f1098194e573     948  cgi/inP1.obj
+4443f5bd850cec426e0bafd72539f1694de241442bb55acc37ec48f6f354dd10     948  cgi/inP3.obj
+11cd3d5f4cbe84f5ecda280776c1231e3666cad738d811fcd9cef5bb996cd792    7420  cgi/ip.obj
+9379c7a5a0b34f50c59d92f8b004aa4500356512a0040219ce78caa12ea47752    1092  cgi/lcd1.obj
+04f2088c90162d3e3e1b103230199b4d21f4b132d01731a26d937bc82c7f4435    1092  cgi/lcd2.obj
+8067da85eeb8b98b6d93e8d2c1daafd520a8d0a7337eb9e2b424654079adcde8   55792  cgi/libcgi.a
+0969e7ae5d70234f4119a0f9dc5cd096cf0fa7831e2e756a6bb6226ac334da49    7468  cgi/mac.obj
+0f6a740ec77211410084f3264bb12ab0d11db3f8fc3a474f6ddece7b0893a475    1428  cgi/outCom.obj
+68d426827bc68ece6c71818138bfca148b8bde71674195a623356b2200c5c5cd    1432  cgi/outP1.obj
+a759d60178b5717efe7de2e3727b73aae977b8bcc139658a1ce756f0429d1f20    1564  cgi/outP13.obj
+aa4f3f5bdf2a5a911c80b209c94350adc0c19f669fda14df9a7a22e878e56584    1440  cgi/outP3.obj
+6abf5d363e4ce8994067edd303956f32ecda87022eddf4be5a5f74239e06685b    1248  cgi/passwd.obj
+2616f31343048f8af80091e6ac0b082a0ddf13d7be46b8fcfd520d6b26d00f02    2608  cgi/rts.obj
+a7c8de270a279fc7d3dde4837acad3c31d4e015a6bc8ad4e3f0abcb6c86e666e    2996  cgi/shcl.obj
+12ce038e8a3f5ea6252a18cd88f6ddebb2a61b3601614a3d64eae938d40e4498    2696  cgi/shreg.obj
+3457def11121ea8f534e982fe43c2463a89ddf67d408bc82c44458c0cdcf215e     840  cgi/shtemp.obj
+642e34be251ae1a2c069f7ca3dff6a990c2d0f5f37fee6af61d3abb6f6ab00c2    1004  cgi/testP1.obj
+9f8c1536e53ebc2ce9c837190020da4b4d28b317117ae75312c7cdb5fd925f86    1004  cgi/testP3.obj
+21bb0c3be49b44a6e7df2c1e0865028d8bb566a3efe531f7179114b85a18728d    2612  cgi/xon.obj
+
+The 28 hashes for cgi/*.obj, lib/web51_80.obj, lib/web51_23.obj, lib/libk80.a
+and lib/libw80.a are identical to the "SOURCE FILES (source C, gnu13/)" block
+of the objects report's PROVENANCE (kept outside this repository), which
+recorded them independently.
+
+The derived file, see section 6:
+
+aeb3d964ab51a63ebec33fbc9d4d570c75ef7ccd65f1efec08b95ec5374c85b4    5629  lib/www51.sc
+
+
+------------------------------------------------------------------------
+3. WHAT THE OVERLAY REPLACES - base.7z copies of the same paths
+------------------------------------------------------------------------
+ed9a9d70a14af5d7dabc24e94e02018c7556c696911aa0f0db617bac2ba70158   45166  lib/libk23.a
+6c16cb145933d2ac1030f860473e5cc04213ec96ce4e5f2c8faae7db22ddeaa2   42638  lib/libk80.a
+1d7c810e130f723de3c3af74579f96ce03365612c2a92a683c0bd85e8437c5c9   78576  lib/libw23.a
+8065c61fdeef0bab337aef57014bffbfe1a8ecf472f6da1f6a14204ff456b8a6   78576  lib/libw80.a
+a00bb9ecd9ad9e7c58d9f9c4efa407b92ba129d0535c80aef7f13a840b09b71e   10708  lib/web51_23.obj
+ff0c60de66ebcd6a08ab7346039f1499fa5dcc29edb365213298065ca0e4b0a1   10280  lib/web51_80.obj
+dae56bcbf5f68928779f6e9c2bdc8edd055694558603ab42d9e746d1c08cf2ea   55332  cgi/libcgi.a
+plus the 26 cgi/*.obj, whose base.7z hashes are the "STAGED OUTPUTS" block of
+the same PROVENANCE record.
+
+Every one of these now has a provenance chain back to the 2001 originals in
+this archive. The 26 cgi/*.obj and lib/libk80.a in base.7z are gnu13's own
+objects run through tb/i51elf_le2be.py + tb/i51elf_sym_uc.py, byte-identical
+after conversion. lib/web51_80.obj, lib/web51_23.obj and lib/libw80.a were
+re-assembled copies until they were replaced by the same conversion of the
+overlay's originals; the archives go through tb/i51elf_ar.py, which runs the
+two steps per member and reproduces lib/libk80.a, lib/libk23.a and
+lib/libw23.a from this archive byte-for-byte.
+
+lib/libk23.a and lib/libw23.a in the overlay are byte-identical to
+lib/lib23_old/libk23.a and lib/lib23_old/libw23.a already shipped inside
+base.7z, which is a second, independent copy of the same 2001 files.
+
+
+------------------------------------------------------------------------
+4. KNOWN CONTENT DELTAS - overlay vs base.7z, beyond format
+------------------------------------------------------------------------
+These paths are not just a re-encoding of one another; the bytes differ beyond
+endianness and symbol case.
+
+lib/web51_80.obj, lib/web51_23.obj and lib/libw80.a used to be listed here.
+base.7z shipped re-assembled copies of them, and a re-assembly loses what the
+port's assembler could not write: an external memory-space common came out as
+SHN_COMMON instead of the SHN_I51_* index naming its space. Counted over the
+symbol tables, the three lost 0xff02 x1 + 0xff06 x6, 0xff02 x1 + 0xff06 x8 and
+0xff00 x11 + 0xff02 x2 + 0xff03 x2 + 0xff06 x21 respectively, every one of them
+turning into a plain common the linker then placed in byte-addressed .bss.
+They now hold the overlay's own objects converted through
+tb/i51elf_le2be.py + tb/i51elf_sym_uc.py (tb/i51elf_ar.py for the archive), so
+the only remaining difference is the format the conversion exists to change.
+
+  cgi/libcgi.a  55792 (overlay) vs 55332 (base.7z)
+  lib/libk23.a, lib/libw23.a - member-level comparison not carried out; the
+    overlay copies are the same bytes base.7z already carries in lib/lib23_old.
+
+Paths base.7z ships that the overlay does NOT replace, because gnu13 has no
+counterpart and no project links them: lib/web51.obj (a duplicate of
+base.7z's lib/web51_80.obj), lib/libw.a, and the stray
+"cgi/$(basename  .asm).obj" left behind by a Makefile expansion. They stay in
+the current object format inside a frozen run and are never opened.
+
+
+------------------------------------------------------------------------
+5. WHAT THE OVERLAY DELIBERATELY LEAVES ALONE
+------------------------------------------------------------------------
+gnu13 also carries the .asm sources, the perl generators, include/param.inc,
+lib/www51.sc and the project directories, and those differ from base.7z's:
+
+  - .section flags were rewritten from `, #alloc` to `, "ax"` throughout the
+    sources and inside bin/html2db.pl. Both spellings parse in 2.11.2 gas
+    (obj_elf_section_word and obj_elf_parse_section_letters respectively);
+    "ax" additionally sets SHF_EXECINSTR, which only affects orphan placement.
+  - include/param.inc uses .equ where 2001 used .set, and guards ACTIVESTACK
+    and DUALSTACK with .ifndef.
+  - lib/www51.sc comments out *(reset_network), uppercases the interrupt
+    trampoline symbol to _RETI_, and adds INTIE0.. and STACK aliases next to
+    the lowercase intIE0.. and stack ones.
+
+The overlay keeps base.7z's versions of the sources and the generators on
+purpose. The reference ROMs in base.7z were linked from them, so swapping in
+gnu13's would change what a frozen run is being compared against rather than
+tell us anything about the toolchain. lib/www51.sc is the one exception, and
+only for the symbol name - section 6.
+
+
+------------------------------------------------------------------------
+6. lib/www51.sc - THE ONE DERIVED FILE
+------------------------------------------------------------------------
+The overlay's copy is base.7z's own lib/www51.sc with the ten occurrences of
+_RETI_ rewritten to _reti_, and nothing else:
+
+  python -c "import sys;d=open(sys.argv[1],'rb').read();
+             open(sys.argv[2],'wb').write(d.replace(b'_RETI_',b'_reti_'))" \
+      base.7z:lib/www51.sc  overlay:lib/www51.sc
+
+  base.7z    b4b89651391bedd81b31373588ac70a897fcea5e7fed2bc6c38ace907e548099
+  overlay    aeb3d964ab51a63ebec33fbc9d4d570c75ef7ccd65f1efec08b95ec5374c85b4
+  both 5629 bytes, 265 LF-terminated lines
+
+Why. The script's ten PROVIDE lines for the unused interrupt vectors all
+resolve to the trampoline in web51_80.obj / web51_23.obj. That symbol is
+spelled _reti_ in the 2001 objects and _RETI_ in base.7z's, because the
+current assembler uppercases every symbol it emits - which is what
+tb/i51elf_sym_uc.py replays when converting an old object to the new format.
+Left alone, a frozen link stops with
+
+  lib/www51.sc: undefined symbol `_RETI_' referenced in expression
+
+on all ten projects. Rewriting the reference is the script-side half of the
+same case conversion the objects went through; the uppercase alias names
+INTIE0.., which nothing in a frozen run references, are left in place.
+
+What was NOT done, deliberately: gnu13's own lib/www51.sc was not used. It
+still has *(reset_network) live, where base.7z's has it commented out, so it
+would place a section that the reference ROMs were linked without. That is a
+testbench decision, not an encoding difference, and it applies to the frozen
+and the current line alike. Keeping base.7z's script leaves exactly one
+variable between the two lines: the toolchain and the object encoding it
+reads.

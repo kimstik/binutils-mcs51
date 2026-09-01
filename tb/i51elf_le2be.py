@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Convert old i51 ELF objects (big-endian, machine 0x7262)
-to new i51 ELF objects (little-endian, machine 0x1051)
+to new i51 ELF objects (little-endian, machine EM_8051 = 165)
 """
 import struct
 import sys
@@ -33,10 +33,10 @@ def convert_elf(input_file, output_file):
     e_type = struct.unpack('>H', data[16:18])[0]
     data[16:18] = struct.pack('<H', e_type)
 
-    # e_machine at offset 18 (2 bytes) - change from 0x7262 to 0x1051
+    # e_machine at offset 18 (2 bytes) - change from 0x7262 to EM_8051 (165)
     old_machine = struct.unpack('>H', data[18:20])[0]
     print(f"  Old machine type: 0x{old_machine:04x}")
-    data[18:20] = struct.pack('<H', 0x1051)
+    data[18:20] = struct.pack('<H', 165)
 
     # e_version at offset 20 (4 bytes)
     e_version = struct.unpack('>I', data[20:24])[0]
