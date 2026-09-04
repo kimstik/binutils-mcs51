@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """
-Convert all symbol names in an ELF object to uppercase
+Convert all symbol names in an ELF object to uppercase.
+
+Little-endian objects only: every field is unpacked `<' whatever EI_DATA
+says.  Measured on an ELFDATA2MSB object - tb/base.7z's cgi/bd.obj, or any
+member of its lib/libk80.a - it reads the header as `Sections: 3072,
+Section header offset: 0xe8000000' and then dies with `struct.error:
+unpack requires a buffer of 4 bytes', writing no output.  Upper-casing an
+ELF string table is itself endian-independent; only the header and
+section-header reads are not.
 """
 import struct
 import sys
