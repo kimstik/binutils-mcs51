@@ -1216,10 +1216,10 @@ index 00000000..bcd0d2b0
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..66a4ebfc
+index 00000000..07b367f1
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2886 @@
+@@ -0,0 +1,2900 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -1246,15 +1246,15 @@ index 00000000..66a4ebfc
 +#include "subsegs.h"
 +#include "elf/i51.h"
 +#include <stdio.h>
-+#include <ctype.h>
++#include "safe-ctype.h"
 +
 +//#define ASMDBG 1
 +
 +/* forward declaration */
-+static int  check_range (long, int);
++static int  check_range (offsetT, int);
 +static int  i51_prefix_keyword (const char *);
 +static int  i51_arg_kind (char);
-+static void i51_check_direct (fixS *, long);
++static void i51_check_direct (fixS *, offsetT);
 +static void fixup8 (expressionS *, int, int);
 +static void fixup11 (expressionS *, unsigned int, int, int);
 +static void fixup16 (expressionS *, int, int);
@@ -1730,7 +1730,10 @@ index 00000000..66a4ebfc
 +  /* Find the op code end.  */
 +  for (op_end = from; *op_end != 0 && *op_end != ',' && *op_end != ' ';)
 +    {
-+      to[size++] = toupper ((unsigned char) *op_end++);
++      /* TOUPPER folds the same way in every locale, so a lower-case
++	 operand name reaches the same hash entry on every host.  */
++      to[size++] = TOUPPER ((unsigned char) *op_end);
++      op_end++;
 +      if (size + 1 >= limit)
 +	break;
 +    }
@@ -2013,7 +2016,7 @@ index 00000000..66a4ebfc
 +{
 +  bfd_byte *where;
 +  unsigned long insn;
-+  long value;
++  offsetT value;
 +
 +  if (fixp->fx_addsy == (symbolS *) NULL)
 +    {
@@ -2084,7 +2087,7 @@ index 00000000..66a4ebfc
 +	case BFD_RELOC_I51_8_HIGH:
 +	  if (value < -65536 || value > 65535)
 +	    as_bad_where (fixp->fx_file, fixp->fx_line,
-+			  _("operand out of range: %ld"), value);
++			  _("operand out of range: %lld"), (long long) value);
 +	  value >>= 8;
 +	  /* Fall through.  */
 +
@@ -2094,17 +2097,17 @@ index 00000000..66a4ebfc
 +	case BFD_RELOC_I51_8_BIT:
 +	  if (value < -256 || value > 255)
 +	    as_bad_where (fixp->fx_file, fixp->fx_line,
-+			  _("operand out of range: %ld"), value);
++			  _("operand out of range: %lld"), (long long) value);
 +	  ((bfd_byte *) where)[0] = (bfd_byte) (value & 0xFF);
 +	  break;
 +
 +	case BFD_RELOC_I51_7_PCREL:
 +	  if (value < -128 || value > 127)
 +	    as_bad_where (fixp->fx_file, fixp->fx_line,
-+			  _("operand out of range: %ld"), value);
++			  _("operand out of range: %lld"), (long long) value);
 +	  ((bfd_byte *) where)[0] = (bfd_byte) value;
 +#ifdef ASMDBG
-+	  fprintf(stderr, "fbdreloc7: %lx\n", value);
++	  fprintf(stderr, "fbdreloc7: %llx\n", (unsigned long long) value);
 +#endif
 +	  break;
 +
@@ -2117,13 +2120,14 @@ index 00000000..66a4ebfc
 +	     the following instruction, so the target has to sit in the
 +	     same 2K page.  */
 +	  {
-+	    long pc = (fixp->fx_frag->fr_address + fixp->fx_where + 2);
++	    offsetT pc = (fixp->fx_frag->fr_address + fixp->fx_where + 2);
 +
 +	    if (((value ^ pc) & 0xF800) != 0)
 +	      as_bad_where (fixp->fx_file, fixp->fx_line,
-+			    _("ACALL/AJMP target 0x%lx is not in the same "
-+			      "2K page as 0x%lx"),
-+			    (unsigned long) value, (unsigned long) pc);
++			    _("ACALL/AJMP target 0x%llx is not in the same "
++			      "2K page as 0x%llx"),
++			    (unsigned long long) value,
++			    (unsigned long long) pc);
 +	  }
 +	  insn = bfd_getb16 (where) & 0x1F00;
 +	  value = (((value & 0x0700) << 5) | (value & 0x00FF));
@@ -2142,16 +2146,16 @@ index 00000000..66a4ebfc
 +	       past the eighth names no bit of it.  */
 +	    if (off > 7)
 +	      as_bad_where (fixp->fx_file, fixp->fx_line,
-+			    _("operand out of bit range: B2B(%ld,%ld)."),
-+			    value, off);
++			    _("operand out of bit range: B2B(%lld,%ld)."),
++			    (long long) value, off);
 +	    else if (value >= 0x20 && value < 0x30)
 +	      where[0] = (bfd_byte) ((value - 0x20) * 8 + off);
 +	    else if (value >= 0x80 && value <= 0xF8 && (value & 7) == 0)
 +	      where[0] = (bfd_byte) (value + off);
 +	    else
 +	      as_bad_where (fixp->fx_file, fixp->fx_line,
-+			    _("0x%lx is not bit addressable"),
-+			    (unsigned long) value);
++			    _("0x%llx is not bit addressable"),
++			    (unsigned long long) value);
 +	  }
 +	  break;
 +
@@ -2159,8 +2163,8 @@ index 00000000..66a4ebfc
 +	  /* Mirrors R_I51_13_PCODE in bfd/elf32-i51.c.  */
 +	  if (value < 0x0100)
 +	    as_bad_where (fixp->fx_file, fixp->fx_line,
-+			  _("pcode exec address underflow: 0x%lx"),
-+			  (unsigned long) value);
++			  _("pcode exec address underflow: 0x%llx"),
++			  (unsigned long long) value);
 +	  insn = bfd_getb16 (where) & 0xE000;
 +	  bfd_putb16 ((bfd_vma) (insn | (value & 0x1FFF)), where);
 +	  break;
@@ -2892,7 +2896,7 @@ index 00000000..66a4ebfc
 +
 +/* Checks that the number 'num' fits for a given mode.  */
 +static int
-+check_range (long num, int mode)
++check_range (offsetT num, int mode)
 +{
 +  switch (mode)
 +    {
@@ -2907,11 +2911,13 @@ index 00000000..66a4ebfc
 +      return (num >= -128 && num <= 127) ? 1 : 0;
 +
 +    case I51_OP_JUMP_INPAGE:
-+      return (((num & 0xFFFF0000) == 0) || ((num & 0xFFFF0000) == 0xFFFF0000)) ? 1 : 0;
++      /* A 16-bit operand written either as an unsigned value or as its
++	 negative: 0..65535 and -65536..-1.  */
++      return (num >= -65536 && num <= 65535) ? 1 : 0;
 +
 +    case I51_OP_IMM16:
 +    case I51_OP_HIGH_ADDR:
-+      return (((num & 0xFFFF0000) == 0) || ((num & 0xFFFF0000) == 0xFFFF0000)) ? 1 : 0;
++      return (num >= -65536 && num <= 65535) ? 1 : 0;
 +
 +    case I51_OP_LOW_ADDR:
 +      return 1;
@@ -2950,7 +2956,7 @@ index 00000000..66a4ebfc
 +   assembled.  */
 +
 +static void
-+i51_check_direct (fixS *fixp, long value)
++i51_check_direct (fixS *fixp, offsetT value)
 +{
 +  symbolS *sym = fixp->tc_fix_data;
 +  offsetT addr;
@@ -2977,10 +2983,10 @@ index 00000000..66a4ebfc
 +	  : (offsetT) value);
 +  if (addr >= 0x80)
 +    as_bad_where (fixp->fx_file, fixp->fx_line,
-+		  _("`%s' is at 0x%lx, which a direct address cannot reach: "
++		  _("`%s' is at 0x%llx, which a direct address cannot reach: "
 +		    "0x80 and above is the special function register page, "
 +		    "and RAM there is reachable only through @R0/@R1"),
-+		  S_GET_NAME (sym), (unsigned long) addr);
++		  S_GET_NAME (sym), (unsigned long long) addr);
 +}
 +
 +/* Put a 1 byte expression described by 'oper'.  If this expression contains
@@ -3195,9 +3201,17 @@ index 00000000..66a4ebfc
 +{
 +  size_t len = strlen (kw);
 +  char *p = skip_space (input_line_pointer);
++  size_t i;
 +
-+  if (strncasecmp (p, kw, len) != 0)
-+    return 0;
++  /* An ASCII fold rather than strncasecmp (): gas calls setlocale
++     (LC_CTYPE, ""), so a case fold from the C library follows the user's
++     locale, and in one where `i' and `I' are not a pair the prefixes stop
++     being recognised - the operand assembles as an ordinary expression and
++     the bytes change with no diagnostic.  The comparison stops at the first
++     difference, so a P shorter than KW ends it at the terminator.  */
++  for (i = 0; i < len; i++)
++    if (TOUPPER ((unsigned char) p[i]) != TOUPPER ((unsigned char) kw[i]))
++      return 0;
 +  if (is_part_of_name (p[len]))
 +    return 0;
 +
