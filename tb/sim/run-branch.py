@@ -42,6 +42,14 @@ def main():
 
     print('== branch: %d cases' % len(branch.CASES))
     bad = []
+    # Cases that reported, not messages: the numerator has to stay a count of
+    # cases that passed even if a case ever grows a second complaint.
+    failed = set()
+
+    def fail(name, detail):
+        bad.append('%-16s %s' % (name, detail))
+        failed.add(name)
+
     with tempfile.TemporaryDirectory() as work:
         for c in branch.CASES:
             pad = c['skip']
@@ -50,22 +58,22 @@ def main():
 
             if c['want'] is None:
                 if err is None:
-                    bad.append('%-16s %-22s accepted, must be rejected'
-                               % (c['name'], c['src']))
+                    fail(c['name'], '%-22s accepted, must be rejected'
+                         % c['src'])
                 continue
 
             want = bytes(pad) + bytes.fromhex(c['want'])
             if err is not None:
-                bad.append('%-16s %-22s %s' % (c['name'], c['src'], err))
+                fail(c['name'], '%-22s %s' % (c['src'], err))
             elif got != want:
                 if got[:pad] == want[:pad]:
                     what = 'want %s got %s' % (want[pad:].hex(),
                                                got[pad:].hex() or 'nothing')
                 else:
                     what = 'padding differs, want %d zero bytes' % pad
-                bad.append('%-16s %-22s %s' % (c['name'], c['src'], what))
+                fail(c['name'], '%-22s %s' % (c['src'], what))
 
-    print('   checked:  %d/%d' % (len(branch.CASES) - len(bad),
+    print('   checked:  %d/%d' % (len(branch.CASES) - len(failed),
                                   len(branch.CASES)))
     for line in bad:
         print('     ' + line)

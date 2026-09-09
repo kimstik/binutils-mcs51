@@ -412,9 +412,15 @@ def main():
 
     bad = []
     checks = 0
+    # Checks that produced at least one message, not messages: one check can
+    # report up to eleven of them (a relocation table compared entry by
+    # entry), so counting messages would subtract eleven for one failure and
+    # can drive the printed numerator below zero.
+    failed = set()
 
     def fail(what, detail):
         bad.append('%-18s %s' % (what, detail))
+        failed.add(checks)
 
     with tempfile.TemporaryDirectory() as work:
         t.work = work
@@ -605,7 +611,7 @@ def main():
                              % (img.hex(), straight.hex()))
 
     print('== reloc: %d checks' % checks)
-    print('   checked:  %d/%d' % (checks - len(bad), checks))
+    print('   checked:  %d/%d' % (checks - len(failed), checks))
     for line in bad:
         print('     ' + line)
     print('FAIL: %d' % len(bad) if bad else 'PASS')

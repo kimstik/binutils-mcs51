@@ -80,6 +80,13 @@ def main():
     total = len(bits.ASM_CASES) + len(bits.DIR_CASES) + len(bits.LINK_CASES)
     print('== bits: %d cases' % total)
     bad = []
+    # Cases that reported, not messages: the numerator is a count of cases
+    # that passed, and stays one if a case ever grows a second complaint.
+    failed = set()
+
+    def fail(name, detail):
+        bad.append('%-18s %s' % (name, detail))
+        failed.add(name)
 
     with tempfile.TemporaryDirectory() as work:
         for c in bits.ASM_CASES + bits.DIR_CASES:
@@ -88,58 +95,58 @@ def main():
                               for l in c['src'].splitlines())
             if c['want'] is None:
                 if obj is not None:
-                    bad.append('%-18s %-30s accepted, must be rejected'
-                               % (c['name'], flat))
+                    fail(c['name'], '%-30s accepted, must be rejected'
+                               % (flat))
                 elif c['msg'] and c['msg'] not in err:
-                    bad.append('%-18s %-30s rejected, but not for `%s\': %s'
-                               % (c['name'], flat, c['msg'],
+                    fail(c['name'], '%-30s rejected, but not for `%s\': %s'
+                               % (flat, c['msg'],
                                   err.splitlines()[0] if err else ''))
                 continue
             if obj is None:
-                bad.append('%-18s %-30s %s'
-                           % (c['name'], flat, err.splitlines()[-1] if err else 'as failed'))
+                fail(c['name'], '%-30s %s'
+                           % (flat, err.splitlines()[-1] if err else 'as failed'))
                 continue
             sec = c.get('section', '.text')
             got = (t.text(obj, work) if sec == '.text'
                    else t.section(obj, work, sec))
             if got is None:
-                bad.append('%-18s %-30s no %s in the object'
-                           % (c['name'], flat, sec))
+                fail(c['name'], '%-30s no %s in the object'
+                           % (flat, sec))
                 continue
             want = bytes.fromhex(c['want'])
             if got != want:
-                bad.append('%-18s %-30s %s: want %s got %s'
-                           % (c['name'], flat, sec, want.hex(),
+                fail(c['name'], '%-30s %s: want %s got %s'
+                           % (flat, sec, want.hex(),
                               got.hex() or 'nothing'))
 
         for c in bits.LINK_CASES:
             src = 'setb B2B(BDVAR,%d)' % c['off']
             obj, err = t.assemble(src, work, 'link.o')
             if obj is None:
-                bad.append('%-18s %-30s %s' % (c['name'], src, err))
+                fail(c['name'], '%-30s %s' % (src, err))
                 continue
             elf, log = t.link(obj, work, {'BDVAR': c['addr']})
             what = '%s BDVAR=0x%02x' % (src, c['addr'])
             if c['want'] is None:
                 if c['msg'] not in log:
-                    bad.append('%-18s %-30s expected `%s\', got: %s'
-                               % (c['name'], what, c['msg'],
+                    fail(c['name'], '%-30s expected `%s\', got: %s'
+                               % (what, c['msg'],
                                   log.splitlines()[-1] if log else 'a clean link'))
                 continue
             if elf is None:
-                bad.append('%-18s %-30s link failed: %s'
-                           % (c['name'], what, log.splitlines()[-1] if log else ''))
+                fail(c['name'], '%-30s link failed: %s'
+                           % (what, log.splitlines()[-1] if log else ''))
                 continue
             got = t.text(elf, work)
             if len(got) < 2 or got[1] != c['want']:
-                bad.append('%-18s %-30s want bit 0x%02x got %s'
-                           % (c['name'], what, c['want'],
+                fail(c['name'], '%-30s want bit 0x%02x got %s'
+                           % (what, c['want'],
                               '0x%02x' % got[1] if len(got) > 1 else 'nothing'))
             elif log:
-                bad.append('%-18s %-30s linked, but complained: %s'
-                           % (c['name'], what, log.splitlines()[-1]))
+                fail(c['name'], '%-30s linked, but complained: %s'
+                           % (what, log.splitlines()[-1]))
 
-    print('   checked:  %d/%d' % (total - len(bad), total))
+    print('   checked:  %d/%d' % (total - len(failed), total))
     for line in bad:
         print('     ' + line)
     print('FAIL: %d' % len(bad) if bad else 'PASS')
