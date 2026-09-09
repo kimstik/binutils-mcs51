@@ -1,5 +1,16 @@
 # Nothing produced by a build belongs in this repository
 work/
+
+# what release.yml assembles in the runner's workspace
+dl/
+out/
+body.md
 *.o
 *.obj
 *.lst
+
+# agent worktrees
+.claude/
+
+# python bytecode from the testbench helpers
+__pycache__/

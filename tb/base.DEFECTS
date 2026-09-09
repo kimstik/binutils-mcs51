@@ -1,0 +1,110 @@
+DEFECTS - tb/base.7z
+====================
+
+Defects in the vendored 2001 material inside tb/base.7z that are known and
+deliberately NOT repaired. The archive is an input, not source this project
+maintains: its sha256 is recorded in tb/base2001.PROVENANCE and the ten
+projekt/<p>/www8051.rom files it ships are pinned in tb/reference.md5, so a
+repack moves the reference every gate run is judged against.
+
+Archive measured for this file: sha256
+e4cdbb943b96f589e2f072e9355e261e281c6ddcd84e529a1422d585e33163bb, 132549
+bytes, which is the hash tb/base2001.PROVENANCE already records.
+
+Why a note and not a patch. tb/isa/testall-fixes.patch is the other half of
+this rule: there a vendored third-party file has a defect and the defect IS
+repaired, because tb/sim/run-testall.sh copies testall.asm to a work
+directory and assembles it on every `make sim' run, so the correction has a
+run to attach to and the vendored bytes still never change. Nothing in the
+gate assembles the file below. A .patch beside it would be a repair that
+never runs, and running it is precisely what must not happen: see WHY IT IS
+LEFT.
+
+
+------------------------------------------------------------------------
+1. lib/http.asm line 98 - `cjne a,0xFF' should be `cjne a,#0xFF'
+------------------------------------------------------------------------
+
+Lines 95-100 of lib/http.asm, the 16-bit decrement of data_len:
+
+    ;; data_len--;
+        dec     data_len+1      ;LSB
+        mov     a,data_len+1
+        cjne    a,0xFF,nodecdlen        <-- line 98
+        dec     data_len        ;MSB
+    nodecdlen:
+
+The borrow into the high byte is meant to be taken when the low byte just
+wrapped 0x00 -> 0xFF, so the operand is meant to be the constant 255. Written
+without `#' it is a direct address instead. The instruction assembles as
+CJNE A,direct,rel, opcode 0xB5, and compares A against the byte read from
+direct address 0xFF - which is in SFR space and unimplemented on the 8051,
+so the value is whatever the part returns for an absent SFR. The borrow is
+then taken, or skipped, for a reason unconnected to the counter.
+
+What it should be: `cjne a,#0xFF,nodecdlen', which is CJNE A,#data,rel,
+opcode 0xB4. Same length, one opcode byte different.
+
+The `#' is not optional style. Every other comparison against a literal in
+the file carries it (`cjne a,#CR', `cjne a,#'g'', `cjne a,#8'), and the places
+that do mean a direct operand name a register-bank address rather than a
+number (`cjne a,ar2,ROMlop'), so line 98 is the only comparison in the file
+whose operand form disagrees with its comment.
+
+
+WHY IT IS LEFT
+--------------
+
+Because the defect is not a transcription slip in the .asm. It is in the
+2001 binary as well, and the binary is what the testbench links.
+
+  - No gate stage assembles lib/*.asm. tb/Makefile's check and oracle targets
+    run `make' only inside projekt/<p>, and each of those Makefiles takes the
+    library as a prebuilt file: nine link $(LIBDIR)/libw80.a via `-lw80',
+    serial links $(LIBDIR)/libw23.a via `-lw23'. lib/Makefile does carry an
+    http.obj rule and a libw.a rule, but nothing in tb/ ever descends into
+    lib/ to run them.
+
+  - The prebuilt member carries the same encoding. In base.7z's
+    lib/libw80.a, member http.obj, at .text offset 0x4c:
+
+        70 02  05 00  15 00  e5 00  b5 ff 02  15 00  e5 00  25
+
+    which is jnz +2 / inc data_addr / dec data_len+1 / mov a,data_len+1 /
+    CJNE A,0FFh,+2 / dec data_len / mov a,state80, and then the 0x25 opcode
+    of `add a,acc'. The direct operands are still 0x00, awaiting their
+    relocations; the 0xFF is not, because it is written as a constant.
+    Opcode 0xB5, the direct form. Hand-counting the instruction lengths from
+    the top of .text in lib/http.asm reaches 0x4c at that same line, so the
+    object is the source, assembled as written.
+
+    The identical bytes sit at the identical offset in base2001.7z's
+    lib/libw80.a, which section 1 of tb/base2001.PROVENANCE shows is copied
+    byte-for-byte out of the 2001 gnu13 tarball, and in base.7z's own
+    lib/lib23_old/libw23.a. Three copies of the 2001 build, one encoding.
+
+  - Nine of the ten pinned reference ROMs already contain the instruction,
+    at these offsets in projekt/<p>/www8051.rom as base.7z ships it:
+
+        ds1620   0x0fd5      led2     0x0bae
+        ds1822   0x0f55      led3     0x0c6c
+        lcd      0x0de4      serial   0x1785
+        led1     0x0c51      welcome  0x0ae8
+                             wjava    0x0ae8
+
+    diag is the exception, and only because it links no CGI objects and no
+    web51_80.obj, so nothing references a symbol http.obj defines and the
+    archive member is never pulled in; its 1267-byte ROM holds no copy.
+
+So repairing lib/http.asm inside the archive would leave the source and the
+shipped library disagreeing, and rebuilding the library from the repaired
+source would change one byte in nine ROMs: every md5 in tb/reference.md5
+except diag's, and the `make oracle' comparison against the untouched
+projekt/*/www8051.hex, which is the one record of what the 2001 port emitted
+and cannot be regenerated.
+
+That is a deliberate change to the reference, not hygiene. If it is ever
+wanted it belongs in a commit of its own that repacks base.7z, re-pins
+tb/reference.md5 and teaches tb/hexoracle.py to expect the delta, with this
+note updated to say so. Until then the archive stays as it is and the defect
+is recorded here so it cannot be lost.

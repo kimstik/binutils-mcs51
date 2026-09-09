@@ -1,7 +1,22 @@
 #!/usr/bin/env python3
 """
-Convert old i51 ELF objects (big-endian, machine 0x7262)
-to new i51 ELF objects (little-endian, machine 0x1051)
+Byte-swap a 2001 i51 ELF object: big-endian container, machine 0x7262 ->
+little-endian container, machine EM_8051 = 165.
+
+STALE.  The little-endian half is no longer a format this project uses, and
+`le2be' in the name has been backwards since the port went ELFDATA2MSB.
+Measured: all 30 loose objects in tb/base.7z are EI_DATA = 2 with e_machine
+165, and this script followed by i51elf_sym_uc.py turns tb/base2001.7z's
+cgi/bd.obj into an EI_DATA = 1 object hashing 47d84c73..., against
+base.7z's 702ced5b....  It does not reproduce the staged tree in
+docs/objects-report/staged/ either: those 28 files are EI_DATA = 1 but
+e_machine 0x1051.  This chain reproduces nothing that exists.
+
+The transform that does reproduce tb/base.7z, measured over every file in
+tb/base2001.7z: leave EI_DATA at 2, rewrite only e_machine as a big-endian
+halfword, upper-case every SHT_STRTAB linked from a SHT_SYMTAB, and touch
+nothing else - 28 of 28 loose objects and 4 of 4 archives come out
+byte-identical.  This script does not do that.
 """
 import struct
 import sys
@@ -33,10 +48,10 @@ def convert_elf(input_file, output_file):
     e_type = struct.unpack('>H', data[16:18])[0]
     data[16:18] = struct.pack('<H', e_type)
 
-    # e_machine at offset 18 (2 bytes) - change from 0x7262 to 0x1051
+    # e_machine at offset 18 (2 bytes) - change from 0x7262 to EM_8051 (165)
     old_machine = struct.unpack('>H', data[18:20])[0]
     print(f"  Old machine type: 0x{old_machine:04x}")
-    data[18:20] = struct.pack('<H', 0x1051)
+    data[18:20] = struct.pack('<H', 165)
 
     # e_version at offset 20 (4 bytes)
     e_version = struct.unpack('>I', data[20:24])[0]

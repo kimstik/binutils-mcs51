@@ -1,0 +1,111 @@
+name: mutation coverage
+
+# Which gate stage earns its place, measured rather than argued.
+#
+# NOT A GATE. It has one trigger, workflow_dispatch, and nothing merges or
+# releases on its verdict; it must never grow a `push' or `pull_request'
+# trigger. Its output is a table, not a pass/fail: a stage that reads zero
+# unique kills has not been shown to be removable, and COVERAGE.md says so
+# at the top and again at the bottom.
+#
+# What it does that .github/workflows/gate.yml cannot: gate.yml runs each
+# stage once against one tree. This runs the whole stage list against every
+# mutant produced by tb/mutation/gen.py, so each stage's verdict on each
+# injected fault is recorded on its own. `make -C tb mutants' cannot answer
+# the same question - it stops at the first stage that goes red, so a stage
+# late in the list is only ever recorded catching what every stage before it
+# missed, and the last run read sim 0 and commons 0 for that reason alone.
+#
+# COST. One incremental rebuild plus the entire stage list per mutant, where
+# an ordinary mutation run stops at the first red. `cap' is the knob: it is
+# gen.py's --cap, the number of mutants sampled per operator per file, and
+# the run grows roughly linearly in the population. The howto and opctab
+# operators carry fixed caps of their own inside gen.py (30 and 24), so even
+# cap=1 leaves a population of about sixty. A hosted runner is capped at six
+# hours; start low, read the wall clock the report prints, and raise it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      cap:
+        description: 'mutants per operator per file (gen.py --cap); the run grows with it'
+        required: false
+        default: '3'
+      stages:
+        description: 'stage list to measure, space separated (empty = tb/Makefile $(MUTGATE))'
+        required: false
+        default: ''
+      only:
+        description: 'restrict to these mutant ids or operator names, comma separated (empty = all)'
+        required: false
+        default: ''
+      timeout:
+        description: 'seconds allowed per stage; a stage that overruns is recorded as a kill by timeout'
+        required: false
+        default: '600'
+
+# One at a time: two runs would fight over the same work/ tree.
+concurrency:
+  group: mutation-coverage
+  cancel-in-progress: false
+
+jobs:
+  coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full sdcc-ucsim
+
+      # The tree the mutants are injected into, and the baseline the run
+      # refuses to start without: run.py puts the clean tree through the
+      # whole stage list first, because a stage already red would read as
+      # killing every mutant.
+      - name: Build the port
+        run: make -C tb build
+
+      - name: Full-matrix mutation run
+        env:
+          CAP: ${{ inputs.cap }}
+          STAGES: ${{ inputs.stages }}
+          ONLY: ${{ inputs.only }}
+          TMO: ${{ inputs.timeout }}
+        run: |
+          set -e
+          if [ -n "$STAGES" ]; then
+            make -C tb mutants-coverage \
+              MUTCAP="$CAP" MUTONLY="$ONLY" MUTTIMEOUT="$TMO" MUTSTAGES="$STAGES"
+          else
+            make -C tb mutants-coverage \
+              MUTCAP="$CAP" MUTONLY="$ONLY" MUTTIMEOUT="$TMO"
+          fi
+
+      # The report is the deliverable, so put it where it can be read without
+      # downloading anything.
+      - name: Report to the run summary
+        if: always()
+        run: |
+          if [ -f work/mutants/COVERAGE.md ]; then
+            cat work/mutants/COVERAGE.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '%s\n' \
+              '# mutation coverage' \
+              '' \
+              'No COVERAGE.md was produced - the run did not reach the report.' \
+              'The job log and the mutation-coverage artifact say how far it got.' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mutation-coverage
+          if-no-files-found: warn
+          path: |
+            work/mutants/COVERAGE.md
+            work/mutants/coverage.json
+            work/mutants/mutants.json

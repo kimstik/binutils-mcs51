@@ -1,0 +1,3 @@
+main: anl c,/c|:02000000B0D777
+main: anl c,/cy|:02000000B0D777
+main: orl c,/c|:02000000A0D787

@@ -1,0 +1,26 @@
+# Instructions whose operand byte is 0x00.
+# 8051.txt reaches no such encoding, and a disassembler that treats a zero
+# operand byte as a read error decodes every one of these as garbage while
+# every other gate stays green. The second group encodes a zero displacement
+# as well: the branch target is the address right after the instruction.
+# Same format as 8051.txt: source | Intel HEX record. Unlike 8051.txt the
+# golden column is hand-derived, from the MCS-51 manual - one instruction
+# each, no addressing subtlety involved.
+main: mov a,#0|:0200000074008A
+main: mov 0,a|:02000000F50009
+main: mov c,0|:02000000A2005C
+main: ljmp 0|:03000000020000FB
+main: mov dptr,#0|:030000009000006D
+main: jb 0,main|:030000002000FDE0
+main: cjne a,#0,main|:03000000B400FD4C
+main: djnz 0,main|:03000000D500FD2B
+main: mov 0,#0|:0300000075000088
+main: mov 0,1|:0300000085010077
+main: sjmp 0x0002|:0200000080007E
+main: jc 0x0002|:020000004000BE
+main: acall 0x0000|:020000001100ED
+main: ajmp 0x0000|:020000000100FD
+main: anl c,/0|:02000000B0004E
+main: jb 0,0x0003|:03000000200000DD
+main: cjne a,#0,0x0003|:03000000B4000049
+main: djnz 0,0x0003|:03000000D5000028

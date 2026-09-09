@@ -1,0 +1,302 @@
+name: release
+
+# The half that publishes. The deliverable of this repository is the two patches
+# in mcs51/ plus a built toolchain, and until now neither left CI: build.yml made
+# binaries for five hosts and they died with the run's artifact retention.
+#
+# Deliberate, never automatic: a tag matching v* , or a hand dispatch that has to
+# name the tag. A push to main publishes nothing.
+#
+# WHY A RE-RUN OF THE PUBLISH JOB CANNOT GET ROUND THE GATE
+#
+# The fourteen stages run in this same workflow run, in the `gate' job below, and
+# `publish' declares `needs: [gate, build]'. Actions will not start a job whose
+# needs did not succeed: while `gate' is red, `publish' is skipped, and the only
+# re-run that can reach it - "re-run failed jobs" - re-runs `gate' first. There
+# is no input, no `if:' and no `continue-on-error' anywhere on `gate' that a
+# dispatcher could use to skip or soften it.
+#
+# That is the structural half. The publish job then re-derives, for itself, the
+# facts the release note states, and refuses if any of them cannot be filled in:
+#
+#   * tb/Makefile's own gate list has to be exactly the fourteen names this
+#     workflow publishes. A stage deleted from $(GATE) to make the gate cheap
+#     is caught here. Both of the checks below read that same list, so between
+#     them they establish one fact, not two: what $(GATE) says it will run.
+#     That a stage actually ran is established by the point below, not by these.
+#   * the gate job only reports anything at all if every step before it passed:
+#     its recording step carries no `if:', so a failed stage skips it and the
+#     output arrives empty.
+#   * every archive is opened and its BUILD-INFO has to name this commit, this
+#     binutils version and this tarball hash, so artifacts from another build
+#     cannot be published under this tag.
+#   * the release is created as a draft, the assets are uploaded into it, the
+#     asset count is checked, and only then is it made public. A failure
+#     anywhere leaves a draft nobody is served, not a half-populated release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish at, e.g. v2.47-1. It must not already have a release.'
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The gate, in this run, on this commit. It runs tb/Makefile's $(GATE) through
+  # `make gate' rather than repeating the stage names, so there is no list here
+  # to fall out of step. gate.yml keeps no copy either any more - it asks
+  # tb/Makefile for the same names, because it wants a verdict per stage where
+  # this job only wants a verdict.
+  gate:
+    name: fourteen stages
+    runs-on: ubuntu-24.04
+    outputs:
+      stages: ${{ steps.stages.outputs.list }}
+      count: ${{ steps.stages.outputs.count }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full sdcc-ucsim
+
+      - name: Build the port
+        run: make -C tb build
+
+      # $(GATE): the eleven toolchain stages, then check and oracle. Stops at the
+      # first failure, which for a release is the whole answer.
+      - name: The gate
+        run: make -C tb gate BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      # Not in any list in the Makefile, so `make gate' does not run it: proves a
+      # sabotaged toolchain still makes the testbench go red.
+      - name: Testbench canary
+        run: make -C tb check-canary
+
+      # No `if:' on purpose. Any failure above skips this step, the outputs stay
+      # empty, and the publish job refuses on an empty stage list.
+      - name: Record which stages ran
+        id: stages
+        run: |
+          set -eu
+          list=$(make --no-print-directory -s -C tb gate-list)
+          count=$(printf '%s\n' $list | wc -l | tr -d ' ')
+          printf 'the gate passed %s stages: %s\n' "$count" "$list"
+          printf 'list=%s\n' "$list" >> "$GITHUB_OUTPUT"
+          printf 'count=%s\n' "$count" >> "$GITHUB_OUTPUT"
+
+  # The five host builds, from build.yml itself rather than a second copy of its
+  # matrix. Its archives are the release archives, so what is published is what
+  # every ordinary push already builds and checks.
+  build:
+    uses: ./.github/workflows/build.yml
+
+  publish:
+    needs: [gate, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+
+      - name: Read the pins from tb/Makefile
+        run: make --no-print-directory -s -C tb release-vars >> "$GITHUB_ENV"
+
+      # A tag push brings its own; a dispatch has to say. Either way it must look
+      # like a release tag, so `archive/...' and friends cannot become releases.
+      - name: Resolve the tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            tag=${GITHUB_REF#refs/tags/}
+          else
+            tag=$INPUT_TAG
+          fi
+          case "$tag" in
+            v[0-9]*) ;;
+            *) echo "::error::'$tag' is not a release tag - expected v<version>"; exit 1 ;;
+          esac
+          printf 'TAG=%s\n' "$tag" >> "$GITHUB_ENV"
+
+      # Releases are not overwritten, and a tag that already exists has to be the
+      # commit this run gated and built. Otherwise the release page would carry
+      # one commit's note over another commit's binaries.
+      - name: The tag must be free, or point at this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::a release already exists for $TAG - releases here are never overwritten"
+            exit 1
+          fi
+          ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" \
+                  --jq '.object.type + " " + .object.sha' 2> /dev/null || true)
+          if [ -n "$ref" ]; then
+            kind=${ref%% *}
+            sha=${ref##* }
+            if [ "$kind" = tag ]; then
+              sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.object.sha')
+            fi
+            if [ "$sha" != "$GITHUB_SHA" ]; then
+              echo "::error::$TAG points at $sha but this run gated and built $GITHUB_SHA"
+              exit 1
+            fi
+            echo "$TAG already exists at $sha, which is this commit"
+          else
+            echo "$TAG does not exist yet; publishing the draft will create it at $GITHUB_SHA"
+          fi
+
+      # Everything the body will claim, checked before anything is assembled.
+      # Any hole here and no release is created at all.
+      - name: The body's facts, or no release
+        env:
+          STAGES_RAN: ${{ needs.gate.outputs.stages }}
+          COUNT_RAN: ${{ needs.gate.outputs.count }}
+        run: |
+          set -u
+          rc=0
+          # The fourteen this release note names, pinned. When a stage is added
+          # to $(GATE), this line and the wording of the body change together -
+          # until they do, no release is cut claiming a number that moved.
+          want='isa roundtrip branch bits reloc guard sim defaultlink commons script disasm check oracle check-canary'
+          if [ "$GATE_STAGES" != "$want" ]; then
+            echo "::error::tb/Makefile's gate list is '$GATE_STAGES', this workflow publishes '$want'"
+            rc=1
+          fi
+          if [ "$STAGES_RAN" != "$want" ]; then
+            echo "::error::the gate job reported '$STAGES_RAN', not the fourteen stages"
+            rc=1
+          fi
+          if [ "$COUNT_RAN" != 14 ]; then
+            echo "::error::the gate job reported '$COUNT_RAN' stages, the release body says fourteen"
+            rc=1
+          fi
+          if ! printf '%s' "$PORT_VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)+$'; then
+            echo "::error::PORT_VERSION '$PORT_VERSION' is not a binutils version"
+            rc=1
+          fi
+          if ! printf '%s' "$PORT_SHA256" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "::error::PORT_SHA256 is not a sha256"
+            rc=1
+          fi
+          if ! printf '%s' "$GITHUB_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::the commit is not a full sha"
+            rc=1
+          fi
+          exit $rc
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: dl
+          pattern: i51-binutils-*
+
+      # Copies nothing on trust: one archive per host in build.yml's matrix, each
+      # opened, each carrying this commit's BUILD-INFO, plus the two patches, plus
+      # SHA256SUMS over the lot.
+      - name: Assemble and verify the assets
+        run: |
+          python3 tb/release_manifest.py \
+            --workflow .github/workflows/build.yml \
+            --downloads dl --out out \
+            --version "$PORT_VERSION" --sha256 "$PORT_SHA256" \
+            --commit "$GITHUB_SHA" --target "$TARGET" \
+            --patch mcs51/additions.patch \
+            --patch mcs51/modifications.patch
+
+      # Every fact in the body is one this run established, and SHA256SUMS is
+      # inlined so the whole release can be checked from the page itself.
+      - name: Compose the body
+        run: |
+          set -eu
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          {
+            printf '%s\n' \
+              'GNU binutils for the Intel MCS-51 / 8051, target `i51-elf`, built from the two' \
+              'patches in `mcs51/` and published only from a tree that passed the gate.' \
+              '' \
+              '| | |' \
+              '| --- | --- |'
+            printf '| upstream binutils | `%s` |\n' "$PORT_VERSION"
+            printf '| upstream tarball | `%s` |\n' "$PORT_TARBALL"
+            printf '| its sha256 | `%s` |\n' "$PORT_SHA256"
+            printf '| built from commit | `%s` |\n' "$GITHUB_SHA"
+            printf '| gate | 14 of 14 stages passed |\n'
+            printf '| run | %s |\n' "$run_url"
+            printf '%s\n' \
+              '' \
+              'The tarball hash above is not a note: `tb/Makefile` pins it as `PORT_SHA256`' \
+              'and every build in this run checked the tarball it downloaded against it, so' \
+              'a binutils release re-rolled under the same name would have failed the run.' \
+              '' \
+              '## The fourteen stages'
+            printf '\n`%s`\n' "$GATE_STAGES"
+            printf '%s\n' \
+              '' \
+              'They ran on this commit, in the run linked above, before any of these files' \
+              'existed. `make -C tb gate-list` prints the same list.' \
+              '' \
+              '## Files' \
+              '' \
+              'One archive per host, stripped, each unpacking to a directory of its own name' \
+              'and carrying `bin/`, the licence, and a `BUILD-INFO.txt` naming this commit.' \
+              'The two patches are the deliverable proper and apply to the binutils above' \
+              'with zero fuzz and zero offset.' \
+              '' \
+              '```'
+            cat out/SHA256SUMS
+            printf '%s\n' \
+              '```' \
+              '' \
+              'Verify with `sha256sum -c SHA256SUMS` after downloading.'
+          } > body.md
+          cat body.md
+
+      # Created as a draft with every asset in the same call, counted, and only
+      # then made public. A failure anywhere leaves a draft, which nobody is
+      # served and which the "already exists" check above will refuse to build
+      # a second release on top of - never a release with four of five hosts.
+      #
+      # Publishing the draft is also what creates the tag, at --target. That
+      # push is made with GITHUB_TOKEN, and Actions does not start workflows
+      # from GITHUB_TOKEN pushes, so it cannot come back round as another
+      # release run.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          want=$(ls out | wc -l | tr -d ' ')
+          gh release create "$TAG" \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "i51 binutils $TAG (binutils $PORT_VERSION)" \
+            --notes-file body.md \
+            out/*
+          have=$(gh release view "$TAG" --json assets --jq '.assets | length')
+          if [ "$have" != "$want" ]; then
+            echo "::error::$have of $want assets reached the draft - it stays a draft"
+            exit 1
+          fi
+          echo "$have assets in the draft; publishing"
+          gh release edit "$TAG" --draft=false
+          gh release view "$TAG" --json url --jq .url

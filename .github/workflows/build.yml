@@ -2,9 +2,23 @@ name: build
 
 # mcs51/additions.patch and mcs51/modifications.patch applied to binutils,
 # built for each host, then verified against the testbench.
+#
+# `workflow_call' is here so release.yml can build the release archives with
+# this workflow instead of keeping a second copy of the host matrix. The
+# archives it uploads ARE the release archives - same names, same layout, same
+# `make dist' - so every push that touches the port already proves the
+# packaging a release will use, and a host added here is released without
+# anybody remembering to add it anywhere else.
+#
+# The archive names carry the binutils version and an unambiguous host, and the
+# directory inside carries the same name: `win64' said neither the OS nor the
+# architecture (Windows on arm64 exists), and every host's archive used to
+# unpack to a directory called `toolchain', so unpacking two of them in one
+# place silently left one on top of the other.
 
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     paths:
       - 'mcs51/**'
@@ -22,41 +36,64 @@ jobs:
             flags: -Os -flto -march=haswell
             arwrap: yes
             check: native
+            distrun: native
+            pack: tar
           - name: linux-arm64
             os: ubuntu-24.04-arm
             flags: -Os -flto
             arwrap: yes
             check: native
+            distrun: native
+            pack: tar
           - name: macos-arm64
             os: macos-14
             flags: -Os -flto
             arwrap: ''
             check: native
-          - name: win64
+            distrun: native
+            pack: tar
+          - name: windows-x86_64
             os: ubuntu-24.04
             host: x86_64-w64-mingw32
             flags: -Os -flto -march=haswell
             arwrap: yes
             check: wine
-          - name: win32
+            distrun: wine
+            pack: zip
+          - name: windows-i686
             os: ubuntu-24.04
             host: i686-w64-mingw32
             flags: -Os -flto
             arwrap: yes
             check: wine
+            distrun: wine
+            pack: zip
 
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
+      # The pins live in tb/Makefile and nowhere else: PORT_VERSION names the
+      # archives below, and the release workflow reads the same line.
+      - name: Read the pins from tb/Makefile
+        run: make --no-print-directory -s -C tb release-vars >> "$GITHUB_ENV"
+
       - name: Install build dependencies (linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y p7zip-full texinfo
+          sudo apt-get install -y p7zip-full texinfo zip
           if [ -n "${{ matrix.host }}" ]; then sudo apt-get install -y mingw-w64; fi
-          if [ "${{ matrix.check }}" = wine ]; then sudo apt-get install -y wine64; fi
+          if [ "${{ matrix.check }}" = wine ]; then
+            if [ "${{ matrix.host }}" = i686-w64-mingw32 ]; then
+              sudo dpkg --add-architecture i386
+              sudo apt-get update
+              sudo apt-get install -y wine64 wine32:i386
+            else
+              sudo apt-get install -y wine64
+            fi
+          fi
 
       - name: Install build dependencies (macos)
         if: runner.os == 'macOS'
@@ -64,7 +101,7 @@ jobs:
           HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
           HOMEBREW_NO_INSTALL_UPGRADE: 1
         run: |
-          brew install --quiet coreutils
+          brew install --quiet coreutils p7zip
           echo "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
 
       - name: Build
@@ -74,17 +111,49 @@ jobs:
         if: matrix.check == 'native'
         run: make -C tb check BUILD=$GITHUB_WORKSPACE/work/modern/build
 
+      # Runs whatever the testbench reported: it checks that a broken toolchain
+      # makes the testbench go red, which is only worth knowing when the testbench
+      # has just been run.
+      - name: Testbench canary
+        if: always() && matrix.check == 'native'
+        run: make -C tb check-canary
+
+      - name: Instruction gate
+        if: matrix.check == 'native'
+        run: make -C tb isa BUILD=$GITHUB_WORKSPACE/work/modern/build
+
       - name: Smoke test under wine
         if: matrix.check == 'wine'
         run: |
+          set -o pipefail
           wine work/modern/build/gas/as-new.exe --version | head -2
           wine work/modern/build/ld/ld-new.exe --version | head -2
 
+      # Installs, licences, strips, and then runs tb/dist_check.sh over the
+      # INSTALLED tree - the only check in the repository that looks at what
+      # `install' produced rather than at the build directory. On the two mingw
+      # hosts it assembles and links its probe under wine, so the .exe files
+      # that go into the archive are the ones proved to work.
       - name: Install and strip
-        run: make -C tb dist HOST=${{ matrix.host }}
+        run: |
+          make -C tb dist \
+            HOST=${{ matrix.host }} \
+            DIST_LABEL=${{ matrix.name }} \
+            DIST_RUN=${{ matrix.distrun }} \
+            DIST_COMMIT=$GITHUB_SHA
 
+      # zip for Windows, tar.gz elsewhere, and the directory inside the archive
+      # is named after the archive so two hosts cannot land on top of each other.
       - name: Package
-        run: tar czf i51-binutils-${{ matrix.name }}.tar.gz -C work/modern toolchain
+        run: |
+          set -eu
+          pkg="i51-binutils-$PORT_VERSION-${{ matrix.name }}"
+          mv work/modern/toolchain "work/modern/$pkg"
+          case "${{ matrix.pack }}" in
+            zip) ( cd work/modern && zip -q -r -9 "$GITHUB_WORKSPACE/$pkg.zip" "$pkg" ) ;;
+            *)   tar czf "$pkg.tar.gz" -C work/modern "$pkg" ;;
+          esac
+          ls -l ./"$pkg".*
 
       - name: Refresh the patches
         if: matrix.name == 'linux-x86_64'
@@ -94,9 +163,12 @@ jobs:
         if: always()
         with:
           name: i51-binutils-${{ matrix.name }}
-          if-no-files-found: ignore
+          if-no-files-found: warn
           path: |
-            i51-binutils-${{ matrix.name }}.tar.gz
+            i51-binutils-*.tar.gz
+            i51-binutils-*.zip
             work/refreshed/*.patch
             work/tb/results.md5
+            work/tb/projekt/*/www8051.rom
+            work/tb/projekt/*/map
             work/tb/*.log

@@ -1,0 +1,157 @@
+name: upstream-watch
+
+# Notices a new upstream binutils release and proves the port still applies to it.
+#
+# Every night it lists https://ftp.gnu.org/gnu/binutils/, the directory
+# tb/Makefile's PORT_URL downloads from, and compares the newest release carrying
+# a detached .sig against PORT_VERSION. Same version: the run says so in its
+# summary and touches nothing - a watcher that files an issue every night is a
+# watcher people switch off. Newer: it downloads that tarball, records its
+# sha256, applies mcs51/additions.patch and mcs51/modifications.patch at
+# --fuzz 0, and files ONE issue carrying the version, the sha256 and the per-file
+# result. While that issue is open it is rewritten rather than duplicated.
+#
+# Why ftp.gnu.org and not sourceware.org, and what makes a listing entry a
+# release: the docstring at the head of tb/upstream_watch.py, which also records
+# what both listings held when this was written.
+#
+# WHAT IT MAY NOT DO. It never edits tb/Makefile, never rewrites mcs51/*.patch,
+# never runs `make refresh', never commits and never opens a pull request - the
+# job's token is `contents: read'. The patches are the deliverable: a machine may
+# report that they still apply and may not decide that they do, and it may not
+# walk the port onto a release nobody has looked at. Bumping PORT_VERSION and
+# PORT_SHA256 is a human edit, and .github/workflows/gate.yml is what then says
+# whether the port still works.
+#
+# HOW IT FAILS. Patches that do not apply to a new release are news, not a broken
+# watcher: the job stays green and the issue says "rejected". The job goes red
+# only when the watcher cannot be trusted to have answered the question - index
+# unreachable or unparsable, the pinned PORT_VERSION missing from the listing,
+# PORT_URL pointing somewhere other than the listed directory, a download that is
+# not a tarball, a .sig that is an error page, patch(1) in trouble rather than
+# rejecting hunks. No path turns a failure into "nothing new".
+#
+# The one failure this cannot make loud is GitHub's own: a scheduled workflow
+# stops running after 60 days without activity in the repository, and nothing
+# inside the repository can notice that its own schedule was disabled. The
+# workflow_dispatch button below re-arms it, and frozen.yml's weekly schedule
+# lives with the same rule.
+#
+# Testing it without waiting for a release: run it from the Actions tab with
+# `pretend_port_version` set to an older release, e.g. 2.40. That forces the
+# whole download-and-apply path against the newest release and, because a
+# pretended baseline would produce a misleading issue, forces a dry run: the
+# report goes to the job summary and the artifact, and no issue is touched.
+# `make -C tb upstream PRETEND=2.40' does the same on a workstation.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pretend_port_version:
+        description: 'Compare against this version instead of PORT_VERSION (forces a dry run)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Write the report, touch no issue'
+        type: boolean
+        default: true
+  schedule:
+    # Nightly, off the hour: GitHub queues everything scheduled on the hour.
+    - cron: '41 5 * * *'
+
+permissions:
+  contents: read
+
+# One at a time, and never cancelled halfway: a cancelled run could stop between
+# `gh issue create' and the next night's update.
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # Needs nothing installed: python3, make, patch, tar and xz are all on the
+      # runner image, and the script is stdlib-only.
+      - name: Look for a newer release and apply the patches to it
+        id: watch
+        env:
+          UPSTREAM_WATCH_PRETEND: ${{ inputs.pretend_port_version }}
+          UPSTREAM_WATCH_DRY_RUN: ${{ inputs.dry_run && 'yes' || 'no' }}
+        run: make -C tb upstream
+
+      # The step above exits 0 both when there is nothing to report and when there
+      # is, so "green" alone does not say it reached a decision. This makes the
+      # decision itself the thing that has to be present: an exit 0 that named
+      # neither `none' nor `report' - outputs lost, an early return added later -
+      # fails here instead of passing for a night nobody was told about.
+      - name: The watcher has to have decided something
+        env:
+          ACTION: ${{ steps.watch.outputs.action }}
+          VERSION: ${{ steps.watch.outputs.version }}
+          DRY: ${{ steps.watch.outputs.dry_run }}
+        run: |
+          set -eu
+          case "$ACTION" in
+            none)   echo "newest release $VERSION, nothing to report" ;;
+            report) echo "newest release $VERSION, reporting (dry_run=$DRY)" ;;
+            *)      echo "::error title=upstream-watch::the watcher exited 0 without deciding anything (action='$ACTION')"
+                    exit 1 ;;
+          esac
+
+      # One issue, reused. The label is the identity - it is an API filter, not a
+      # search query, so it answers the same way the moment the issue exists,
+      # where `gh issue list --search' can lag behind its index and open a second
+      # issue for the same release. The body is replaced every run; a comment is
+      # posted only when the headline actually changed, so an unattended report
+      # sitting open notifies nobody a second time.
+      - name: File or update the one issue
+        if: steps.watch.outputs.action == 'report' && steps.watch.outputs.dry_run == 'no'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ steps.watch.outputs.title }}
+          REPORT: ${{ steps.watch.outputs.report }}
+        run: |
+          set -euo pipefail
+          test -s "$REPORT"
+          gh label create upstream-watch --color 0e8a16 --force \
+             --description 'filed by .github/workflows/upstream.yml'
+          gh issue list --state open --label upstream-watch --limit 50 \
+             --json number,title > work/upstream/open.json
+          count=$(jq 'length' work/upstream/open.json)
+          number=$(jq -r '.[0].number // empty' work/upstream/open.json)
+          old=$(jq -r '.[0].title // empty' work/upstream/open.json)
+          if [ "$count" -gt 1 ]; then
+            echo "::warning title=upstream-watch::$count open upstream-watch issues, updating the newest (#$number) - close the others"
+          fi
+          if [ -z "$number" ]; then
+            gh issue create --title "$TITLE" --label upstream-watch --body-file "$REPORT"
+          else
+            gh issue edit "$number" --title "$TITLE" --body-file "$REPORT"
+            if [ "$old" = "$TITLE" ]; then
+              echo "#$number already says: $TITLE - body refreshed, no comment"
+            else
+              gh issue comment "$number" --body "upstream-watch: $TITLE (was: $old)"
+            fi
+          fi
+
+      # The rejected hunks themselves, which is what a maintainer actually works
+      # from. Skipped when there was nothing to report; kept when the watcher
+      # failed, because the apply logs are then the evidence. The tarball and the
+      # extracted tree are not uploaded.
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.watch.outputs.action != 'none'
+        with:
+          name: upstream-watch
+          if-no-files-found: warn
+          path: |
+            work/upstream/report.md
+            work/upstream/*.apply.log
+            work/upstream/binutils-*/**/*.rej

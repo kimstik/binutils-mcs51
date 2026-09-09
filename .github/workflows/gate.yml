@@ -1,0 +1,135 @@
+name: gate
+
+# Instruction-level gate. Green here is the condition for merging into main.
+#
+# It runs on every branch, on main, and on every pull request. It used to carry
+# `branches-ignore: [main]' and no `pull_request' trigger at all, which meant the
+# gate never ran on the branch it gates and never ran on the change being merged
+# - only on the pushes to the topic branch beforehand.
+#
+# THE STAGE LIST IS NOT WRITTEN IN THIS FILE. It used to be: one hand-written
+# step per stage, a second copy of a list tb/Makefile already owned, and that
+# copy had drifted - for a long time the merge gate ran `oracle' and never once
+# hashed a produced ROM against the reference base.7z ships. The one step below
+# asks tb/Makefile for the names (`make -C tb ci-list', which is $(GATE) with
+# check-canary spliced in behind the `check' it judges) and runs whatever it
+# prints, so a stage added there is gated here with no edit to this file, and a
+# stage cannot be quietly left out of the run. `ci-list' refuses to print a list
+# that is not $(GATE) plus the canary, so that drift is fatal at the first line
+# of the step rather than invisible.
+#
+# What that step has to keep, and how, now that there is not a step per stage:
+#
+#   * one unit per stage in the log. Each stage runs inside a `::group::' of its
+#     own name and prints its verdict outside the fold, so the log reads as a
+#     PASS/FAIL list with each stage's output folded away behind its name.
+#   * the failing stage named without opening anything: an `::error' annotation
+#     per red stage, which Actions shows at the top of the run and against the
+#     job, plus a row per stage in the job summary.
+#   * a red stage does not stop the rest. That is what the per-step
+#     `if: always()' bought; the loop records each stage's status, carries on,
+#     and exits nonzero at the end if any of them failed.
+#
+# Why each stage exists is written above its recipe in tb/Makefile, which is
+# also where a stage is added. This file used to carry a second copy of those
+# notes as step comments; they are gone, not lost.
+#
+# The build is not a stage and stays a step of its own, before the loop: if it
+# fails there is no toolchain, and fourteen stages each reporting `no toolchain'
+# is noise. The artifact upload is not a stage either and keeps its own
+# `if: always()'.
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  # The job id is the check name a branch protection rule would name, so it
+  # stays `isa' although the job has run the whole gate for a long time.
+  isa:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full sdcc-ucsim
+
+      - name: Build the port
+        run: make -C tb build
+
+      # BUILD reaches the stages through the environment rather than as a
+      # `BUILD=' argument on each one, and that is deliberate. check-canary runs
+      # `check' against a toolchain it sabotages itself and passes its own BUILD
+      # on the sub-make's command line; a command-line assignment beats one from
+      # the environment, so the canary keeps the sabotaged toolchain. Handing
+      # each stage `BUILD=...' on the command line would instead leave that
+      # contest to how make merges MAKEFLAGS with argv, and if the real
+      # toolchain won it the canary would report a pass for a sabotage that
+      # never reached the assembler.
+      - name: Gate stages
+        env:
+          BUILD: ${{ github.workspace }}/work/modern/build
+        run: |
+          set -u
+          sum="${GITHUB_STEP_SUMMARY:-/dev/null}"
+          stages=$(make --no-print-directory -s -C tb ci-list)
+          if [ -z "$stages" ]; then
+            echo "::error title=gate::tb/Makefile printed no stage list"
+            exit 1
+          fi
+          echo "stages, from tb/Makefile: $stages"
+          {
+            printf '### gate stages\n\n'
+            printf '| stage | verdict | seconds |\n'
+            printf '| --- | --- | --: |\n'
+          } >> "$sum"
+          ran=0
+          passed=0
+          failed=
+          for s in $stages; do
+            ran=$((ran + 1))
+            echo "::group::$s"
+            t0=$SECONDS
+            if make -C tb "$s"; then verdict=PASS; else verdict=FAIL; fi
+            t=$((SECONDS - t0))
+            echo "::endgroup::"
+            if [ "$verdict" = PASS ]; then
+              passed=$((passed + 1))
+            else
+              failed="$failed $s"
+              echo "::error title=gate stage $s::$s failed after ${t}s - its output is the '$s' group in this step"
+            fi
+            printf '%s %-12s %4ss\n' "$verdict" "$s" "$t"
+            printf '| `%s` | %s | %s |\n' "$s" "$verdict" "$t" >> "$sum"
+          done
+          # Every name the release workflow will claim was run. gate-list is the
+          # same list ci-list is checked against, asked for a second time and
+          # counted against what the loop actually executed, so a stage that
+          # falls out between the two - a bug in the loop above, a name that
+          # word-splitting swallows - reddens the run instead of shrinking the
+          # gate silently.
+          want=$(make --no-print-directory -s -C tb gate-list | wc -w)
+          printf '\n%s of %s stages passed\n' "$passed" "$ran" | tee -a "$sum"
+          if [ "$ran" -ne "$want" ]; then
+            echo "::error title=gate::$ran stages ran, tb/Makefile's gate-list names $want"
+            exit 1
+          fi
+          if [ -n "$failed" ]; then
+            echo "red:$failed"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gate-results
+          if-no-files-found: warn
+          path: |
+            work/tb/results.md5
+            work/tb/reference.md5
+            work/tb/*.log
+            work/tb/projekt/*/www8051.rom
+            work/tb/projekt/*/map

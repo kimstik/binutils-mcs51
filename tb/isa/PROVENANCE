@@ -1,0 +1,16 @@
+Third-party test corpora, vendored verbatim. Used only as a merge gate; not shipped in releases.
+
+8051.txt      naken_asm, GPL-3.0. One instruction per line as `source|Intel HEX record`.
+              The golden column was produced by c51asm, an independent assembler.
+testall.asm   oc8051 by Simon Teran (OpenCores), LGPL-2.1+. Self-checking program
+              covering every instruction except MOVX and RETI.
+              The .hex files shipped alongside it upstream are stale and are not used.
+
+8051.txt       
+  https://github.com/mikeakohn/naken_asm/blob/75b8b59e43effe875a63a706500f60ea17c31138/tests/comparison/8051.txt
+  sha256 a597813a2fcd00162863cee1511b18261a3469d25ad0931908db8c781207884c
+  bytes  7374
+testall.asm    
+  https://github.com/freecores/8051/blob/d2643453e0457d9c15b3eca0a9978718b43f2b7a/asm/testall.asm
+  sha256 7869c57e4ef7946cb49f87350819ff92cb6e7f732046f7906a93171d0385c583
+  bytes  30704
