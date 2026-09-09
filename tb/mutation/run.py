@@ -30,8 +30,12 @@ earlier always got there first.  Nothing about removing or merging a stage
 can be argued from a number like that.  mutation/coverage.py reduces the
 full matrix this mode writes; it refuses a fail-first file outright.
 
-Exit: 0 the run completed (kill rate in the report), 2 setup problem,
-      3 the clean tree does not pass the gate.
+Exit: 0 the run completed (kill rate in the report), 1 interrupted (the
+      sources are restored), 2 setup problem, 3 the clean tree does not pass
+      the gate before the run, 4 the rebuild that restores the tree after the
+      run failed, 5 the restored tree does not pass the gate.  4 and 5 still
+      print the report and write --out, but the tree the numbers were measured
+      in cannot be shown clean afterwards, so they prove nothing.
 """
 
 import argparse
@@ -180,7 +184,8 @@ def main():
     # --stages '' or --stages ',' would leave nothing to run: every mutant
     # would survive an empty gate and the kill rate would read 0%.
     if not stages:
-        sys.exit('--stages names no stage')
+        print('--stages names no stage', file=sys.stderr)
+        sys.exit(2)
 
     tree = os.path.abspath(args.tree)
     build = os.path.abspath(args.build)
@@ -192,7 +197,8 @@ def main():
         want = set(args.only.split(','))
         mutants = [m for m in mutants if m['id'] in want or m['op'] in want]
     if not mutants:
-        sys.exit('no mutants selected')
+        print('no mutants selected', file=sys.stderr)
+        sys.exit(2)
 
     h = Harness(tree, build, work, args.jobs, stages, args.timeout)
     h.save(sorted({m['file'] for m in mutants}))
@@ -212,15 +218,18 @@ def main():
         rc, log = h.rebuild()
         if rc:
             print(log[-2000:])
-            sys.exit('clean tree does not build')
+            print('clean tree does not build', file=sys.stderr)
+            sys.exit(2)
         killer, base_rc, base_secs, log = h.gate(every=args.all_stages)
         if killer:
             print(log[-3000:])
             # In --all-stages every stage ran, so name every red one: the log
             # printed is the first one's, but a reader fixing the tree needs
             # to know it is not the only one.
-            sys.exit('clean tree fails stage(s) %s - fix that first'
-                     % ' '.join(s for s in stages if base_rc.get(s)))
+            print('clean tree fails stage(s) %s - fix that first'
+                  % ' '.join(s for s in stages if base_rc.get(s)),
+                  file=sys.stderr)
+            sys.exit(3)
         print('baseline: %s all pass' % ' '.join(stages))
         if args.all_stages:
             print('baseline cost: %s'
@@ -257,12 +266,24 @@ def main():
         sys.stdout.flush()
 
     h.restore()
-    rc, _ = h.rebuild()          # leave the tree as it was found
-    # Fail-first even in --all-stages: this only has to prove nothing leaked
-    # out of the loop, and one red is proof enough.
-    killer, _, _, _ = h.gate()
-    if killer:
-        print('WARNING: the clean tree now fails %s - results are suspect' % killer)
+    # Leave the tree as it was found, and prove it.  The gate below says
+    # nothing unless the binary it runs against was rebuilt from the restored
+    # sources, so a failed rebuild ends the proof there: what is installed is
+    # still the last mutant's.
+    rc, rlog = h.rebuild()
+    if rc:
+        print(rlog[-2000:])
+        print('WARNING: the restoring rebuild failed - the tree still holds '
+              'the last mutant and was never shown clean')
+        leaked = 4
+    else:
+        # Fail-first even in --all-stages: this only has to prove nothing
+        # leaked out of the loop, and one red is proof enough.
+        killer, _, _, _ = h.gate()
+        leaked = 5 if killer else 0
+        if killer:
+            print('WARNING: the clean tree now fails %s - results are suspect'
+                  % killer)
 
     live = [r for r in results if r['status'] == 'survived']
     killed = [r for r in results if r['status'] == 'killed']
@@ -299,7 +320,10 @@ def main():
                        'killed': len(killed), 'survived': len(live),
                        'nobuild': len(nobuild)}, f, indent=1)
         print('\nresults -> %s' % args.out)
-    return 0
+    if leaked:
+        print('\nexit %d: the report above was measured in a tree that cannot '
+              'be shown clean afterwards' % leaked)
+    return leaked
 
 
 if __name__ == '__main__':

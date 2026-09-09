@@ -6,7 +6,8 @@
 #   make check-frozen        ... with the 2001 objects, for the 2.11.2 toolchain
 #   make oracle              against projekt/*/www8051.hex, the 2001 ROMs base.7z ships
 #   make check-canary        prove check reports red when an input is sabotaged
-#   make isa                 instruction-level gate against third-party corpora
+#   make isa                 instruction-level gate against third-party and
+#                            hand-derived corpora
 #   make roundtrip           disassemble the golden bytes and reassemble them
 #   make branch              literal-branch encodings against hand-derived bytes
 #   make bits                bit addressing at its boundaries, assembler and linker
@@ -40,7 +41,6 @@
 #   make upstream            is there a newer binutils release, and do the
 #                            patches still apply to it? reports, changes nothing
 #   make libk80              rebuild libk80.a with uppercased symbols
-#                            (BROKEN, see the note above the recipe)
 #   make clean
 #
 # The reference is not a golden file kept in sync by hand: base.7z ships the www8051.rom
@@ -409,19 +409,24 @@ check-canary:
 
 # Merge gate, not part of a release. 8051.txt carries golden bytes from an
 # unrelated assembler; testall.asm is a real program covering branches and tables.
+# zeroops.txt is hand-derived from the MCS-51 manual: the encodings whose
+# operand byte is zero, which 8051.txt never reaches. Assembling it here is what
+# holds that column against gas - the roundtrip stage feeds gas the disassembly
+# of the same bytes, and gas and the disassembler share include/opcode/i51.h, so
+# a wrong column there would agree with itself.
 isa:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
 	python3 $(HERE)/isa_check.py --build $(BUILD) \
 		--table $(HERE)/isa/8051.txt \
 		--program $(HERE)/isa/testall.asm --dialect
 	python3 $(HERE)/isa_check.py --build $(BUILD) --table $(HERE)/isa/extra.txt
+	python3 $(HERE)/isa_check.py --build $(BUILD) --table $(HERE)/isa/zeroops.txt
 
 # Disassembler against assembler on the same golden bytes: what `isa' decoded
 # is fed straight back to gas and has to produce the bytes it came from, and
 # the displacement a branch prints has to agree with the target its comment
-# names. --stages roundtrip, so this does not re-run the assemble and decode
-# stages `isa' above has already run; zeroops.txt is only reached here, so for
-# that table the roundtrip stage decodes for itself.
+# names. --stages roundtrip, so the assemble and decode stages `isa' above has
+# already run over these three tables are not run again.
 roundtrip:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
 	python3 $(HERE)/isa_check.py --build $(BUILD) --table $(HERE)/isa/8051.txt --stages roundtrip
@@ -729,9 +734,9 @@ release-vars:
 
 # The stage list a release is allowed to claim, straight out of $(GATE) plus the
 # canary, which is in no list above. release.yml runs `gate' and `check-canary'
-# and then requires this list to be exactly the fourteen names it names in the
+# and then requires this list to be exactly the fifteen names it names in the
 # release body: adding a stage without saying so in the release note fails the
-# publish instead of quietly changing what "fourteen stages" means.
+# publish instead of quietly changing what "fifteen stages" means.
 gate-list:
 	@echo $(GATE) check-canary
 
@@ -804,13 +809,11 @@ print-port:
 # libk80.a has to carry uppercased symbols to link against the rest of the library set.
 # Only needed when the library itself is rebuilt, not for an ordinary check run.
 #
-# BROKEN as it stands. It runs i51elf_sym_uc.py over members extracted from the
-# CURRENT libk80.a, and every member of that archive is ELFDATA2MSB - measured:
-# all 27 are EI_DATA = 2, e_machine 165. i51elf_sym_uc.py unpacks every header
-# field little-endian whatever EI_DATA says, so it aborts with `struct.error:
-# unpack requires a buffer of 4 bytes' and writes no output; the `mv' below then
-# fails on a file that is not there. Making the script endian-aware is what fixes
-# this target; nothing in the Makefile needs to change.
+# It unpacks the archive `make check' left in $(WORK)/tb/lib, runs
+# i51elf_sym_uc.py over the members below and packs them again. The converter
+# takes its byte order from EI_DATA - every member of this archive is
+# ELFDATA2MSB - and a member is replaced only once its conversion has succeeded,
+# so a converter that fails ends the recipe with libk80.a as it was.
 LIBK80_OBJS := ptstr2se pr2x pisecz2x pchcksum prx2s tcp arp arppoirq udp icmp psendchr \
                ethdata outtcp closetcp closetcp2 retrytcp connecttcp synrqtcp psearch \
                scanpar pingcfg prx2e telnet ptcpinsum ptcpoutsum copytcp chngstack
@@ -819,8 +822,9 @@ libk80:
 	@test -d $(WORK)/tb/lib || { echo "run make check first - $(WORK)/tb/lib is missing"; exit 2; }
 	cd $(WORK)/tb/lib && $(BUILD)/binutils/ar x libk80.a
 	@cd $(WORK)/tb/lib && for f in $(LIBK80_OBJS); do \
-		python3 $(HERE)/i51elf_sym_uc.py $$f.obj $$f.upper.obj > /dev/null; \
-		mv $$f.upper.obj $$f.obj; \
+		python3 $(HERE)/i51elf_sym_uc.py $$f.obj $$f.upper.obj > /dev/null \
+			&& mv $$f.upper.obj $$f.obj \
+			|| { echo "converting $$f.obj failed"; exit 1; }; \
 	done
 	cd $(WORK)/tb/lib && $(BUILD)/binutils/ar rcs libk80.a $(addsuffix .obj,$(LIBK80_OBJS))
 	$(BUILD)/binutils/ar t $(WORK)/tb/lib/libk80.a | wc -l

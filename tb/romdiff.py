@@ -38,6 +38,12 @@ def main():
     args = ap.parse_args()
 
     projects = args.projects.split()
+    # Comparing nothing is not agreement: an empty list would otherwise walk
+    # no project, reach the closing line with no failure to report and exit 0
+    # against a --reference that need not even exist.
+    if not projects:
+        sys.exit('no projects to compare: --projects is empty')
+
     rows = []
     detail = []
     outcome = {}
