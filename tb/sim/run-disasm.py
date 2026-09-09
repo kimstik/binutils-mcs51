@@ -3,17 +3,16 @@
 
 Every other objdump call in this testbench passes `-b binary': the isa and
 roundtrip stages hand the disassembler a flat image that carries no symbol
-table at all.  So i51_symbol_is_valid - the hook opcodes/i51-dis.c installs
+table at all, so i51_symbol_is_valid - the hook opcodes/i51-dis.c installs
 through disassemble_init_for_target, and the only reason the MCS-51's five
-address spaces do not name each other's addresses - had never once been
-executed by the gate.
+address spaces do not name each other's addresses - never runs under any
+of those calls.
 
-Handing objdump a .o would not have executed it either.  Its
-find_symbol_for_address asks sym_ok, and sym_ok rejects a symbol from
-another section on its own whenever want_section is set - which it is on a
-relocatable object, because the file carries relocations and the address
-being named lies inside the section being disassembled.  What the hook says
-is invisible there.
+Handing objdump a .o does not execute it either.  Its find_symbol_for_address
+asks sym_ok, and sym_ok rejects a symbol from another section on its own
+whenever want_section is set - which it is on a relocatable object, because
+the file carries relocations and the address being named lies inside the
+section being disassembled.  What the hook says is invisible there.
 
 On a linked executable HAS_RELOC is clear, want_section is false, and the
 fallback loop walks down to the nearest preceding symbol the hook accepts,

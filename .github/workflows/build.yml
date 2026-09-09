@@ -11,10 +11,10 @@ name: build
 # anybody remembering to add it anywhere else.
 #
 # The archive names carry the binutils version and an unambiguous host, and the
-# directory inside carries the same name: `win64' said neither the OS nor the
-# architecture (Windows on arm64 exists), and every host's archive used to
-# unpack to a directory called `toolchain', so unpacking two of them in one
-# place silently left one on top of the other.
+# directory inside carries the same name: `win64' names neither the OS nor the
+# architecture (Windows on arm64 exists), and a shared directory name like
+# `toolchain' would let two hosts' archives collide when unpacked into the
+# same place, silently overwriting one with the other.
 
 on:
   workflow_dispatch:

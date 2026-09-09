@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Convert a 2001 i51 ELF archive, member by member, through the loose-object
-pipeline.  See the note below: that pipeline no longer targets the format
+pipeline.  See the note below: that pipeline does not target the format
 the current port reads.
 
 Each member goes through the same two steps as a loose object -
@@ -15,20 +15,18 @@ already in tb/base.7z carry.
 
   usage: i51elf_ar.py <old.a> <new.a>
 
-This used to reproduce tb/base.7z's lib/libk80.a, lib/libk23.a and
-lib/libw23.a byte-for-byte from their tb/base2001.7z originals.  It no
-longer reproduces any of them.  Measured, on tb/base2001.7z's
-lib/libk80.a, it writes
+This does not currently reproduce tb/base.7z's lib/libk80.a, lib/libk23.a,
+lib/libw23.a or lib/libw80.a byte-for-byte from their tb/base2001.7z
+originals.  Measured, on tb/base2001.7z's lib/libk80.a, it writes
 5c4af50d95a654b868ba189d1dfe281be67fa28bb41ae6f842a88b82cd28f42a where
 tb/base.7z's lib/libk80.a is
 fc3cdcc371837b1452d75d91f1f4d0098a595108b3e8dc4ec9b24ba3b6a2f268.  The
 cause is in the member step, not here: i51elf_le2be.py byte-swaps the
-container to ELFDATA2LSB, and base.7z has been ELFDATA2MSB since the
-byte-order decision.  The archive-level work below - armap upper-casing and
-deterministic ar headers - is correct: with the member transform corrected
-to an e_machine restamp that leaves EI_DATA alone, lib/libk80.a,
-lib/libk23.a, lib/libw23.a and lib/libw80.a all come out byte-identical to
-base.7z (measured, 4 of 4).
+container to ELFDATA2LSB, while base.7z is ELFDATA2MSB.  The archive-level
+work below - armap upper-casing and deterministic ar headers - is correct:
+with the member transform replaced by an e_machine restamp that leaves
+EI_DATA alone, lib/libk80.a, lib/libk23.a, lib/libw23.a and lib/libw80.a all
+come out byte-identical to base.7z (measured, 4 of 4).
 """
 import contextlib
 import io

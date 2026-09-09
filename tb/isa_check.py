@@ -324,13 +324,13 @@ def main():
     if unknown:
         sys.exit('unknown stage(s): %s' % ','.join(unknown))
 
-    # An invocation that would check nothing has to be an error.  Both of the
-    # cases below used to run to the end and print PASS: with neither --table
-    # nor --program there is nothing to check at all, and `--stages ""' with a
-    # table reads the corpus and then runs no stage over it, so a damaged or
-    # mistyped stage list would report success for a table nothing touched.
-    # --stages governs the corpus stages only, so an empty one is not an error
-    # when there is no --table: the program is still assembled.
+    # An invocation that would check nothing has to be an error: with neither
+    # --table nor --program there is nothing to check at all, and `--stages ""'
+    # with a table reads the corpus and then runs no stage over it, which would
+    # otherwise report success for a table nothing touched - a damaged or
+    # mistyped stage list must not pass silently. --stages governs the corpus
+    # stages only, so an empty one is not an error when there is no --table:
+    # the program is still assembled.
     if not args.table and not args.program:
         sys.exit('nothing to check: pass --table, --program, or both')
     if args.table and not stages:

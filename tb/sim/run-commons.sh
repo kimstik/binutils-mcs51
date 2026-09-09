@@ -35,9 +35,10 @@
 #   - one name declared a common of two different spaces is refused.
 #     The spaces are disjoint address spaces and the linker's own
 #     arbitration knows nothing of them: it keeps the larger of the two
-#     and, at equal sizes, the one it saw first, so link order alone used
-#     to decide the answer.  The same name in the SAME space in two
-#     objects, and a plain .comm beside a space common, must still link.
+#     and, at equal sizes, the one it saw first, and link order alone
+#     would decide the answer if that arbitration ran unchecked.  The
+#     same name in the SAME space in two objects, and a plain .comm
+#     beside a space common, must still link.
 #
 #   usage: run-commons.sh BUILD-DIR
 #
@@ -595,8 +596,9 @@ expect_says() {  # WHAT ERR-FILE WORD..., each word somewhere in the message
     done
 }
 
-# Both orders, because the order is exactly what used to decide the
-# answer, and a check that fires only one way round leaves half the bug.
+# Both orders, because ordinary arbitration is exactly what is order
+# dependent, and a check that fires only one way round would leave half
+# the bug uncaught.
 if "$LD" -o "$W/conflict.elf" "$W/confx.o" "$W/confi.o" 2> "$W/conflict.err"; then
     fail "conflict: the link succeeded - CONFVAR is .xcomm in confx.o and .icomm in confi.o"
 else

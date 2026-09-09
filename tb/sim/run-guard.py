@@ -35,10 +35,10 @@ import subprocess
 import sys
 import tempfile
 
-# Elf32 field offsets, from docs/reviews-round3/fuzz/elfmangle.py, made
-# endian-aware: the port's objects are ELFDATA2MSB, container and contents
-# alike, and that mangler unpacks every field little-endian whatever
-# e_ident[EI_DATA] says.
+# Elf32 field offsets, read endian-aware because the port's objects are
+# ELFDATA2MSB, container and contents alike: unpacking them little-endian
+# regardless of e_ident[EI_DATA] would silently read every multi-byte
+# field backwards.
 EH = {'e_shoff': (32, 'I'), 'e_shentsize': (46, 'H'), 'e_shnum': (48, 'H')}
 SH = {'sh_name': (0, 'I'), 'sh_type': (4, 'I'), 'sh_flags': (8, 'I'),
       'sh_addr': (12, 'I'), 'sh_offset': (16, 'I'), 'sh_size': (20, 'I'),
@@ -74,9 +74,10 @@ PROBES = [
     ('pcode', 11, '\t.pcode\tPSYM\n',       {'PSYM': 0x0123}),
 ]
 
-# The offset docs/reviews-round3/fuzz/repro used to reach the wild write:
-# far past any section this testbench assembles, so with the check gone the
-# linker writes into whatever follows the contents buffer.
+# Chosen to be far past any section this testbench assembles: with the
+# range check removed, an offset this large makes the linker write into
+# whatever follows the contents buffer, rather than landing by chance on
+# another byte still inside it.
 WILD_OFFSET = 0xffff
 
 # What ld prints for bfd_reloc_outofrange, from the switch in

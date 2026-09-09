@@ -71,11 +71,12 @@ ASM_CASES = [
     # space; both are refused wherever the fold is made.
     acase('b2b-ram-past-bit7', 'setb B2B(0x20,8)', None, NOTRANGE),
     acase('b2b-sfr-past-bit7', 'setb B2B(0xf8,8)', None, NOTRANGE),
-    # Only every eighth byte of the SFR page is bit addressable.  This arm
-    # of the constant fold used to be reached by every byte from 0x80 up,
-    # so B2B(0x84,1) folded to bit address 0x85, which is P0.5 and has
-    # nothing to do with the byte at 0x84, while the same operand through
-    # md_apply_fix or through the linker was refused.
+    # Only every eighth byte of the SFR page is bit addressable, and every
+    # fold path has to reject an unaligned one alike. If this constant fold
+    # accepted every byte from 0x80 up, B2B(0x84,1) would fold to bit
+    # address 0x85, which is P0.5 and has nothing to do with the byte at
+    # 0x84, even though the same operand through md_apply_fix or through
+    # the linker is refused.
     acase('b2b-sfr-unalign', 'setb B2B(0x84,1)', None, NOTRANGE),
     acase('b2b-sfr-top',     'setb B2B(0xff,0)', None, NOTRANGE),
 
@@ -120,11 +121,10 @@ LINK_CASES = [
     lcase('link-ram-past-bit7', 0x20, 8, None, 'relocation truncated'),
     lcase('link-sfr-past-bit7', 0xf8, 8, None, 'relocation truncated'),
     # Above the SFR space there is no byte address left to fold, so this is
-    # refused like every other non-bit-addressable byte.  It used to be the
-    # one arm with no diagnostic at all: R_I51_8_B2B returned bfd_reloc_ok
-    # for srel >= 0x100 and left the byte alone, which contradicted the rule
-    # at the top of this file.  claude/review-newcode changed that return to
-    # bfd_reloc_outofrange; this case was pinning the behaviour it fixed.
+    # refused like every other non-bit-addressable byte: R_I51_8_B2B must
+    # return bfd_reloc_outofrange for srel >= 0x100 rather than
+    # bfd_reloc_ok, which would leave the byte unfolded and silently
+    # contradict the rule at the top of this file.
     lcase('link-offchip',    0x100, 1, None, 'out of range'),
 ]
 

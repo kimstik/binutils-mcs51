@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Linker-script coverage: every `*(...)' arm gets a real input.
 
-The bug this exists to catch is the one that hid `reset_network' until base.7z
-was repacked.  `lib/www51.sc' shipped with `*(reset_network)' commented out;
-the section was still assembled, still linked, and still had a symbol - it
-just became an orphan placed past `_etext', so `objcopy -j .text' dropped it
-and every ROM was three bytes short.  Nothing went red.  The archive now
-carries the line live, and this file is what stops it going missing again.
-A dropped arm loses code without losing a symbol, a section, or an exit
-status, so no test that only links and compares symbols can see it.
+A commented-out or otherwise unreachable arm - like `*(reset_network)' in
+`lib/www51.sc' - can drop code silently: the section is still assembled,
+still linked, and still carries a symbol, but becomes an orphan placed past
+`_etext', so `objcopy -j .text' drops it with no nonzero exit status
+anywhere.  A dropped arm loses code without losing a symbol, a section, or
+an exit status, so no test that only links and compares symbols can see it.
+This file gives every arm of both scripts a real input, so a dropped one is
+caught by the image comparison below.
 
 Both scripts are covered:
 

@@ -2,23 +2,20 @@ name: gate
 
 # Instruction-level gate. Green here is the condition for merging into main.
 #
-# It runs on every branch, on main, and on every pull request. It used to carry
-# `branches-ignore: [main]' and no `pull_request' trigger at all, which meant the
-# gate never ran on the branch it gates and never ran on the change being merged
-# - only on the pushes to the topic branch beforehand.
+# It runs on every branch, on main, and on every pull request, so the gate
+# covers both the branch being merged and the change itself - not just
+# precursor pushes to the topic branch before the merge.
 #
-# THE STAGE LIST IS NOT WRITTEN IN THIS FILE. It used to be: one hand-written
-# step per stage, a second copy of a list tb/Makefile already owned, and that
-# copy had drifted - for a long time the merge gate ran `oracle' and never once
-# hashed a produced ROM against the reference base.7z ships. The one step below
-# asks tb/Makefile for the names (`make -C tb ci-list', which is $(GATE) with
+# THE STAGE LIST IS NOT WRITTEN IN THIS FILE. tb/Makefile owns it; the step
+# below asks for the names (`make -C tb ci-list', which is $(GATE) with
 # check-canary spliced in behind the `check' it judges) and runs whatever it
 # prints, so a stage added there is gated here with no edit to this file, and a
-# stage cannot be quietly left out of the run. `ci-list' refuses to print a list
-# that is not $(GATE) plus the canary, so that drift is fatal at the first line
-# of the step rather than invisible.
+# stage cannot be silently missing from the run. `ci-list' refuses to print a
+# list that is not $(GATE) plus the canary, so drift between the two is fatal
+# at the first line of the step rather than invisible.
 #
-# What that step has to keep, and how, now that there is not a step per stage:
+# The loop below stands in for what per-stage steps would give for free, so it
+# reproduces three things explicitly:
 #
 #   * one unit per stage in the log. Each stage runs inside a `::group::' of its
 #     own name and prints its verdict outside the fold, so the log reads as a
@@ -26,16 +23,16 @@ name: gate
 #   * the failing stage named without opening anything: an `::error' annotation
 #     per red stage, which Actions shows at the top of the run and against the
 #     job, plus a row per stage in the job summary.
-#   * a red stage does not stop the rest. That is what the per-step
-#     `if: always()' bought; the loop records each stage's status, carries on,
+#   * a red stage does not stop the rest: the loop's `if'/`else' around each
+#     `make -C tb "$s"' call catches its exit status instead of letting a
+#     nonzero code end the step, so it records the stage's status, carries on,
 #     and exits nonzero at the end if any of them failed.
 #
-# Why each stage exists is written above its recipe in tb/Makefile, which is
-# also where a stage is added. This file used to carry a second copy of those
-# notes as step comments; they are gone, not lost.
+# Why each stage exists is documented above its recipe in tb/Makefile, which is
+# also where a stage is added; that is the only place those notes live.
 #
 # The build is not a stage and stays a step of its own, before the loop: if it
-# fails there is no toolchain, and fourteen stages each reporting `no toolchain'
+# fails there is no toolchain, and fifteen stages each reporting `no toolchain'
 # is noise. The artifact upload is not a stage either and keeps its own
 # `if: always()'.
 
@@ -45,8 +42,9 @@ on:
   pull_request:
 
 jobs:
-  # The job id is the check name a branch protection rule would name, so it
-  # stays `isa' although the job has run the whole gate for a long time.
+  # The job id is the check name a branch protection rule references, so it
+  # stays `isa' even though the job runs the whole gate, not just the
+  # instruction check.
   isa:
     runs-on: ubuntu-24.04
     steps:

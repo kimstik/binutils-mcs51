@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Check gas/doc/c-i51.texi against the code it documents.
 
-The manual was made normative and nothing checked it.  Three of its
-sentences were found false in one afternoon - the HIGH()/LOW() prefix rule
-for jb/jnb/jbc, the B2B edge, the .ds direct-address case - and a human
-reading caught every one of them.  This stage is the part of that reading a
-machine can do.
+The manual is normative, but nothing enforces it against the code
+automatically: a sentence like the HIGH()/LOW() prefix rule for
+jb/jnb/jbc, the B2B edge case, or the .ds direct-address case can go false
+the moment the code it describes changes, and only a human reading catches
+it.  This stage is the part of that reading a machine can do.
 
 WHAT IT CHECKS.  Six facts that the manual and the source each state
 independently, so that the two can be compared without either being taken
@@ -56,10 +56,10 @@ In particular it does not know, and does not pretend to know:
 
   * whether a documented rule is the rule the code implements.  "They are
     rejected on the operand of @code{acall} and @code{ajmp}" names two
-    mnemonics that exist and a behaviour nothing here tests; the three
-    false sentences that prompted this stage were all of that shape, and
-    all three would still pass it.  Only a stage that assembles something
-    can judge them - that is what bits, reloc and branch are for.
+    mnemonics that exist and a behaviour nothing here tests - a rule of
+    that shape would pass this check even if the code did something else.
+    Only a stage that assembles something can judge them - that is what
+    bits, reloc and branch are for.
   * whether a stated number is right.  The manual says 0x20.3 is bit
     address 0x03; the fold that decides is C in i51_fold_bit_suffix (), and
     re-deriving it in Python here would only compare this file against the
@@ -405,8 +405,9 @@ def format_regex(fmt):
     White space is collapsed to single spaces first, and the manual text is
     collapsed the same way before matching, because a diagnostic reaches
     the manual wrapped to the page.  Collapsing must not strip: the space
-    on either side of a conversion is part of the sentence, and losing it
-    made this matcher reject three diagnostics that were quoted correctly.
+    on either side of a conversion is part of the sentence, and stripping
+    it would make this matcher reject diagnostics that are quoted
+    correctly.
     """
     fmt = re.sub(r"\s+", " ", fmt).strip()
     out, i = [], 0

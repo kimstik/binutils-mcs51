@@ -26,7 +26,7 @@ A tag matching `v*`, or a hand dispatch of `.github/workflows/release.yml`,
 publishes one stripped archive per host, both patches, and a `SHA256SUMS` over
 all of it. A push to main publishes nothing.
 
-Nothing is published from a tree that has not passed the fourteen gate stages:
+Nothing is published from a tree that has not passed the fifteen gate stages:
 they run in the release run itself and the publishing job cannot start while
 they are red. The release note carries the binutils release, that tarball's
 sha256 and the commit built from, all of them checked before the release is

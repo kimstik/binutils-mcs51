@@ -14,7 +14,8 @@ name: mutation coverage
 # injected fault is recorded on its own. `make -C tb mutants' cannot answer
 # the same question - it stops at the first stage that goes red, so a stage
 # late in the list is only ever recorded catching what every stage before it
-# missed, and the last run read sim 0 and commons 0 for that reason alone.
+# missed, and can show zero unique kills for that reason alone rather than
+# because it is redundant.
 #
 # COST. One incremental rebuild plus the entire stage list per mutant, where
 # an ordinary mutation run stops at the first red. `cap' is the knob: it is
