@@ -46,5 +46,14 @@ and it is decided separately.
 | `r5-elfhdr.md` | 48934 | claude/r5-elfhdr @ e8050e9f | R5-ELFHDR — `e_flags` and `EI_DATA` |
 | `r5-rewrite.md` | 24581 | claude/r5-rewrite @ 03dd796d | R5: account for the rewrite |
 
-35 reports.
+| `r6-summary.md` | 12543 | review of main @ 70a8b20, written in place (no branch) | R6: consolidated findings, root causes, suggested fix order |
+| `r6-gas-encoding.md` | 12157 | review of main @ 70a8b20, written in place (no branch) | R6: assembler instruction matching and encoding |
+| `r6-ld-relocs.md` | 14626 | review of main @ 70a8b20, written in place (no branch) | R6: linker relocations, overflow, address spaces, script |
+| `r6-tools.md` | 9499 | review of main @ 70a8b20, written in place (no branch) | R6: disassembler and the other binutils tools |
+| `r6-directives-docs.md` | 10625 | review of main @ 70a8b20, written in place (no branch) | R6: directives, memory model, documentation truth |
+| `r6-testbench-ci.md` | 13779 | review of main @ 70a8b20, written in place (no branch) | R6: gate, CI, release, mutation |
+| `r6-code-quality.md` | 15607 | review of main @ 70a8b20, written in place (no branch) | R6: C code, sanitizers, upstream blockers |
+| `r6-idioms-reuse.md` | 17080 | review of main @ 70a8b20, written in place (no branch) | R6: binutils idioms, reinvented wheels, redundancy |
+
+43 reports. Round 6 repro sources (text only) are in `r6-repro/`.
 

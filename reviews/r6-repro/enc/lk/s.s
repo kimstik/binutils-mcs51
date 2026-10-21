@@ -1,0 +1,2 @@
+ajmp tgt
+sjmp tgt

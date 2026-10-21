@@ -1,0 +1,5 @@
+	nop
+	sjmp 0x10
+	ajmp 0x123
+	jc 5
+	acall 0x0100

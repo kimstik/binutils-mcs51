@@ -1,0 +1,1 @@
+reset:	ljmp 0x0003
