@@ -55,6 +55,10 @@ and it is decided separately.
 | `r6-code-quality.md` | 15607 | review of main @ 70a8b20, written in place (no branch) | R6: C code, sanitizers, upstream blockers |
 | `r6-idioms-reuse.md` | 17080 | review of main @ 70a8b20, written in place (no branch) | R6: binutils idioms, reinvented wheels, redundancy |
 | `r6-status.md` | 6039 | written after the fixes, branch claude/r6-fixes | R6: what became of each finding |
+| `r7-idioms.md` | 12626 | review of claude/r6-fixes @ 95ecb8d | R7: idioms and reuse, re-audit of the 17 R6 items and the new code |
+| `r7-quality.md` | 6303 | review of claude/r6-fixes @ 95ecb8d | R7: C code under sanitizers, analyzers and fuzzing |
+| `r7-regress.md` | 8323 | review of claude/r6-fixes @ 95ecb8d | R7: behaviour changes against the toolchain before the fixes |
+| `r7-tests.md` | 8313 | review of claude/r6-fixes @ 95ecb8d | R7: do the tests, docs and CI establish the claims |
 
-44 reports. Round 6 repro sources (text only) are in `r6-repro/`.
+48 reports. Round 6 repro sources (text only) are in `r6-repro/`.
 
