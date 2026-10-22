@@ -96,9 +96,11 @@ else
 fi
 
 # Assemble, link with ld's own default script and extract the ROM, using the
-# INSTALLED programs.  One instruction is enough: `ljmp _START' at 0 is 02 00 00
-# and the default script closes .text with __I51_RET = . ; BYTE(0x22), which is
-# the same 02 00 00 22 that tb/sim/run-defaultlink.sh's larger image ends on.
+# INSTALLED programs.  Every target sits at a nonzero address, so a relocation
+# the linker failed to apply leaves a byte that is wrong rather than one that
+# happens to be right: ljmp (R_I51_16_CODE) and acall (R_I51_11) are the
+# linker's, sjmp back is the assembler's, and the default script closes .text
+# with __I51_RET = . ; BYTE(0x22).
 if [ "$MODE" = none ]; then
     echo "== link probe SKIPPED (MODE=none: these binaries do not run on this machine)"
 else
@@ -118,10 +120,15 @@ else
         # a mingw binary under wine resolves a unix absolute path against
         # whatever drive it happens to be on.
         {
-            echo '; the smallest program that proves the shipped toolchain works.'
+            echo '; a small program that proves the shipped toolchain links.'
             echo '        .text'
             echo '        .global _START'
-            echo '_START: ljmp    _START'
+            echo '_START: ljmp    main'
+            echo '        nop'
+            echo '        nop'
+            echo 'main:   acall   sub'
+            echo '        sjmp    main'
+            echo 'sub:    ret'
         } > "$W/probe.s"
 
         run() { if [ "$MODE" = wine ]; then wine "$@"; else "$@"; fi; }
@@ -138,18 +145,18 @@ else
         fi
         if [ -f "$W/probe.bin" ]; then
             img=$(od -An -v -tx1 "$W/probe.bin" | tr -d ' \n')
-            want=02000022
+            want=0200050000110980fc2222
             if [ "$img" = "$want" ]; then
                 echo "   ROM image $img"
             else
-                fail "ROM image $img, expected $want (ljmp _START, then the script's RET byte)"
+                fail "ROM image $img, expected $want (the probe, then the script's RET byte)"
             fi
         else
             fail "no ROM image was produced"
         fi
         if [ -f "$W/probe.elf" ]; then
             syms=$( ( cd "$W" || exit 2; run "$NM" probe.elf ) | tr -d '\r' )
-            for pair in '_START 0' '__I51_RET 3' '_ETEXT 4'; do
+            for pair in '_START 0' '__I51_RET 10' '_ETEXT 11'; do
                 s=${pair% *}; wantv=${pair#* }
                 v=$(printf '%s\n' "$syms" | awk -v s="$s" '$NF == s { print $1; exit }')
                 # An undefined symbol prints `U' in the value column, and
