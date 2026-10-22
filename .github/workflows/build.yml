@@ -106,7 +106,7 @@ jobs:
           HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
           HOMEBREW_NO_INSTALL_UPGRADE: 1
         run: |
-          brew install --quiet coreutils p7zip deja-gnu
+          brew install --quiet coreutils gnu-tar p7zip deja-gnu
           echo "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
 
       - name: Build
@@ -157,14 +157,24 @@ jobs:
 
       # zip for Windows, tar.gz elsewhere, and the directory inside the archive
       # is named after the archive so two hosts cannot land on top of each other.
+      #
+      # The archive is reproducible: every file carries the commit's time, the
+      # entries are in name order, and owner and gzip header carry nothing of
+      # the machine that made it.
       - name: Package
         run: |
           set -eu
           pkg="i51-binutils-$PORT_VERSION-${{ matrix.name }}"
           mv work/modern/toolchain "work/modern/$pkg"
+          epoch=$(git log -1 --format=%ct)
+          find "work/modern/$pkg" -exec touch -h -d "@$epoch" {} +
           case "${{ matrix.pack }}" in
-            zip) ( cd work/modern && zip -q -r -9 "$GITHUB_WORKSPACE/$pkg.zip" "$pkg" ) ;;
-            *)   tar czf "$pkg.tar.gz" -C work/modern "$pkg" ;;
+            zip) ( cd work/modern && find "$pkg" -print | LC_ALL=C sort \
+                     | zip -q -X -9 "$GITHUB_WORKSPACE/$pkg.zip" -@ ) ;;
+            *)   tar=tar; command -v gtar > /dev/null && tar=gtar
+                 $tar --sort=name --owner=0 --group=0 --numeric-owner \
+                      --mtime="@$epoch" -C work/modern -cf - "$pkg" \
+                   | gzip -n -9 > "$pkg.tar.gz" ;;
           esac
           ls -l ./"$pkg".*
 
