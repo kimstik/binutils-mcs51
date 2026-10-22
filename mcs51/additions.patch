@@ -1263,10 +1263,10 @@ index 00000000..85a77602
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..fa66112d
+index 00000000..a89b5e9c
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2284 @@
+@@ -0,0 +1,2293 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1986,8 +1986,10 @@ index 00000000..fa66112d
 +	      "be defined"));
 +  i51_check_common (sym);
 +
-+  if ((!S_IS_DEFINED (sym) && !S_IS_EXTERNAL (sym) && !S_IS_WEAK (sym))
-+      || symbol_section_p (sym))
++  /* Using a built-in name makes no symbol, so any symbol of the name -
++     defined, or made by .local, .global, .type and the like - came
++     after.  */
++  if (symbol_section_p (sym))
 +    return;
 +  use = i51_name_use (S_GET_NAME (sym));
 +  if (use == NULL)
@@ -3239,11 +3241,17 @@ index 00000000..fa66112d
 +  for (i = 0; i < len; i++)
 +    if (TOUPPER ((unsigned char) input_line_pointer[i]) != kw[i])
 +      return false;
-+  if (is_part_of_name (kw[len - 1]) && is_part_of_name (input_line_pointer[len]))
++  if (is_part_of_name (kw[len - 1])
++      && is_part_of_name (input_line_pointer[len]))
 +    return false;
-+  /* A bare keyword is a symbol of the program when one has its name.  */
-+  if (ISALPHA (kw[0]) && i51_user_symbol (input_line_pointer, len))
-+    return false;
++  /* A bare keyword is a symbol of the program when one has its name, and
++     one made later is refused.  */
++  if (ISALPHA (kw[0]))
++    {
++      if (i51_user_symbol (input_line_pointer, len))
++	return false;
++      i51_note_use (kw, false);
++    }
 +  input_line_pointer += len;
 +  return true;
 +}
@@ -3319,7 +3327,7 @@ index 00000000..fa66112d
 +static bool
 +pcode_byte_present (offsetT v, offsetT adjust)
 +{
-+  return (v & 0xff) != 0 || (v != 0 && ((v + adjust) & 0xff) != 0);
++  return (v & 0xff) != 0 || (v != 0 && (((valueT) v + adjust) & 0xff) != 0);
 +}
 +
 +/* Put a byte operand, left out when it is a zero constant.  ADJUST is
@@ -3334,8 +3342,8 @@ index 00000000..fa66112d
 +  if (ex->X_op == O_constant)
 +    {
 +      if (pcode_byte_present (ex->X_add_number, adjust))
-+	md_number_to_chars (frag_more (1), (ex->X_add_number + adjust) & 0xff,
-+			    1);
++	md_number_to_chars (frag_more (1),
++			    ((valueT) ex->X_add_number + adjust) & 0xff, 1);
 +      return;
 +    }
 +  f = frag_more (1);
@@ -3412,7 +3420,7 @@ index 00000000..fa66112d
 +{
 +  bool constant = ex->X_op == O_constant;
 +  offsetT v = ex->X_add_number;
-+  offsetT stored = mode == PCODE_INDIRECTBYTE ? v - 1 : v;
++  offsetT stored = mode == PCODE_INDIRECTBYTE ? (offsetT) ((valueT) v - 1) : v;
 +  bool word = mode == PCODE_DIRECTWORD || mode == PCODE_DIRECTSWAP;
 +  unsigned int flags = 0;
 +
@@ -3451,7 +3459,8 @@ index 00000000..fa66112d
 +    }
 +  if (mode == PCODE_DIRECTSWAP || mode == PCODE_INDIRECTSWAP)
 +    flags |= I51_PCODE_SWAP;
-+  if (mode == PCODE_INDIRECTWORD || mode == PCODE_INDIRECTBYTE || mode == PCODE_INDIRECTSWAP)
++  if (mode == PCODE_INDIRECTWORD || mode == PCODE_INDIRECTBYTE
++      || mode == PCODE_INDIRECTSWAP)
 +    flags |= I51_PCODE_INDIRECT;
 +  return flags;
 +}
@@ -4800,22 +4809,30 @@ index 00000000..c3785a39
 +#error_output: builtin-global.l
 diff --git a/gas/testsuite/gas/i51/builtin-global.l b/gas/testsuite/gas/i51/builtin-global.l
 new file mode 100644
-index 00000000..313b6cc1
+index 00000000..ce046fe1
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/builtin-global.l
-@@ -0,0 +1,2 @@
+@@ -0,0 +1,5 @@
 +.*: Assembler messages:
++.*:9: Error: pcode operand out of range: \-9223372036854775808
 +.*:3: Error: `EA' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
++.*:5: Error: `ACC' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
++.*:7: Error: `SWAP' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
 diff --git a/gas/testsuite/gas/i51/builtin-global.s b/gas/testsuite/gas/i51/builtin-global.s
 new file mode 100644
-index 00000000..8cce3636
+index 00000000..796f830d
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/builtin-global.s
-@@ -0,0 +1,4 @@
+@@ -0,0 +1,9 @@
 +; A built-in name used as such cannot become a global symbol afterwards.
 +	.text
 +	setb	ea
 +	.global	ea
++	mov	a,acc
++	.local	acc
++	.pcode	0x200 swap-1
++	.equ	swap,7
++	.pcode	0x200 @BYTE 0x8000000000000000
 diff --git a/gas/testsuite/gas/i51/case-bad.d b/gas/testsuite/gas/i51/case-bad.d
 new file mode 100644
 index 00000000..a6d0073c
