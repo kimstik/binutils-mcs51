@@ -1170,10 +1170,10 @@ index 00000000..b1bb4225
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..e9c23b1c
+index 00000000..d4660c4d
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2353 @@
+@@ -0,0 +1,2345 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -3043,35 +3043,22 @@ index 00000000..e9c23b1c
 +  return flags;
 +}
 +
++/* .using BANK: the register bank AR0..AR7 name the registers of.  */
++
 +static void
 +i51_using (int par ATTRIBUTE_UNUSED)
 +{
-+  SKIP_WHITESPACE ();
-+  switch (*input_line_pointer)
++  offsetT bank = get_absolute_expression ();
++
++  if (bank < 0 || bank > 3)
 +    {
-+    case '0':  /* Reg bank 0 */
-+      regbank = 0;
-+      break;
-+    case '1':  /* Reg bank 1 */
-+      regbank = 8;
-+      break;
-+    case '2':  /* Reg bank 2 */
-+      regbank = 16;
-+      break;
-+    case '3':  /* Reg bank 3 */
-+      regbank = 24;
-+      break;
-+    default:
-+      /* Do not step over the character: at end of line that would be the
-+	 newline, and the rest of the file would shift by a line.  */
 +      as_bad (_("expected a register bank number 0, 1, 2 or 3"));
 +      ignore_rest_of_line ();
 +      return;
 +    }
-+  input_line_pointer++;
-+  if (regbank > regused) regused = regbank;
-+  /* Without this anything after the bank number is handed back to the
-+     reader as a statement of its own: `.using 1 nop' assembled a nop.  */
++  regbank = bank * 8;
++  if (regbank > regused)
++    regused = regbank;
 +  demand_empty_rest_of_line ();
 +}
 +
@@ -3230,6 +3217,11 @@ index 00000000..e9c23b1c
 +    i51_alloc_local (symbolP, space, size, align);
 +  else
 +    {
++      /* The object records it, but the linker places a memory-space
++	 common by its section, whose alignment it takes instead.  */
++      if (alignment > 1)
++	as_warn (_("the linker does not honour the alignment of a "
++		   "memory-space common"));
 +      S_SET_VALUE (symbolP, size);
 +      S_SET_ALIGN (symbolP, alignment);
 +      S_SET_EXTERNAL (symbolP);
@@ -3529,10 +3521,10 @@ index 00000000..e9c23b1c
 +}
 diff --git a/gas/config/tc-i51.h b/gas/config/tc-i51.h
 new file mode 100644
-index 00000000..1e2eaa7e
+index 00000000..6f9b4eda
 --- /dev/null
 +++ b/gas/config/tc-i51.h
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,191 @@
 +/* This file is tc-i51.h
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +
@@ -3700,8 +3692,11 @@ index 00000000..1e2eaa7e
 +     example, a value of 2 might print `1234 5678' where a value of 1
 +     would print `12 34 56 78'.  The default value is 4.  */
 +
-+//#define LEX_DOLLAR 0
-+/* AVR port uses `$' as a logical line separator */
++/* `$' separates statements on one line, so it is neither a name
++   character nor the mark of a local label.  */
++#define LEX_DOLLAR 0
++#undef  LOCAL_LABELS_DOLLAR
++#define LOCAL_LABELS_DOLLAR 0
 +
 +//#define TC_IMPLICIT_LCOMM_ALIGNMENT(SIZE, P2VAR) (P2VAR) = 0
 +/*   An `.lcomm' directive with no explicit alignment parameter will
@@ -3723,10 +3718,10 @@ index 00000000..1e2eaa7e
 +#define tc_init_after_args() i51_init_after_args ()
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..fc008a17
+index 00000000..23162ea8
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,819 @@
+@@ -0,0 +1,825 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -4201,7 +4196,8 @@ index 00000000..fc008a17
 +linker under a processor-specific section index rather than
 +@code{SHN_COMMON}, and the generic allocation reads @code{st_value} only
 +for @code{SHN_COMMON}, so such a symbol is placed at the next free
-+address in its space whatever alignment was asked for.
++address in its space whatever alignment was asked for, and the assembler
++warns when an alignment greater than one is given.
 +
 +@table @code
 +@cindex @code{bbss} directive, MCS-51
@@ -4352,7 +4348,8 @@ index 00000000..fc008a17
 +
 +@cindex @code{using} directive, MCS-51
 +@item .using @var{bank}
-+Select register bank @var{bank}, which must be 0, 1, 2 or 3.  This fixes
++Select register bank @var{bank}, an absolute expression whose value must be
++0, 1, 2 or 3.  This fixes
 +the byte addresses that @code{AR0} @dots{} @code{AR7} stand for:
 +@code{AR@var{n}} becomes @code{0x00}, @code{0x08}, @code{0x10} or
 +@code{0x18} plus @var{n}, according to the bank.  Using one of those names
@@ -4384,6 +4381,10 @@ index 00000000..fc008a17
 +also makes each of them a symbol of the program, which then takes the place
 +of a built-in operand name of the same spelling (@pxref{i51-Regs}), and
 +makes a common directive that follows allocate the symbol in this file.
++
++@cindex @code{$}, MCS-51
++@samp{$} separates statements on one line, so it is neither a character of
++a name nor the mark of a local label.
 +
 +@cindex @code{ds} directive, MCS-51
 +@code{.ds} is the generic directive, which reserves its count of two-byte
@@ -4711,12 +4712,13 @@ index 00000000..1f056ba3
 +	.icomm	buf2, 4, 3
 diff --git a/gas/testsuite/gas/i51/comm.d b/gas/testsuite/gas/i51/comm.d
 new file mode 100644
-index 00000000..e1c1b588
+index 00000000..ffec535a
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/comm.d
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,12 @@
 +#name: i51 memory-space commons
 +#as:
++#warning: .*the linker does not honour the alignment of a memory-space common
 +#readelf: -s --wide
 +
 +Symbol table '.symtab' contains .* entries:
@@ -5119,6 +5121,33 @@ index 00000000..44161de9
 +	mov	r0,#ar7		; 78 17
 +	push	ar7		; c0 17
 +	mov	a,#ar2+1	; 74 13
+diff --git a/gas/testsuite/gas/i51/separator.d b/gas/testsuite/gas/i51/separator.d
+new file mode 100644
+index 00000000..5853e606
+--- /dev/null
++++ b/gas/testsuite/gas/i51/separator.d
+@@ -0,0 +1,8 @@
++#name: i51 statement separator and .using
++#as:
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 01020000 c010 +.*
+diff --git a/gas/testsuite/gas/i51/separator.s b/gas/testsuite/gas/i51/separator.s
+new file mode 100644
+index 00000000..be7e44b9
+--- /dev/null
++++ b/gas/testsuite/gas/i51/separator.s
+@@ -0,0 +1,7 @@
++; `$' separates statements, and .using takes an expression.
++	.text
++	.byte	1 $ .byte 2
++	nop $ nop
++	.equ	bank, 2
++	.using	bank
++	push	ar0
 diff --git a/gas/testsuite/gas/i51/shadow.d b/gas/testsuite/gas/i51/shadow.d
 new file mode 100644
 index 00000000..7b79e9c5
