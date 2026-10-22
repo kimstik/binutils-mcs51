@@ -1,0 +1,4267 @@
+diff --git a/bfd/Makefile.am b/bfd/Makefile.am
+index e4df0544..590f079c 100644
+--- a/bfd/Makefile.am
++++ b/bfd/Makefile.am
+@@ -117,6 +117,7 @@ ALL_MACHINES = \
+ 	cpu-h8300.lo \
+ 	cpu-hppa.lo \
+ 	cpu-i386.lo \
++	cpu-i51.lo \
+ 	cpu-ia64.lo \
+ 	cpu-iamcu.lo \
+ 	cpu-ip2k.lo \
+@@ -200,6 +201,7 @@ ALL_MACHINES_CFILES = \
+ 	cpu-h8300.c \
+ 	cpu-hppa.c \
+ 	cpu-i386.c \
++	cpu-i51.c \
+ 	cpu-ia64.c \
+ 	cpu-iamcu.c \
+ 	cpu-ip2k.c \
+@@ -315,6 +317,7 @@ BFD32_BACKENDS = \
+ 	elf32-h8300.lo \
+ 	elf32-hppa.lo \
+ 	elf32-i386.lo \
++	elf32-i51.lo \
+ 	elf32-ip2k.lo \
+ 	elf32-iq2000.lo \
+ 	elf32-lm32.lo \
+@@ -450,6 +453,7 @@ BFD32_BACKENDS_CFILES = \
+ 	elf32-h8300.c \
+ 	elf32-hppa.c \
+ 	elf32-i386.c \
++	elf32-i51.c \
+ 	elf32-ip2k.c \
+ 	elf32-iq2000.c \
+ 	elf32-lm32.c \
+diff --git a/bfd/Makefile.in b/bfd/Makefile.in
+index 14512cf6..fdebc811 100644
+--- a/bfd/Makefile.in
++++ b/bfd/Makefile.in
+@@ -585,6 +585,7 @@ ALL_MACHINES = \
+ 	cpu-h8300.lo \
+ 	cpu-hppa.lo \
+ 	cpu-i386.lo \
++	cpu-i51.lo \
+ 	cpu-ia64.lo \
+ 	cpu-iamcu.lo \
+ 	cpu-ip2k.lo \
+@@ -668,6 +669,7 @@ ALL_MACHINES_CFILES = \
+ 	cpu-h8300.c \
+ 	cpu-hppa.c \
+ 	cpu-i386.c \
++	cpu-i51.c \
+ 	cpu-ia64.c \
+ 	cpu-iamcu.c \
+ 	cpu-ip2k.c \
+@@ -784,6 +786,7 @@ BFD32_BACKENDS = \
+ 	elf32-h8300.lo \
+ 	elf32-hppa.lo \
+ 	elf32-i386.lo \
++	elf32-i51.lo \
+ 	elf32-ip2k.lo \
+ 	elf32-iq2000.lo \
+ 	elf32-lm32.lo \
+@@ -919,6 +922,7 @@ BFD32_BACKENDS_CFILES = \
+ 	elf32-h8300.c \
+ 	elf32-hppa.c \
+ 	elf32-i386.c \
++	elf32-i51.c \
+ 	elf32-ip2k.c \
+ 	elf32-iq2000.c \
+ 	elf32-lm32.c \
+@@ -1497,6 +1501,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-h8300.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-hppa.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-i386.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-i51.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-ia64.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-iamcu.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu-ip2k.Plo@am__quote@
+@@ -1592,6 +1597,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-h8300.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-hppa.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-i386.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-i51.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-ia64.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-ip2k.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/elf32-iq2000.Plo@am__quote@
+diff --git a/bfd/archures.c b/bfd/archures.c
+index 0e919246..a17bc3d0 100644
+--- a/bfd/archures.c
++++ b/bfd/archures.c
+@@ -210,6 +210,7 @@ DESCRIPTION
+ .#define bfd_mach_iamcu			(1 << 8)
+ .#define bfd_mach_i386_iamcu		(bfd_mach_i386_i386 | bfd_mach_iamcu)
+ .#define bfd_mach_i386_iamcu_intel_syntax (bfd_mach_i386_iamcu | bfd_mach_i386_intel_syntax)
++.  bfd_arch_i51,       {* MCS-51/8051 microcontrollers.  *}
+ .  bfd_arch_romp,      {* IBM ROMP PC/RT.  *}
+ .  bfd_arch_convex,    {* Convex.  *}
+ .  bfd_arch_m98k,      {* Motorola 98xxx.  *}
+@@ -665,6 +666,7 @@ extern const bfd_arch_info_type bfd_h8300_arch;
+ extern const bfd_arch_info_type bfd_hppa_arch;
+ extern const bfd_arch_info_type bfd_i386_arch;
+ extern const bfd_arch_info_type bfd_iamcu_arch;
++extern const bfd_arch_info_type bfd_i51_arch;
+ extern const bfd_arch_info_type bfd_ia64_arch;
+ extern const bfd_arch_info_type bfd_ip2k_arch;
+ extern const bfd_arch_info_type bfd_iq2000_arch;
+@@ -753,6 +755,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
+     &bfd_hppa_arch,
+     &bfd_i386_arch,
+     &bfd_iamcu_arch,
++    &bfd_i51_arch,
+     &bfd_ia64_arch,
+     &bfd_ip2k_arch,
+     &bfd_iq2000_arch,
+diff --git a/bfd/bfd-in2.h b/bfd/bfd-in2.h
+index e49d6731..293e39a5 100644
+--- a/bfd/bfd-in2.h
++++ b/bfd/bfd-in2.h
+@@ -1467,6 +1467,7 @@ enum bfd_architecture
+ #define bfd_mach_iamcu                 (1 << 8)
+ #define bfd_mach_i386_iamcu            (bfd_mach_i386_i386 | bfd_mach_iamcu)
+ #define bfd_mach_i386_iamcu_intel_syntax (bfd_mach_i386_iamcu | bfd_mach_i386_intel_syntax)
++  bfd_arch_i51,       /* MCS-51/8051 microcontrollers.  */
+   bfd_arch_romp,      /* IBM ROMP PC/RT.  */
+   bfd_arch_convex,    /* Convex.  */
+   bfd_arch_m98k,      /* Motorola 98xxx.  */
+@@ -5190,6 +5191,37 @@ enum bfd_reloc_code_real
+      as a global register.  It does not modify contents.  */
+   BFD_RELOC_MMIX_LOCAL,
+ 
++  /* This is a 7 bit PC relative relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_7_PCREL,
++
++  /* This is an 11 bit relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_11,
++
++  /* This is an 8 bit relocation for bit addressing in the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_8_BIT,
++
++  /* This is an 8 bit low byte relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_8_LOW,
++
++  /* This is an 8 bit high byte relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_8_HIGH,
++
++  /* This is a 16 bit code address relocation for the MCS-51/8051
++     microcontroller: the target of an LJMP or LCALL.  */
++  BFD_RELOC_I51_16_CODE,
++
++  /* This is an 8 bit byte-to-bit relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_8_B2B,
++
++  /* This is a 13 bit pcode relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_13_PCODE,
++
++  /* This is an 8 bit direct address relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_8_DIR,
++
++  /* This is an 8 bit immediate relocation for the MCS-51/8051 microcontroller.  */
++  BFD_RELOC_I51_8_IMM,
++
+   /* This is a 16 bit reloc for the AVR that stores 8 bit pc relative
+      short offset into 7 bits.  */
+   BFD_RELOC_AVR_7_PCREL,
+diff --git a/bfd/config.bfd b/bfd/config.bfd
+index 02a1a685..3259c8e3 100644
+--- a/bfd/config.bfd
++++ b/bfd/config.bfd
+@@ -644,6 +644,10 @@ case "${targ}" in
+     targ_underscore=yes
+     ;;
+ 
++  i51-*-*)
++    targ_defvec=i51_elf32_vec
++    ;;
++
+   ia16-*-elf)
+     targ_defvec=i386_elf32_vec
+     targ_selvecs="i386_msdos_vec i386_aout_vec"
+diff --git a/bfd/configure b/bfd/configure
+index 1b829384..45bd29fd 100755
+--- a/bfd/configure
++++ b/bfd/configure
+@@ -15940,6 +15940,7 @@ do
+     i386_pe_big_vec)		 tb="$tb pe-i386.lo peigen.lo $coff" ;;
+     i386_pei_vec)		 tb="$tb pei-i386.lo peigen.lo $coff" ;;
+     iamcu_elf32_vec)		 tb="$tb elf32-i386.lo $elfxx_x86 elf32.lo $elf" ;;
++    i51_elf32_vec)		 tb="$tb elf32-i51.lo elf32.lo $elf" ;;
+     ia64_elf32_be_vec)		 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
+     ia64_elf32_hpux_be_vec)	 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
+     ia64_elf64_be_vec)		 tb="$tb elf64-ia64.lo elfxx-ia64.lo elf64.lo $elf"; target_size=64 ;;
+diff --git a/bfd/configure.ac b/bfd/configure.ac
+index c30a75ba..0c628f12 100644
+--- a/bfd/configure.ac
++++ b/bfd/configure.ac
+@@ -481,6 +481,7 @@ do
+     i386_pe_big_vec)		 tb="$tb pe-i386.lo peigen.lo $coff" ;;
+     i386_pei_vec)		 tb="$tb pei-i386.lo peigen.lo $coff" ;;
+     iamcu_elf32_vec)		 tb="$tb elf32-i386.lo $elfxx_x86 elf32.lo $elf" ;;
++    i51_elf32_vec)		 tb="$tb elf32-i51.lo elf32.lo $elf" ;;
+     ia64_elf32_be_vec)		 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
+     ia64_elf32_hpux_be_vec)	 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
+     ia64_elf64_be_vec)		 tb="$tb elf64-ia64.lo elfxx-ia64.lo elf64.lo $elf"; target_size=64 ;;
+diff --git a/bfd/libbfd.h b/bfd/libbfd.h
+index 27bc0875..01579dea 100644
+--- a/bfd/libbfd.h
++++ b/bfd/libbfd.h
+@@ -2252,6 +2252,16 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
+   "BFD_RELOC_MMIX_REG",
+   "BFD_RELOC_MMIX_BASE_PLUS_OFFSET",
+   "BFD_RELOC_MMIX_LOCAL",
++  "BFD_RELOC_I51_7_PCREL",
++  "BFD_RELOC_I51_11",
++  "BFD_RELOC_I51_8_BIT",
++  "BFD_RELOC_I51_8_LOW",
++  "BFD_RELOC_I51_8_HIGH",
++  "BFD_RELOC_I51_16_CODE",
++  "BFD_RELOC_I51_8_B2B",
++  "BFD_RELOC_I51_13_PCODE",
++  "BFD_RELOC_I51_8_DIR",
++  "BFD_RELOC_I51_8_IMM",
+   "BFD_RELOC_AVR_7_PCREL",
+   "BFD_RELOC_AVR_13_PCREL",
+   "BFD_RELOC_AVR_16_PM",
+diff --git a/bfd/po/SRC-POTFILES.in b/bfd/po/SRC-POTFILES.in
+index 40632924..da8a9f21 100644
+--- a/bfd/po/SRC-POTFILES.in
++++ b/bfd/po/SRC-POTFILES.in
+@@ -64,6 +64,7 @@ cpu-h8300.c
+ cpu-h8300.h
+ cpu-hppa.c
+ cpu-i386.c
++cpu-i51.c
+ cpu-ia64.c
+ cpu-iamcu.c
+ cpu-ip2k.c
+@@ -176,6 +177,7 @@ elf32-h8300.c
+ elf32-hppa.c
+ elf32-hppa.h
+ elf32-i386.c
++elf32-i51.c
+ elf32-ip2k.c
+ elf32-iq2000.c
+ elf32-lm32.c
+diff --git a/bfd/reloc.c b/bfd/reloc.c
+index 6b9e00da..153340bd 100644
+--- a/bfd/reloc.c
++++ b/bfd/reloc.c
+@@ -4484,6 +4484,48 @@ ENUMDOC
+   This relocation is an assertion that the expression is not allocated
+   as a global register.  It does not modify contents.
+ 
++ENUM
++  BFD_RELOC_I51_7_PCREL
++ENUMDOC
++  This is a 7 bit PC relative relocation for the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_11
++ENUMDOC
++  This is an 11 bit relocation for the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_8_BIT
++ENUMDOC
++  This is an 8 bit relocation for bit addressing in the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_8_LOW
++ENUMDOC
++  This is an 8 bit low byte relocation for the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_8_HIGH
++ENUMDOC
++  This is an 8 bit high byte relocation for the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_16_CODE
++ENUMDOC
++  This is a 16 bit code address relocation for the MCS-51/8051
++  microcontroller: the target of an LJMP or LCALL.
++ENUM
++  BFD_RELOC_I51_8_B2B
++ENUMDOC
++  This is an 8 bit byte-to-bit relocation for the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_13_PCODE
++ENUMDOC
++  This is a 13 bit pcode relocation for the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_8_DIR
++ENUMDOC
++  This is an 8 bit direct address relocation for the MCS-51/8051 microcontroller.
++ENUM
++  BFD_RELOC_I51_8_IMM
++ENUMDOC
++  This is an 8 bit immediate relocation for the MCS-51/8051 microcontroller.
++
+ ENUM
+   BFD_RELOC_AVR_7_PCREL
+ ENUMDOC
+diff --git a/bfd/targets.c b/bfd/targets.c
+index fcf65041..3e7e30c6 100644
+--- a/bfd/targets.c
++++ b/bfd/targets.c
+@@ -759,6 +759,7 @@ extern const bfd_target i386_pe_vec;
+ extern const bfd_target i386_pe_big_vec;
+ extern const bfd_target i386_pei_vec;
+ extern const bfd_target iamcu_elf32_vec;
++extern const bfd_target i51_elf32_vec;
+ extern const bfd_target ia64_elf32_be_vec;
+ extern const bfd_target ia64_elf32_hpux_be_vec;
+ extern const bfd_target ia64_elf64_be_vec;
+@@ -1105,6 +1106,7 @@ static const bfd_target * const _bfd_target_vector[] =
+ 	&i386_pei_vec,
+ 
+ 	&iamcu_elf32_vec,
++	&i51_elf32_vec,
+ 
+ #ifdef BFD64
+ 	&bpf_elf64_be_vec,
+diff --git a/binutils/NEWS b/binutils/NEWS
+index b8a762c7..56c2a717 100644
+--- a/binutils/NEWS
++++ b/binutils/NEWS
+@@ -2,6 +2,8 @@
+ 
+ Changes in 2.47:
+ 
++* Add support for the Intel MCS-51 (8051) microcontroller, target i51-elf.
++
+ * The s390 32-bit target (s390-*) is deprecated and planned for removal in a
+   future release, along with the elf32-s390 target format.  configure emits
+   an error for this target, which can be overridden using --enable-obsolete.
+diff --git a/binutils/readelf.c b/binutils/readelf.c
+index 1f7a90e7..fcba001b 100644
+--- a/binutils/readelf.c
++++ b/binutils/readelf.c
+@@ -117,6 +117,7 @@
+ #include "elf/h8.h"
+ #include "elf/hppa.h"
+ #include "elf/i386.h"
++#include "elf/i51.h"
+ #include "elf/i370.h"
+ #include "elf/i860.h"
+ #include "elf/i960.h"
+@@ -1272,6 +1273,7 @@ guess_is_rela (unsigned int e_machine)
+ 
+       /* Targets that use RELA relocations.  */
+     case EM_68K:
++    case EM_8051:
+     case EM_860:
+     case EM_AARCH64:
+     case EM_ADAPTEVA_EPIPHANY:
+@@ -2383,6 +2385,9 @@ dump_relocations (Filedata *          filedata,
+ 	case EM_AVR_OLD:
+ 	  rtype = elf_avr_reloc_type (type);
+ 	  break;
++	case EM_8051:
++	  rtype = elf_i51_reloc_type (type);
++	  break;
+ 
+ 	case EM_OLD_SPARCV9:
+ 	case EM_SPARC32PLUS:
+@@ -16109,6 +16114,8 @@ is_32bit_abs_reloc (Filedata * filedata, unsigned int reloc_type)
+       return reloc_type == 1; /* R_386_32.  */
+     case EM_68K:
+       return reloc_type == 1; /* R_68K_32.  */
++    case EM_8051:
++      return reloc_type == 15; /* R_I51_32.  */
+     case EM_860:
+       return reloc_type == 1; /* R_860_32.  */
+     case EM_960:
+@@ -16499,6 +16506,8 @@ is_16bit_abs_reloc (Filedata * filedata, unsigned int reloc_type)
+   /* Please keep this table alpha-sorted for ease of visual lookup.  */
+   switch (filedata->file_header.e_machine)
+     {
++    case EM_8051:
++      return reloc_type == 9; /* R_I51_16.  */
+     case EM_ARC:
+     case EM_ARC_COMPACT:
+     case EM_ARC_COMPACT2:
+@@ -16572,6 +16581,8 @@ is_8bit_abs_reloc (Filedata * filedata, unsigned int reloc_type)
+ {
+   switch (filedata->file_header.e_machine)
+     {
++    case EM_8051:
++      return reloc_type == 6; /* R_I51_8.  */
+     case EM_RISCV:
+       return reloc_type == 54; /* R_RISCV_SET8.  */
+     case EM_Z80:
+@@ -16786,6 +16797,7 @@ is_none_reloc (Filedata * filedata, unsigned int reloc_type)
+     {
+     case EM_386:     /* R_386_NONE.  */
+     case EM_68K:     /* R_68K_NONE.  */
++    case EM_8051:    /* R_I51_NONE.  */
+     case EM_ADAPTEVA_EPIPHANY:
+     case EM_ALPHA:   /* R_ALPHA_NONE.  */
+     case EM_ALTERA_NIOS2: /* R_NIOS2_NONE.  */
+diff --git a/binutils/testsuite/binutils-all/ar.exp b/binutils/testsuite/binutils-all/ar.exp
+index 7ea5f35e..9a84d5b4 100644
+--- a/binutils/testsuite/binutils-all/ar.exp
++++ b/binutils/testsuite/binutils-all/ar.exp
+@@ -217,6 +217,8 @@ proc symbol_table { } {
+     }
+ 
+     set got [binutils_run $NM "--print-armap $archive"]
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if { ![string match "*text_symbol in bintest.${obj}*" $got] \
+ 	 || ![string match "*data_symbol in bintest.${obj}*" $got] \
+ 	 || ![string match "*common_symbol in bintest.${obj}*" $got] \
+@@ -275,6 +277,8 @@ proc thin_archive { bfdtests } {
+     }
+ 
+     set got [binutils_run $NM "--print-armap $archive"]
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if { ![string match "*text_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*data_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*common_symbol in *bintest.${obj}*" $got] \
+@@ -350,6 +354,8 @@ proc thin_archive_with_nested { bfdtests } {
+     }
+ 
+     set got [binutils_run $NM "--print-armap $archive"]
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if { ![string match "*text_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*data_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*common_symbol in *bintest.${obj}*" $got] \
+@@ -703,6 +709,8 @@ proc unique_symbol { } {
+     }
+ 
+     set got [binutils_run $NM "--print-armap $archive"]
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if ![string match "*foo in *unique.${obj}*" $got] {
+ 	fail $testname
+ 	return
+diff --git a/binutils/testsuite/binutils-all/multi-1.d b/binutils/testsuite/binutils-all/multi-1.d
+index 4cfdc61d..0df443d1 100644
+--- a/binutils/testsuite/binutils-all/multi-1.d
++++ b/binutils/testsuite/binutils-all/multi-1.d
+@@ -5,6 +5,8 @@
+ #objdump: --disassemble=func -wz
+ # ECOFF disassembly omits local symbols, for whatever reason.
+ #xfail: "alpha*-*-*ecoff" "alpha*-*-osf*"
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/binutils/testsuite/binutils-all/multi-2.d b/binutils/testsuite/binutils-all/multi-2.d
+index 791aa875..b0814528 100644
+--- a/binutils/testsuite/binutils-all/multi-2.d
++++ b/binutils/testsuite/binutils-all/multi-2.d
+@@ -5,6 +5,8 @@
+ #objdump: --disassemble=func2 -wz
+ # ECOFF disassembly omits local symbols, for whatever reason.
+ #xfail: "alpha*-*-*ecoff" "alpha*-*-osf*"
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/binutils/testsuite/binutils-all/multi-3.d b/binutils/testsuite/binutils-all/multi-3.d
+index bc6f7444..5880becc 100644
+--- a/binutils/testsuite/binutils-all/multi-3.d
++++ b/binutils/testsuite/binutils-all/multi-3.d
+@@ -5,6 +5,8 @@
+ #objdump: --disassemble=func --disassemble=func2 -wz
+ # ECOFF disassembly omits local symbols, for whatever reason.
+ #xfail: "alpha*-*-*ecoff" "alpha*-*-osf*"
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/binutils/testsuite/binutils-all/nm.exp b/binutils/testsuite/binutils-all/nm.exp
+index 367e8b61..5076d55d 100644
+--- a/binutils/testsuite/binutils-all/nm.exp
++++ b/binutils/testsuite/binutils-all/nm.exp
+@@ -52,6 +52,9 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 	setup_xfail *-*-*
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set got [binutils_run $NM "$NMFLAGS $tempfile"]
+ 
+     if [info exists vars] then { unset vars }
+@@ -79,6 +82,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 
+     # Test nm -g
+ 
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS -g $tempfile"]
+ 
+     if [info exists vars] then { unset vars }
+@@ -110,6 +114,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 	setup_xfail *-*-*
+     }
+ 
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS -P $tempfile"]
+ 
+     set want "common_symbol C \[0\]*4.*data_symbol D \[0-9a-fA-F\]*.*external_symbol U.*static_data_symbol d \[0-9a-fA-F\]*.*static_text_symbol t \[0-9a-fA-F\]*.*text_symbol T \[0-9a-fA-F\]*"
+@@ -122,6 +127,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 
+     # Test nm -t d
+     # Look for leading zeroes and only the digits 0..9 in the actual value.
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS -t d $tempfile"]
+     if [regexp "0+\[1-9\]\[0-9\]* T text_symbol3" $got] then {
+ 	pass "nm -t d"
+@@ -131,6 +137,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 
+     # Test nm --format=posix
+     # ref: PR 24507 - no leading zeros.
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS --format=posix $tempfile"]
+     if [regexp "text_symbol3 T \[1-9a-f\]\[0-9a-f\]*" $got] then {
+ 	pass "nm --format posix"
+@@ -183,6 +190,8 @@ if {![binutils_assemble $srcdir/$subdir/$nm_1_src tmpdir/nm-1.o]} then {
+ 	set tempfile tmpdir/nm-1.o
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS --size-sort $tempfile"]
+ 
+     set want "0*4 T text_symbol3.*0*8 T text_symbol2.*0*c T text_symbol1"
+@@ -208,6 +217,8 @@ if [is_elf_format] {
+ 
+ 	set got [binutils_run $NM "$NMFLAGS -g $tmpfile"]
+ 
++	# The i51 assembler folds symbol names to upper case.
++	setup_xfail "i51-*-*"
+ 	if [regexp "u foo" $got] then {
+ 	    pass "nm -g on unique symbols"
+ 	} else {
+@@ -233,6 +244,9 @@ if [is_elf_format] {
+ 	
+ 	set got [binutils_run $NM "$NMFLAGS --with-symbol-versions --format sysv $tmpfile"]
+ 
++	# The i51 assembler folds symbol names to upper case.
++	setup_xfail "i51-*-*"
++
+ 	if {! [regexp "foo@VER_1" $got]} then {
+ 	    fail "nm --with-symbol-versions (grep for @VER_1)"
+ 	} else {
+@@ -313,12 +327,15 @@ if [is_elf_format] {
+ 
+ 	set got [binutils_run $NM "$NMFLAGS --ifunc-chars=Ff $tmpfile"]
+ 
++	# The i51 assembler folds symbol names to upper case.
++	setup_xfail "i51-*-*"
+ 	if [regexp "F global_foo" $got] then {
+ 	    pass "$testname (global ifunc)"
+ 	} else {
+ 	    fail "$testname (global ifunc)"
+ 	}
+ 
++	setup_xfail "i51-*-*"
+ 	if [regexp "f local_foo" $got] then {
+ 	    pass "$testname (local ifunc)"
+ 	} else {
+@@ -330,12 +347,14 @@ if [is_elf_format] {
+ 
+ 	set got [binutils_run $NM "$NMFLAGS --ifunc-chars=-- $tmpfile"]
+ 
++	setup_xfail "i51-*-*"
+ 	if [regexp -line "^\\S+ - global_foo$" $got] then {
+ 	    pass "$testname=-- (global ifunc)"
+ 	} else {
+ 	    fail "$testname=-- (global ifunc)"
+ 	}
+ 
++	setup_xfail "i51-*-*"
+ 	if [regexp -line "^\\S+ - local_foo$" $got] then {
+ 	    pass "$testname=-- (local ifunc)"
+ 	} else {
+diff --git a/binutils/testsuite/binutils-all/objcopy.exp b/binutils/testsuite/binutils-all/objcopy.exp
+index 25e2a440..2c9f413d 100644
+--- a/binutils/testsuite/binutils-all/objcopy.exp
++++ b/binutils/testsuite/binutils-all/objcopy.exp
+@@ -1268,10 +1268,13 @@ proc objcopy_test_symbol_manipulation {} {
+     foreach t $test_list {
+         # We need to strip the ".d", but can leave the dirname.
+         verbose [file rootname $t]
++        # The i51 assembler folds symbol names to upper case.
++        setup_xfail "i51-*-*"
+         run_dump_test [file rootname $t]
+     }
+ 
+     if { [supports_gnu_unique] } {
++	setup_xfail "i51-*-*"
+ 	run_dump_test "weaken-gnu-unique"
+     }
+ }
+@@ -1289,6 +1292,8 @@ proc objcopy_test_elf_common_symbols {} {
+     foreach t $test_list {
+         # We need to strip the ".d", but can leave the dirname.
+         verbose [file rootname $t]
++        # The i51 assembler folds symbol names to upper case.
++        setup_xfail "i51-*-*"
+         run_dump_test [file rootname $t]
+     }
+ }
+@@ -1310,9 +1315,13 @@ if [is_elf_format] {
+     objcopy_test_readelf "ELF group 3" group-3.s
+     objcopy_test_readelf "ELF group 4" group-4.s
+     objcopy_test_readelf "GNU_MBIND section" mbind1.s
++    # The i51 assembler folds symbol (group signature) names to upper case.
++    setup_xfail "i51-*-*"
+     run_dump_test "group-5"
+     run_dump_test "group-6"
++    setup_xfail "i51-*-*"
+     run_dump_test "group-7a"
++    setup_xfail "i51-*-*"
+     run_dump_test "group-7b"
+     run_dump_test "group-7c"
+     run_dump_test "copy-1"
+@@ -1326,17 +1335,26 @@ if [is_elf_format] {
+ 	run_dump_test "note-4-64"
+ 	run_dump_test "note-6-64"
+     } else {
++	# The i51 assembler folds the symbol names that the notes
++	# print to upper case.
++	setup_xfail "i51-*-*"
+ 	run_dump_test "note-2-32"
++	setup_xfail "i51-*-*"
+ 	run_dump_test "note-3-32"
++	setup_xfail "i51-*-*"
+ 	run_dump_test "note-4-32"
++	setup_xfail "i51-*-*"
+ 	run_dump_test "note-6-32"
+     }
++    setup_xfail "i51-*-*"
+     run_dump_test "note-5"
+     run_dump_test "object-attr-v2"
+ }
+ 
+ run_dump_test "copy-2"
+ run_dump_test "copy-3"
++# The i51 assembler folds symbol names to upper case.
++setup_xfail "i51-*-*"
+ run_dump_test "copy-4"
+ run_dump_test "copy-5"
+ run_dump_test "copy-6"
+@@ -1351,16 +1369,21 @@ run_dump_test "pr19020b"
+ 
+ if [is_elf_format] {
+     run_dump_test "strip-1"
++    # The i51 assembler folds symbol (group signature) names to upper case.
++    setup_xfail "i51-*-*"
+     run_dump_test "strip-2"
+     run_dump_test "strip-3"
+     run_dump_test "strip-4"
+     run_dump_test "strip-5"
+     run_dump_test "strip-6"
++    setup_xfail "i51-*-*"
+     run_dump_test "strip-7"
+     run_dump_test "strip-8"
++    setup_xfail "i51-*-*"
+     run_dump_test "strip-9"
+     # This requires STB_GNU_UNIQUE support with OSABI set to GNU.
+     if { [supports_gnu_unique] } {
++	setup_xfail "i51-*-*"
+ 	run_dump_test "strip-10"
+     }
+     run_dump_test "strip-11"
+@@ -1399,6 +1422,9 @@ if [is_elf_format] {
+     run_dump_test "strip-15" [list \
+ 				  [list source strip-15${reloc_format}.s] \
+ 				  [list as "${elf64} --defsym RELOC=${reloc}"]]
++    # The i51 assembler folds the symbol names that the notes print to
++    # upper case.
++    setup_xfail "i51-*-*"
+     run_dump_test "strip-16"
+ 
+     if { [istarget "i*86-*"] || [istarget "x86_64-*-*"] } {
+@@ -1426,6 +1452,8 @@ if [is_elf_format] {
+     if { [is_bad_symtab] } then {
+ 	setup_xfail "*-*-*"
+     }
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     run_dump_test "localize-hidden-1"
+     run_dump_test "testranges"
+     run_dump_test "testranges-ia64"
+diff --git a/binutils/testsuite/binutils-all/objdump.exp b/binutils/testsuite/binutils-all/objdump.exp
+index 734f9329..259ce5ff 100644
+--- a/binutils/testsuite/binutils-all/objdump.exp
++++ b/binutils/testsuite/binutils-all/objdump.exp
+@@ -173,6 +173,8 @@ proc test_objdump_t { testfile} {
+ 	set got $rest
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if {![info exists vars(text_symbol)] \
+ 	 || ![info exists vars(data_symbol)] \
+ 	 || ![info exists vars(common_symbol)] \
+@@ -198,6 +200,8 @@ proc test_objdump_r { testfile dumpfile } {
+ 
+     set want "${dumpfile}.*:\[ 	\]*file format.*RELOCATION RECORDS FOR \\\[\[^\]\]*(text|TEXT|P|\\\$CODE\\\$)\[^\]\]*\\\].*external_symbol"
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if [regexp $want $got] then {
+ 	pass "objdump -r ($testfile, $dumpfile)"
+     } else {
+@@ -223,6 +227,8 @@ proc test_objdump_d { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     set want "${dumpfile}.*:.*00+0 <text_symbol>"
+     if ![regexp $want $got] then {
+ 	fail "objdump -d $testfile: Missing symbol name and address"
+@@ -279,6 +285,9 @@ proc test_objdump_d_sym { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set want "$dumpfile:.*00+0 <text_symbol>"
+     if [regexp $want $got] then {
+ 	fail "objdump --disassemble=text_symbol2 $testfile: First symbol displayed, when it should be absent"
+@@ -314,6 +323,9 @@ proc test_objdump_d_func_sym { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set want "$dumpfile:.*00+0 <start_of_text>"
+     if [regexp $want $got] then {
+ 	fail "objdump --disassemble=func $testfile: First symbol displayed, when it should be absent"
+@@ -353,6 +365,9 @@ proc test_objdump_d_non_func_sym { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set want "$dumpfile:.*00+0 <start_of_text>"
+     if [regexp $want $got] then {
+ 	fail "objdump --disassemble=non_func $testfile: First symbol displayed, when it should be absent"
+@@ -417,6 +432,8 @@ proc test_objdump_d_show_all_symbols { testfile dumpfile } {
+ # So they do not show up in this test.
+ setup_xfail "*-*-*aix*"
+ setup_xfail "*-*-*ecoff"
++# The i51 assembler folds symbol names to upper case.
++setup_xfail "i51-*-*"
+ test_objdump_d_show_all_symbols $testfile $testfile
+ 
+ # Test objdump -s
+diff --git a/binutils/testsuite/binutils-all/readelf.exp b/binutils/testsuite/binutils-all/readelf.exp
+index 6c5e63fb..2ab6b1f9 100644
+--- a/binutils/testsuite/binutils-all/readelf.exp
++++ b/binutils/testsuite/binutils-all/readelf.exp
+@@ -366,7 +366,11 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+     readelf_test -h $tempfile readelf.h
+     readelf_test -S $tempfile readelf.s
+     setup_xfail "mips-*-*irix*"
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     readelf_test -s $tempfile readelf.ss
++    # Likewise.
++    setup_xfail "i51-*-*"
+     readelf_test -r $tempfile readelf.r
+ 
+     readelf_thin_archive_test
+@@ -384,6 +388,9 @@ if {![binutils_assemble $srcdir/$subdir/mangled.s tmpdir/mangled.o]} then {
+     }
+ 
+     # Run the test.
++    # The i51 assembler folds symbol names to upper case, which breaks
++    # the case-sensitive C++ mangling.
++    setup_xfail "i51-*-*"
+     readelf_test {--syms --demangle --wide} $tempfile readelf.demangled
+ }
+ 
+@@ -713,9 +720,9 @@ proc readelf_relr_test {} {
+     pass "$testname"
+ }
+ 
+-# The AVR, H8300, IP2K and Z80 targets' .dc.a pseudo-op creates a
++# The AVR, H8300, I51, IP2K and Z80 targets' .dc.a pseudo-op creates a
+ # 16-bit entry rather than a 32-bit entry.  Thus creating an
+ # invalid RELR relocation.
+-setup_xfail "avr-*-*" "h8300-*-*" "ip2k-*-*" "z80-*-*"
++setup_xfail "avr-*-*" "h8300-*-*" "i51-*-*" "ip2k-*-*" "z80-*-*"
+ 
+ readelf_relr_test
+diff --git a/config.sub b/config.sub
+index 3d35cde1..3872bd70 100755
+--- a/config.sub
++++ b/config.sub
+@@ -1317,6 +1317,7 @@ case $cpu-$vendor in
+ 			| hppa64 \
+ 			| i*86 \
+ 			| i370 \
++			| i51 \
+ 			| i860 \
+ 			| i960 \
+ 			| ia16 \
+diff --git a/gas/Makefile.am b/gas/Makefile.am
+index 9f90a1de..cdda0c90 100644
+--- a/gas/Makefile.am
++++ b/gas/Makefile.am
+@@ -164,6 +164,7 @@ TARGET_CPU_CFILES = \
+ 	config/tc-hppa.c \
+ 	config/tc-ia64.c \
+ 	config/tc-i386.c \
++	config/tc-i51.c \
+ 	config/tc-ip2k.c \
+ 	config/tc-iq2000.c \
+ 	config/tc-kvx.c \
+@@ -239,6 +240,7 @@ TARGET_CPU_HFILES = \
+ 	config/tc-hppa.h \
+ 	config/tc-ia64.h \
+ 	config/tc-i386.h \
++	config/tc-i51.h \
+ 	config/tc-ip2k.h \
+ 	config/tc-iq2000.h \
+ 	config/tc-kvx.h \
+diff --git a/gas/Makefile.in b/gas/Makefile.in
+index b2bb505c..fcab63ec 100644
+--- a/gas/Makefile.in
++++ b/gas/Makefile.in
+@@ -666,6 +666,7 @@ TARGET_CPU_CFILES = \
+ 	config/tc-hppa.c \
+ 	config/tc-ia64.c \
+ 	config/tc-i386.c \
++	config/tc-i51.c \
+ 	config/tc-ip2k.c \
+ 	config/tc-iq2000.c \
+ 	config/tc-kvx.c \
+@@ -741,6 +742,7 @@ TARGET_CPU_HFILES = \
+ 	config/tc-hppa.h \
+ 	config/tc-ia64.h \
+ 	config/tc-i386.h \
++	config/tc-i51.h \
+ 	config/tc-ip2k.h \
+ 	config/tc-iq2000.h \
+ 	config/tc-kvx.h \
+@@ -982,6 +984,7 @@ CPU_DOCS = \
+ 	doc/c-h8300.texi \
+ 	doc/c-hppa.texi \
+ 	doc/c-i386.texi \
++	doc/c-i51.texi \
+ 	doc/c-ip2k.texi \
+ 	doc/c-kvx.texi \
+ 	doc/c-lm32.texi \
+diff --git a/gas/NEWS b/gas/NEWS
+index 165e2336..012bacfb 100644
+--- a/gas/NEWS
++++ b/gas/NEWS
+@@ -2,6 +2,10 @@
+ 
+ Changes in 2.47:
+ 
++* Add support for the Intel MCS-51 (8051) microcontroller, target i51-elf.
++  The -mmcu option selects the special function register names of the
++  8051, the 8052 or the AT89S8252.
++
+ * New command line option --reloc-section-sym=[all|internal|none]
+   controls whether relocations referencing local binding symbols are adjusted
+   to use section symbols.
+diff --git a/gas/config/obj-elf.c b/gas/config/obj-elf.c
+index 2e15b251..99cb19f0 100644
+--- a/gas/config/obj-elf.c
++++ b/gas/config/obj-elf.c
+@@ -275,6 +275,7 @@ elf_common_parse (int ignore ATTRIBUTE_UNUSED, symbolS *symbolP, addressT size)
+ 	      *input_line_pointer = '\0';
+ 	      as_bad (_("bad .common segment %s"), p);
+ 	      *input_line_pointer = c;
++	      ignore_rest_of_line ();
+ 	      return NULL;
+ 	    }
+ 	  /* ??? Don't ask me why these are always global.  */
+@@ -1796,6 +1797,9 @@ obj_elf_find_and_add_versioned_name (const char *version_name,
+   struct elf_versioned_name_list *versioned_name;
+   const char *p;
+ 
++  /* The name as a symbol of that name would have it.  */
++  version_name = save_symbol_name (version_name);
++
+   for (p = ver + 1; *p == ELF_VER_CHR; p++)
+     ;
+ 
+diff --git a/gas/configure.tgt b/gas/configure.tgt
+index 7a5645fd..07546d74 100644
+--- a/gas/configure.tgt
++++ b/gas/configure.tgt
+@@ -225,6 +225,8 @@ case ${generic_target} in
+   h8300-*-elf)				fmt=elf ;;
+   h8300-*-linux*)			fmt=elf em=linux ;;
+ 
++  i51-*-*)				fmt=elf ;;
++
+   i386-*-beospe*)			fmt=coff em=pe ;;
+   i386-*-beos*)				fmt=elf ;;
+   i386-*-elfiamcu)			fmt=elf arch=iamcu ;;
+diff --git a/gas/doc/all.texi b/gas/doc/all.texi
+index 83418951..eaf0465b 100644
+--- a/gas/doc/all.texi
++++ b/gas/doc/all.texi
+@@ -40,6 +40,7 @@
+ @set H8/300
+ @set HPPA
+ @set I370
++@set I51
+ @set I80386
+ @set IA64
+ @set IP2K
+diff --git a/gas/doc/as.texi b/gas/doc/as.texi
+index 5d7772d6..9ad564bd 100644
+--- a/gas/doc/as.texi
++++ b/gas/doc/as.texi
+@@ -8318,6 +8318,9 @@ subject, see the hardware manufacturer's manual.
+ @ifset I80386
+ * i386-Dependent::              Intel 80386 and AMD x86-64 Dependent Features
+ @end ifset
++@ifset I51
++* i51-Dependent::               Intel MCS-51 (8051) Dependent Features
++@end ifset
+ @ifset IA64
+ * IA-64-Dependent::             Intel IA-64 Dependent Features
+ @end ifset
+@@ -8539,6 +8542,10 @@ family.
+ @include c-i386.texi
+ @end ifset
+ 
++@ifset I51
++@include c-i51.texi
++@end ifset
++
+ @ifset IA64
+ @include c-ia64.texi
+ @end ifset
+diff --git a/gas/doc/local.mk b/gas/doc/local.mk
+index 4185cfe9..a80de883 100644
+--- a/gas/doc/local.mk
++++ b/gas/doc/local.mk
+@@ -60,6 +60,7 @@ CPU_DOCS = \
+ 	%D%/c-h8300.texi \
+ 	%D%/c-hppa.texi \
+ 	%D%/c-i386.texi \
++	%D%/c-i51.texi \
+ 	%D%/c-ip2k.texi \
+ 	%D%/c-kvx.texi \
+ 	%D%/c-lm32.texi \
+diff --git a/gas/po/POTFILES.in b/gas/po/POTFILES.in
+index c0ce2661..2df5eee5 100644
+--- a/gas/po/POTFILES.in
++++ b/gas/po/POTFILES.in
+@@ -82,6 +82,8 @@ config/tc-hppa.c
+ config/tc-hppa.h
+ config/tc-i386.c
+ config/tc-i386.h
++config/tc-i51.c
++config/tc-i51.h
+ config/tc-ia64.c
+ config/tc-ia64.h
+ config/tc-ip2k.c
+diff --git a/gas/read.c b/gas/read.c
+index 1a7537ba..99db876e 100644
+--- a/gas/read.c
++++ b/gas/read.c
+@@ -1866,7 +1866,12 @@ s_comm_internal (int param,
+ 	     name, (long) size, (long) temp);
+ 
+   if (comm_parse_extra != NULL)
+-    symbolP = (*comm_parse_extra) (param, symbolP, size);
++    {
++      /* One that fails has skipped the rest of the line.  */
++      symbolP = (*comm_parse_extra) (param, symbolP, size);
++      if (symbolP == NULL)
++	goto out;
++    }
+   else
+     {
+       S_SET_VALUE (symbolP, size);
+@@ -2610,7 +2615,6 @@ s_linkonce (int ignore ATTRIBUTE_UNUSED)
+ void
+ bss_alloc (symbolS *symbolP, addressT size, unsigned int align)
+ {
+-  char *pfrag;
+   segT current_seg = now_seg;
+   subsegT current_subseg = now_subseg;
+   segT bss_seg = bss_section;
+@@ -2630,6 +2634,21 @@ bss_alloc (symbolS *symbolP, addressT size, unsigned int align)
+ 	}
+     }
+ #endif
++  bss_alloc_section (symbolP, size, align, bss_seg);
++  subseg_set (current_seg, current_subseg);
++}
++
++/* Allocate SIZE bytes for SYMBOLP at an alignment of 2**ALIGN in
++   subsection 1 of BSS_SEG.  */
++
++void
++bss_alloc_section (symbolS *symbolP, addressT size, unsigned int align,
++		   segT bss_seg)
++{
++  char *pfrag;
++  segT current_seg = now_seg;
++  subsegT current_subseg = now_subseg;
++
+   subseg_set (bss_seg, 1);
+ 
+   if (align > OCTETS_PER_BYTE_POWER)
+@@ -3367,23 +3386,28 @@ assign_symbol (char *name, int mode)
+       && (symbolP = md_undefined_symbol (name)) == NULL)
+     {
+       symbolP = symbol_find_or_make (name);
+-#ifndef NO_LISTING
+-      /* When doing symbol listings, play games with dummy fragments living
+-	 outside the normal fragment chain to record the file and line info
+-	 for this symbol.  */
+-      if (listing & LISTING_SYMBOLS)
+-	{
+-	  fragS *dummy_frag = notes_calloc (1, sizeof (*dummy_frag));
+-	  dummy_frag->line = listing_tail;
+-	  dummy_frag->fr_symbol = symbolP;
+-	  symbol_set_frag (symbolP, dummy_frag);
+-	}
+-#endif
+ #ifdef obj_assign_symbol
+       obj_assign_symbol (symbolP);
+ #endif
+     }
+ 
++#ifndef NO_LISTING
++  /* When doing symbol listings, play games with dummy fragments living
++     outside the normal fragment chain to record the file and line info
++     for this symbol, also for one a directive such as .local made before
++     it was given a value.  */
++  if ((listing & LISTING_SYMBOLS)
++      && !S_IS_DEFINED (symbolP)
++      && !symbol_equated_p (symbolP)
++      && symbol_get_frag (symbolP) == &zero_address_frag)
++    {
++      fragS *dummy_frag = notes_calloc (1, sizeof (*dummy_frag));
++      dummy_frag->line = listing_tail;
++      dummy_frag->fr_symbol = symbolP;
++      symbol_set_frag (symbolP, dummy_frag);
++    }
++#endif
++
+   if (S_IS_DEFINED (symbolP) || symbol_equated_p (symbolP))
+     {
+       if ((mode != 0 || !S_IS_VOLATILE (symbolP))
+diff --git a/gas/read.h b/gas/read.h
+index 225a8748..0f7cd43a 100644
+--- a/gas/read.h
++++ b/gas/read.h
+@@ -164,6 +164,7 @@ extern void generate_lineno_debug (void);
+ extern void do_align (unsigned int align, char *fill, unsigned int length,
+ 		      unsigned int max);
+ extern void bss_alloc (symbolS *, addressT, unsigned);
++extern void bss_alloc_section (symbolS *, addressT, unsigned, segT);
+ extern offsetT parse_align (int);
+ extern symbolS *s_comm_internal (int, symbolS *(*) (int, symbolS *, addressT));
+ extern symbolS *s_lcomm_internal (int, symbolS *, addressT);
+diff --git a/gas/symbols.c b/gas/symbols.c
+index 02df923d..0051d031 100644
+--- a/gas/symbols.c
++++ b/gas/symbols.c
+@@ -341,7 +341,7 @@ symbol_new (const char *name, segT segment, fragS *frag, valueT valu)
+ /* Save a symbol name on a permanent obstack, and convert it according
+    to the object file format.  */
+ 
+-static const char *
++const char *
+ save_symbol_name (const char *name)
+ {
+   char *ret;
+diff --git a/gas/symbols.h b/gas/symbols.h
+index 6357237b..c08118e4 100644
+--- a/gas/symbols.h
++++ b/gas/symbols.h
+@@ -60,6 +60,7 @@ symbolS *symbol_find_noref (const char *name, int noref);
+ symbolS *symbol_find_exact (const char *name);
+ symbolS *symbol_find_exact_noref (const char *name, int noref);
+ symbolS *symbol_find_or_make (const char *name);
++const char *save_symbol_name (const char *name);
+ symbolS *symbol_make (const char *name);
+ symbolS *symbol_new (const char *, segT, fragS *, valueT);
+ symbolS *symbol_create (const char *, segT, fragS *, valueT);
+diff --git a/gas/testsuite/gas/all/assign-bad-recursive.d b/gas/testsuite/gas/all/assign-bad-recursive.d
+index aeec5d55..dc170772 100644
+--- a/gas/testsuite/gas/all/assign-bad-recursive.d
++++ b/gas/testsuite/gas/all/assign-bad-recursive.d
+@@ -1,4 +1,5 @@
+ #name: bad recursive assignments
+ #source: assign-bad-recursive.s
+-#xfail: bfin-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: bfin-*-* i51-*-*
+ #error_output: assign-bad-recursive.l
+diff --git a/gas/testsuite/gas/all/assign.d b/gas/testsuite/gas/all/assign.d
+index 172d0b74..1517fcf7 100644
+--- a/gas/testsuite/gas/all/assign.d
++++ b/gas/testsuite/gas/all/assign.d
+@@ -1,5 +1,7 @@
+ #objdump : -r
+ #name : assignment tests
++# The i51 assembler folds symbol names to upper case.
++#xfail : i51-*-*
+ 
+ #...
+ .*zzz.*
+diff --git a/gas/testsuite/gas/all/gas.exp b/gas/testsuite/gas/all/gas.exp
+index 46451fb5..d8d0fcbe 100644
+--- a/gas/testsuite/gas/all/gas.exp
++++ b/gas/testsuite/gas/all/gas.exp
+@@ -180,6 +180,8 @@ switch -glob $target_triplet {
+ 	setup_xfail "m68hc1*-*-*" "m6811-*-*" "m6812-*-*" "rl78-*-*"
+ 	setup_xfail "loongarch*-*-*" "riscv*-*-*" "rx-*-*" "vax*-*-*" "xgate*-*-*" "z8k-*-*"
+ 	setup_xfail "avr-*-*"
++	# The i51 assembler folds symbol names to upper case.
++	setup_xfail "i51-*-*"
+ 	run_dump_test redef2
+ 	setup_xfail "m68hc1*-*-*" "m6811-*-*" "m6812-*-*" "rl78-*-*"
+ 	setup_xfail "loongarch*-*-*" "riscv*-*-*" "rx-*-*" "vax*-*-*" "xgate*-*-*" "z8k-*-*"
+@@ -196,6 +198,8 @@ switch -glob $target_triplet {
+ 	    "i\[3-7\]86-*-*pe" "i\[3-7\]86-*-go32*" \
+ 	    "i\[3-7\]86-*-cygwin*" "i\[3-7\]86-*-mingw*" \
+ 	    "x86_64-*-cygwin*" "x86_64-*-mingw*"
++	# The i51 assembler folds symbol names to upper case.
++	setup_xfail "i51-*-*"
+ 	run_dump_test redef3
+ 	gas_test_error "redef4.s" "" ".set for symbol already used as label"
+ 	gas_test_error "redef5.s" "" ".set for symbol already defined through .comm"
+@@ -531,7 +535,9 @@ if { ![istarget "tic4x*-*-*"] && ![istarget "tic54x*-*-*"] } {
+     run_list_test const-1 "-alm"
+ }
+ 
+-if { ![istarget "tic30-*-*"] } {
++# The i51 assembler folds symbol names to upper case, and an xfail in
++# the .d file covers only the first of this test's two runs.
++if { ![istarget "i51-*-*"] && ![istarget "tic30-*-*"] } {
+     run_dump_test "line-comment"
+ }
+ 
+diff --git a/gas/testsuite/gas/all/org-4.d b/gas/testsuite/gas/all/org-4.d
+index 57b1e7fe..914d0246 100644
+--- a/gas/testsuite/gas/all/org-4.d
++++ b/gas/testsuite/gas/all/org-4.d
+@@ -1,5 +1,7 @@
+ #nm: -g --defined-only
+ #name: .org test 4
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ 0+000014 . bar
+ 0+000010 . foo
+diff --git a/gas/testsuite/gas/all/org-5.d b/gas/testsuite/gas/all/org-5.d
+index 45f72f36..929fb7aa 100644
+--- a/gas/testsuite/gas/all/org-5.d
++++ b/gas/testsuite/gas/all/org-5.d
+@@ -1,5 +1,7 @@
+ #nm: -g --defined-only
+ #name: .org test 5
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ 0+000015 . bar
+ 0+000010 . foo
+diff --git a/gas/testsuite/gas/all/org-6.d b/gas/testsuite/gas/all/org-6.d
+index 25fed711..8c78fbd3 100644
+--- a/gas/testsuite/gas/all/org-6.d
++++ b/gas/testsuite/gas/all/org-6.d
+@@ -1,5 +1,7 @@
+ #nm: -g --defined-only
+ #name: .org test 6
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ 0+000018 . bar
+ 0+000010 . foo
+diff --git a/gas/testsuite/gas/all/quoted-label-blank.d b/gas/testsuite/gas/all/quoted-label-blank.d
+index 92b5ecad..755d1c56 100644
+--- a/gas/testsuite/gas/all/quoted-label-blank.d
++++ b/gas/testsuite/gas/all/quoted-label-blank.d
+@@ -4,6 +4,8 @@
+ #notarget: powerpc*-*-aix* powerpc*-*-beos* powerpc-*-macos* rs6000-*-*
+ # Certain LABELS_WITHOUT_COLONS targets:
+ #notarget: mmix-*-* tic54*-*-* z80-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ 0+00 D blank-after
+diff --git a/gas/testsuite/gas/all/quoted-sym-names.d b/gas/testsuite/gas/all/quoted-sym-names.d
+index 17e48303..14b83a5a 100644
+--- a/gas/testsuite/gas/all/quoted-sym-names.d
++++ b/gas/testsuite/gas/all/quoted-sym-names.d
+@@ -4,6 +4,8 @@
+ #notarget: powerpc*-*-aix* powerpc*-*-beos* powerpc-*-macos* rs6000-*-*
+ # Explicitly no escapes in quoted strings:
+ #notarget: z80-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ 0+00 D test-a
+diff --git a/gas/testsuite/gas/all/sleb128-9.d b/gas/testsuite/gas/all/sleb128-9.d
+index abfe2f3f..e397ce5a 100644
+--- a/gas/testsuite/gas/all/sleb128-9.d
++++ b/gas/testsuite/gas/all/sleb128-9.d
+@@ -1,5 +1,6 @@
+ #name: undefined symbols in sleb128 directive
+ #source: sleb128-9.s
+ #error_output: sleb128-9.l
+-#xfail: riscv*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: riscv*-* i51-*-*
+ 
+diff --git a/gas/testsuite/gas/all/struct.d b/gas/testsuite/gas/all/struct.d
+index d59a8dd5..d1d91ad5 100644
+--- a/gas/testsuite/gas/all/struct.d
++++ b/gas/testsuite/gas/all/struct.d
+@@ -1,5 +1,7 @@
+ #nm: --extern-only
+ #name: struct
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ # Test the .struct pseudo-op.
+ #...
+diff --git a/gas/testsuite/gas/all/version3.d b/gas/testsuite/gas/all/version3.d
+index aff9ad65..24fbc1d6 100644
+--- a/gas/testsuite/gas/all/version3.d
++++ b/gas/testsuite/gas/all/version3.d
+@@ -2,6 +2,8 @@
+ #nm: -f bsd
+ #name: pre-defined version symbol (non-empty symbol table)
+ #source: version.s
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ .* a GAS\(version\)
+diff --git a/gas/testsuite/gas/all/weakref1.d b/gas/testsuite/gas/all/weakref1.d
+index a2640036..47d5e9ff 100644
+--- a/gas/testsuite/gas/all/weakref1.d
++++ b/gas/testsuite/gas/all/weakref1.d
+@@ -5,7 +5,8 @@
+ # darwin (mach-o) reverses the order of relocs.
+ # the following must be present in all weakref1*.d
+ #notarget: alpha*-*-osf* *-*-ecoff pdp11-*-aout *-*-darwin*
+-#xfail: nds32*-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: nds32*-*-* i51-*-*
+ 
+ #...
+ RELOCATION RECORDS FOR \[(\.text|\$CODE\$)\]:
+diff --git a/gas/testsuite/gas/all/weakref1g.d b/gas/testsuite/gas/all/weakref1g.d
+index eb3f31d5..f68807c0 100644
+--- a/gas/testsuite/gas/all/weakref1g.d
++++ b/gas/testsuite/gas/all/weakref1g.d
+@@ -5,6 +5,8 @@
+ # ecoff (OSF/alpha) lacks .weak support
+ # pdp11 lacks .long
+ #notarget: alpha*-*-osf* *-*-ecoff pdp11-*-aout
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ # the rest of this file is generated with the following script:
+ # # script begin
+diff --git a/gas/testsuite/gas/all/weakref1l.d b/gas/testsuite/gas/all/weakref1l.d
+index 3a42c00a..6ac22dda 100644
+--- a/gas/testsuite/gas/all/weakref1l.d
++++ b/gas/testsuite/gas/all/weakref1l.d
+@@ -4,6 +4,8 @@
+ # aix drops local symbols
+ # see weakref1.d for comments on the other notargets
+ #notarget: [is_xcoff_format] alpha*-*-osf* *-*-ecoff pdp11-*-aout
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ # the rest of this file is generated with the following script:
+ # # script begin
+diff --git a/gas/testsuite/gas/all/weakref1u.d b/gas/testsuite/gas/all/weakref1u.d
+index 3259f90a..712d8bf9 100644
+--- a/gas/testsuite/gas/all/weakref1u.d
++++ b/gas/testsuite/gas/all/weakref1u.d
+@@ -4,6 +4,8 @@
+ # aout turns undefined into *ABS* symbols.
+ # see weakref1.d for comments on the other notargets
+ #notarget: [is_aout_format] ns32k-*-* alpha*-*-osf* *-*-ecoff
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ # the rest of this file is generated with the following script:
+ # # script begin
+diff --git a/gas/testsuite/gas/all/weakref1w.d b/gas/testsuite/gas/all/weakref1w.d
+index 4cae455e..80c77193 100644
+--- a/gas/testsuite/gas/all/weakref1w.d
++++ b/gas/testsuite/gas/all/weakref1w.d
+@@ -3,6 +3,8 @@
+ #source: weakref1.s
+ # see weakref1.d for comments on the notargets
+ #notarget: alpha*-*-osf* *-*-ecoff pdp11-*-aout
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ # the rest of this file is generated with the following script:
+ # # script begin
+diff --git a/gas/testsuite/gas/elf/attach-1.d b/gas/testsuite/gas/elf/attach-1.d
+index b6b76f5c..9791baca 100644
+--- a/gas/testsuite/gas/elf/attach-1.d
++++ b/gas/testsuite/gas/elf/attach-1.d
+@@ -1,6 +1,8 @@
+ #readelf: --section-groups
+ #name: Attaching a section to a group
+ #source: attach-1.s
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ group section \[    1\] `\.group' \[foo\.group\] contains [24] sections:
+diff --git a/gas/testsuite/gas/elf/attach-2.d b/gas/testsuite/gas/elf/attach-2.d
+index 68a1aab4..c508618c 100644
+--- a/gas/testsuite/gas/elf/attach-2.d
++++ b/gas/testsuite/gas/elf/attach-2.d
+@@ -1,6 +1,8 @@
+ #readelf: --section-groups
+ #name: Attaching a section to group defined later
+ #source: attach-2.s
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ group section \[    1\] `\.group' \[foo\.group\] contains [24] sections:
+diff --git a/gas/testsuite/gas/elf/common1.d b/gas/testsuite/gas/elf/common1.d
+index 72cc37dc..f4bfdc50 100644
+--- a/gas/testsuite/gas/elf/common1.d
++++ b/gas/testsuite/gas/elf/common1.d
+@@ -1,2 +1,4 @@
+ #name: weak and common directives
+ #error_output: common1.l
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+diff --git a/gas/testsuite/gas/elf/common2.d b/gas/testsuite/gas/elf/common2.d
+index 6bc8a1be..98a92af5 100644
+--- a/gas/testsuite/gas/elf/common2.d
++++ b/gas/testsuite/gas/elf/common2.d
+@@ -1,2 +1,4 @@
+ #name: common and weak directives
+ #error_output: common2.l
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+diff --git a/gas/testsuite/gas/elf/common3a.d b/gas/testsuite/gas/elf/common3a.d
+index f177b231..522b0b2a 100644
+--- a/gas/testsuite/gas/elf/common3a.d
++++ b/gas/testsuite/gas/elf/common3a.d
+@@ -5,6 +5,8 @@
+ # symbol table, and that mode is hard to check for (see irixemul in
+ # binutils/testsuite/binutils-all/mips/mips.exp)
+ #notarget: mips*-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+ +8 +(OBJECT|NOTYPE) +LOCAL +DEFAULT +[1-9] +lbuf
+diff --git a/gas/testsuite/gas/elf/common3b.d b/gas/testsuite/gas/elf/common3b.d
+index c9000abc..7e80f75d 100644
+--- a/gas/testsuite/gas/elf/common3b.d
++++ b/gas/testsuite/gas/elf/common3b.d
+@@ -5,6 +5,8 @@
+ # symbol table, and that mode is hard to check for (see irixemul in
+ # binutils/testsuite/binutils-all/mips/mips.exp)
+ #notarget: mips*-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+ +8 +(OBJECT|NOTYPE) +LOCAL +DEFAULT +[1-9] +lbuf
+diff --git a/gas/testsuite/gas/elf/common4a.d b/gas/testsuite/gas/elf/common4a.d
+index fceb01b6..fc266bdd 100644
+--- a/gas/testsuite/gas/elf/common4a.d
++++ b/gas/testsuite/gas/elf/common4a.d
+@@ -1,6 +1,8 @@
+ #source: common4.s
+ #as: --elf-stt-common=yes
+ #readelf: -s -W
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+4 +30 +TLS +GLOBAL +DEFAULT +COM +foobar
+diff --git a/gas/testsuite/gas/elf/common4b.d b/gas/testsuite/gas/elf/common4b.d
+index c18284ef..75e6ab52 100644
+--- a/gas/testsuite/gas/elf/common4b.d
++++ b/gas/testsuite/gas/elf/common4b.d
+@@ -1,6 +1,8 @@
+ #source: common4.s
+ #as: --elf-stt-common=no
+ #readelf: -s -W
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+4 +30 +TLS +GLOBAL +DEFAULT +COM +foobar
+diff --git a/gas/testsuite/gas/elf/common5a.d b/gas/testsuite/gas/elf/common5a.d
+index ec136b48..de9ec8b7 100644
+--- a/gas/testsuite/gas/elf/common5a.d
++++ b/gas/testsuite/gas/elf/common5a.d
+@@ -2,4 +2,6 @@
+ #as: 
+ #error_output: common5a.l
+ #notarget: alpha-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ # The Alpha target uses its own .set pseudo-insn.
+diff --git a/gas/testsuite/gas/elf/common5b.d b/gas/testsuite/gas/elf/common5b.d
+index 9369c2df..5961af80 100644
+--- a/gas/testsuite/gas/elf/common5b.d
++++ b/gas/testsuite/gas/elf/common5b.d
+@@ -2,4 +2,6 @@
+ #as: 
+ #error_output: common5b.l
+ #notarget: alpha-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ # The Alpha target uses its own .set pseudo-insn.
+diff --git a/gas/testsuite/gas/elf/common5c.d b/gas/testsuite/gas/elf/common5c.d
+index cbb3fc68..bcedfdbf 100644
+--- a/gas/testsuite/gas/elf/common5c.d
++++ b/gas/testsuite/gas/elf/common5c.d
+@@ -2,4 +2,6 @@
+ #as: 
+ #error_output: common5a.l
+ #notarget: alpha-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ # The Alpha target uses its own .set pseudo-insn.
+diff --git a/gas/testsuite/gas/elf/common5d.d b/gas/testsuite/gas/elf/common5d.d
+index 7b11fa24..f01a4b2f 100644
+--- a/gas/testsuite/gas/elf/common5d.d
++++ b/gas/testsuite/gas/elf/common5d.d
+@@ -2,4 +2,6 @@
+ #as: 
+ #error_output: common5b.l
+ #notarget: alpha-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ # The Alpha target uses its own .set pseudo-insn.
+diff --git a/gas/testsuite/gas/elf/elf.exp b/gas/testsuite/gas/elf/elf.exp
+index 5580c494..2c9b3ea2 100644
+--- a/gas/testsuite/gas/elf/elf.exp
++++ b/gas/testsuite/gas/elf/elf.exp
+@@ -265,7 +265,10 @@ if { [is_elf_format] } then {
+ 	}
+     } else {
+ 	run_dump_test ifunc-1
++	# The i51 assembler folds symbol names to upper case.
++	setup_xfail "i51-*-*"
+ 	run_elf_list_test "type" "" "" "-s" "| grep \"1 *\\\[FIONTCU\\\]\""
++	setup_xfail "i51-*-*"
+ 	run_elf_list_test "type-2" "" "--warn" "-s" "| grep \"0 *\\\[FIONT\\\]\""
+     }
+ 
+@@ -361,6 +364,7 @@ if { [is_elf_format] } then {
+     # are supposed to reference macro arguments in double-quoted strings.
+     if { ![istarget "avr-*-*"]
+ 	 && ![istarget "cris*-*-*"]
++	 && ![istarget "i51-*-*"]
+ 	 && ![istarget "msp430-*-*"]
+ 	 && ![istarget "z80-*-*"] } then {
+ 	run_list_test line
+diff --git a/gas/testsuite/gas/elf/file-2.d b/gas/testsuite/gas/elf/file-2.d
+index 8968d170..fc5ec205 100644
+--- a/gas/testsuite/gas/elf/file-2.d
++++ b/gas/testsuite/gas/elf/file-2.d
+@@ -1,5 +1,7 @@
+ #objdump: -t
+ #name: .file file names ordering
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: .*
+ 
+diff --git a/gas/testsuite/gas/elf/group0b.d b/gas/testsuite/gas/elf/group0b.d
+index c979f920..3d93b3a7 100644
+--- a/gas/testsuite/gas/elf/group0b.d
++++ b/gas/testsuite/gas/elf/group0b.d
+@@ -1,6 +1,8 @@
+ #readelf: -g
+ #name: group section (using readelf -g)
+ #source: group0.s
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ COMDAT group section \[    1\] `\.group' \[.foo_group\] contains . sections:
+diff --git a/gas/testsuite/gas/elf/group0c.d b/gas/testsuite/gas/elf/group0c.d
+index ffb129a6..176ea33c 100644
+--- a/gas/testsuite/gas/elf/group0c.d
++++ b/gas/testsuite/gas/elf/group0c.d
+@@ -1,7 +1,8 @@
+ #readelf: -sW
+ #name: group section name
+ #source: group0.s
+-#xfail: *-*-solaris*
++# The i51 assembler folds symbol names to upper case.
++#xfail: *-*-solaris* i51-*-*
+ 
+ #...
+ .*NOTYPE[ 	]+LOCAL[ 	]+DEFAULT[ 	]+[0-9]+[ 	]+\.foo_group
+diff --git a/gas/testsuite/gas/elf/group1b.d b/gas/testsuite/gas/elf/group1b.d
+index 8043f203..6abb8311 100644
+--- a/gas/testsuite/gas/elf/group1b.d
++++ b/gas/testsuite/gas/elf/group1b.d
+@@ -1,6 +1,8 @@
+ #readelf: -g
+ #name: group section with multiple sections of same name (using readelf -g)
+ #source: group1.s
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ COMDAT group section \[    1\] `\.group' \[.foo_group\] contains . sections:
+diff --git a/gas/testsuite/gas/elf/group3.d b/gas/testsuite/gas/elf/group3.d
+index cd92f545..4adc7bd8 100644
+--- a/gas/testsuite/gas/elf/group3.d
++++ b/gas/testsuite/gas/elf/group3.d
+@@ -1,4 +1,6 @@
+ #readelf: -g --wide
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ COMDAT group section \[[ 0-9]+\] `.group' \[foo\] contains . sections:
+    \[Index\]    Name
+diff --git a/gas/testsuite/gas/elf/groupautob.d b/gas/testsuite/gas/elf/groupautob.d
+index b8d8e830..1a9cf8f0 100644
+--- a/gas/testsuite/gas/elf/groupautob.d
++++ b/gas/testsuite/gas/elf/groupautob.d
+@@ -1,6 +1,8 @@
+ #readelf: -g
+ #name: automatic section group b
+ #source: groupauto.s
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ COMDAT group section \[    1\] `\.group' \[some_group\] contains . sections:
+diff --git a/gas/testsuite/gas/elf/ifunc-1.d b/gas/testsuite/gas/elf/ifunc-1.d
+index 5b2657b0..10496c96 100644
+--- a/gas/testsuite/gas/elf/ifunc-1.d
++++ b/gas/testsuite/gas/elf/ifunc-1.d
+@@ -1,6 +1,8 @@
+ #readelf: -s
+ #name: .set with IFUNC
+ #notarget: alpha*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ [ 	]+[0-9]+:[ 	]+[0-9a-f]+[ 	]+[0-9]+[ 	]+IFUNC[ 	]+GLOBAL[ 	]+DEFAULT[ 	]+[1-9] __GI_foo
+diff --git a/gas/testsuite/gas/elf/pr21661.d b/gas/testsuite/gas/elf/pr21661.d
+index 979e3ddf..bbaa3a44 100644
+--- a/gas/testsuite/gas/elf/pr21661.d
++++ b/gas/testsuite/gas/elf/pr21661.d
+@@ -1,3 +1,5 @@
+ #name: unsupported .symver with common symbol
+ #notarget: *-*-hpux*
+ #error_output: pr21661.l
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+diff --git a/gas/testsuite/gas/elf/pr27228.d b/gas/testsuite/gas/elf/pr27228.d
+index ecf2d172..b12d9b09 100644
+--- a/gas/testsuite/gas/elf/pr27228.d
++++ b/gas/testsuite/gas/elf/pr27228.d
+@@ -3,6 +3,8 @@
+ #readelf: -sW
+ # hppa doesn't support use of any BFD_RELOC_*
+ #notarget: hppa*-*-*
++# The i51 assembler reads NAME.N as bit N of NAME.
++#xfail: i51-*-*
+ 
+ Symbol table '\.symtab' contains [0-9]+ entries:
+ #...
+diff --git a/gas/testsuite/gas/elf/redef.d b/gas/testsuite/gas/elf/redef.d
+index 6e5daeab..74b9e833 100644
+--- a/gas/testsuite/gas/elf/redef.d
++++ b/gas/testsuite/gas/elf/redef.d
+@@ -1,5 +1,7 @@
+ #objdump: -t
+ #name: .equ redefinitions (ELF)
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: .*
+ 
+diff --git a/gas/testsuite/gas/elf/reloc-section-sym-internal.d b/gas/testsuite/gas/elf/reloc-section-sym-internal.d
+index 0c0f4644..88f800b8 100644
+--- a/gas/testsuite/gas/elf/reloc-section-sym-internal.d
++++ b/gas/testsuite/gas/elf/reloc-section-sym-internal.d
+@@ -2,6 +2,8 @@
+ #as: --reloc-section-sym=internal
+ #objdump: -rsj .data
+ #name: reloc-section-sym=internal
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/elf/reloc-section-sym-none.d b/gas/testsuite/gas/elf/reloc-section-sym-none.d
+index 1fc0c697..eba2c919 100644
+--- a/gas/testsuite/gas/elf/reloc-section-sym-none.d
++++ b/gas/testsuite/gas/elf/reloc-section-sym-none.d
+@@ -2,6 +2,8 @@
+ #as: --reloc-section-sym=none
+ #objdump: -rsj .data
+ #name: reloc-section-sym=none
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/elf/section-symbol-redef.d b/gas/testsuite/gas/elf/section-symbol-redef.d
+index 1daa20bd..12c8c730 100644
+--- a/gas/testsuite/gas/elf/section-symbol-redef.d
++++ b/gas/testsuite/gas/elf/section-symbol-redef.d
+@@ -1,5 +1,6 @@
+ #objdump: -r
+-#xfail: bfin-*-* h8300-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: bfin-*-* h8300-* i51-*-*
+ 
+ #...
+ 0+ .* u
+diff --git a/gas/testsuite/gas/elf/section12a.d b/gas/testsuite/gas/elf/section12a.d
+index 08ecbd21..f3cecd02 100644
+--- a/gas/testsuite/gas/elf/section12a.d
++++ b/gas/testsuite/gas/elf/section12a.d
+@@ -4,6 +4,8 @@
+ #name: mbind sections 12
+ # A number of targets do not support SHF_GNU_MBIND
+ #notarget: ![supports_gnu_osabi]
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+   \[[ 0-9]+\] \.mbind\.data[ 	]+PROGBITS[ 	]+0+0 0+[0-9a-f]+ 0+1 00 WAD  0   0  1
+diff --git a/gas/testsuite/gas/elf/section16a.d b/gas/testsuite/gas/elf/section16a.d
+index e5a1a85d..ec2d00b3 100644
+--- a/gas/testsuite/gas/elf/section16a.d
++++ b/gas/testsuite/gas/elf/section16a.d
+@@ -4,6 +4,8 @@
+ #name: mbind sections 16
+ # A number of targets do not support SHF_GNU_MBIND
+ #notarget: ![supports_gnu_osabi]
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+   \[[ 0-9]+\] \.mbind\.data[ 	]+PROGBITS[ 	]+0+0 0+[0-9a-f]+ 0+1 00 WAD  0   0  1
+diff --git a/gas/testsuite/gas/elf/section20.d b/gas/testsuite/gas/elf/section20.d
+index cd7ab5e0..7ec2911f 100644
+--- a/gas/testsuite/gas/elf/section20.d
++++ b/gas/testsuite/gas/elf/section20.d
+@@ -1,5 +1,7 @@
+ #readelf: -SWg
+ #name: linked-to section 3
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +\[ *[0-9]+\] +__patchable_function_entries +PROGBITS +[0-9a-f]+ +[0-9a-f]+ +0+[248] +00 +WALG +.*
+diff --git a/gas/testsuite/gas/elf/size.d b/gas/testsuite/gas/elf/size.d
+index 5890386a..105d6287 100644
+--- a/gas/testsuite/gas/elf/size.d
++++ b/gas/testsuite/gas/elf/size.d
+@@ -1,6 +1,8 @@
+ #readelf: -sW
+ #name: ELF symbol size
+ #notarget: alpha-*-* hppa*-*-hpux*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ # The Alpha target uses its own .set pseudo-insn.
+ 
+ #...
+diff --git a/gas/testsuite/gas/elf/struct.d b/gas/testsuite/gas/elf/struct.d
+index dac6b56b..31a119ea 100644
+--- a/gas/testsuite/gas/elf/struct.d
++++ b/gas/testsuite/gas/elf/struct.d
+@@ -1,5 +1,7 @@
+ #nm: --extern-only
+ #name: ELF struct
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ #
+ # Test the .struct pseudo-op.
+ # The #... is there to match extra symbols inserted by
+diff --git a/gas/testsuite/gas/elf/syms.d b/gas/testsuite/gas/elf/syms.d
+index f1f40c10..bc146791 100644
+--- a/gas/testsuite/gas/elf/syms.d
++++ b/gas/testsuite/gas/elf/syms.d
+@@ -1,5 +1,7 @@
+ #readelf: -S -s -p .strtab
+ #name: Multibyte symbol names
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ Section Headers:
+diff --git a/gas/testsuite/gas/elf/symtab.d b/gas/testsuite/gas/elf/symtab.d
+index 68e5e7ca..52283356 100644
+--- a/gas/testsuite/gas/elf/symtab.d
++++ b/gas/testsuite/gas/elf/symtab.d
+@@ -1,6 +1,7 @@
+ # The Alpha has its own version of .set.
+ # hppa SOM does not output non-global absolute symbols.
+-#xfail: alpha-*-* [is_som_format]
++# The i51 assembler folds symbol names to upper case.
++#xfail: alpha-*-* [is_som_format] i51-*-*
+ #readelf: -s
+ #name: .set with expression
+ 
+diff --git a/gas/testsuite/gas/elf/symver.d b/gas/testsuite/gas/elf/symver.d
+index 2292e326..1408109d 100644
+--- a/gas/testsuite/gas/elf/symver.d
++++ b/gas/testsuite/gas/elf/symver.d
+@@ -1,5 +1,7 @@
+ #objdump: --syms
+ #name: ELF symbol versioning
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ #
+ # The #... and #pass are there to match extra symbols inserted by
+ # some toolchains, eg the mips-elf port will add .reginfo and .ptrd
+diff --git a/gas/testsuite/gas/elf/visibility.d b/gas/testsuite/gas/elf/visibility.d
+index 89c977dd..0c5fd918 100644
+--- a/gas/testsuite/gas/elf/visibility.d
++++ b/gas/testsuite/gas/elf/visibility.d
+@@ -2,6 +2,8 @@
+ #readelf: -s -W
+ #warning_output: visibility.l
+ #target: [supports_gnu_unique]
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+ +0 +(NOTYPE|OBJECT) +GLOBAL +INTERNAL +[1-9] +gd
+diff --git a/gas/testsuite/gas/macros/app1.d b/gas/testsuite/gas/macros/app1.d
+index c3d3ff21..bf234a93 100644
+--- a/gas/testsuite/gas/macros/app1.d
++++ b/gas/testsuite/gas/macros/app1.d
+@@ -1,6 +1,7 @@
+ #nm: -n
+ #name: APP with macro without NO_APP
+-#xfail: tic30-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: tic30-*-* i51-*-*
+ #...
+ 0+ T label_a
+ #...
+diff --git a/gas/testsuite/gas/macros/app2.d b/gas/testsuite/gas/macros/app2.d
+index b64771e1..37d745ed 100644
+--- a/gas/testsuite/gas/macros/app2.d
++++ b/gas/testsuite/gas/macros/app2.d
+@@ -1,6 +1,7 @@
+ #nm: -n
+ #name: APP with macro then NO_APP
+-#xfail: tic30-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: tic30-*-* i51-*-*
+ #...
+ 0+ T label_a
+ #...
+diff --git a/gas/testsuite/gas/macros/app3.d b/gas/testsuite/gas/macros/app3.d
+index f5f21dc1..2c122510 100644
+--- a/gas/testsuite/gas/macros/app3.d
++++ b/gas/testsuite/gas/macros/app3.d
+@@ -1,6 +1,7 @@
+ #nm: -n
+ #name: APP with macro then NO_APP then more code
+-#xfail: tic30-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: tic30-*-* i51-*-*
+ #...
+ 0+ T label_a
+ #...
+diff --git a/gas/testsuite/gas/macros/app4.d b/gas/testsuite/gas/macros/app4.d
+index cefe4a63..930f36ab 100644
+--- a/gas/testsuite/gas/macros/app4.d
++++ b/gas/testsuite/gas/macros/app4.d
+@@ -1,7 +1,8 @@
+ #as: -I$srcdir/$subdir
+ #nm: -n
+ #name: included file with .if 0 wrapped in APP/NO_APP, no final NO_APP, macro in main file
+-#xfail: tic30-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: tic30-*-* i51-*-*
+ #...
+ 0+ T label_d
+ #...
+diff --git a/gas/testsuite/gas/macros/irp.d b/gas/testsuite/gas/macros/irp.d
+index 62a5df26..1af483c8 100644
+--- a/gas/testsuite/gas/macros/irp.d
++++ b/gas/testsuite/gas/macros/irp.d
+@@ -1,7 +1,8 @@
+ #objdump: -r
+ #name: macro irp
+ #darwin (mach-o) reverses relocs.
+-#xfail: *-*-darwin* nds32*-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: *-*-darwin* nds32*-*-* i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/macros/macros.exp b/gas/testsuite/gas/macros/macros.exp
+index 34912414..52064ede 100644
+--- a/gas/testsuite/gas/macros/macros.exp
++++ b/gas/testsuite/gas/macros/macros.exp
+@@ -54,7 +54,7 @@ switch -glob $target_triplet {
+ 
+ if { ![istarget hppa*-*-*] || [istarget *-*-linux*] } {
+     # FIXME: Due to macro mishandling of ONLY_STANDARD_ESCAPES.
+-    setup_xfail "avr-*" "cris-*" "crisv32-*" "msp430-*"
++    setup_xfail "avr-*" "cris-*" "crisv32-*" "i51-*" "msp430-*"
+ 
+     # These fail due to NO_STRING_ESCAPES
+     setup_xfail "powerpc*-*-aix*" "powerpc*-*-beos*" "powerpc*-*-macos*"
+diff --git a/gas/testsuite/gas/macros/nesting1.d b/gas/testsuite/gas/macros/nesting1.d
+index 2e090fb8..f3bf0db6 100644
+--- a/gas/testsuite/gas/macros/nesting1.d
++++ b/gas/testsuite/gas/macros/nesting1.d
+@@ -2,6 +2,8 @@
+ #name: Nested macros (PR 32484)
+ # Some targets do not support macros used like this.
+ #skip: mmix-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ foo
+diff --git a/gas/testsuite/gas/macros/nesting2.d b/gas/testsuite/gas/macros/nesting2.d
+index 9cb1e3d8..937db6d8 100644
+--- a/gas/testsuite/gas/macros/nesting2.d
++++ b/gas/testsuite/gas/macros/nesting2.d
+@@ -2,6 +2,8 @@
+ #name: Nested macros (PR 32486)
+ # Some targets do not support macros used like this.
+ #skip: mmix-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ foo
+diff --git a/gas/testsuite/gas/macros/nesting3.d b/gas/testsuite/gas/macros/nesting3.d
+index b44e2333..2b1c3fab 100644
+--- a/gas/testsuite/gas/macros/nesting3.d
++++ b/gas/testsuite/gas/macros/nesting3.d
+@@ -2,6 +2,8 @@
+ #name: Nested macros (PR 32487)
+ # Some targets do not support macros used like this.
+ #skip: mmix-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ foo
+diff --git a/gas/testsuite/gas/macros/repeat.d b/gas/testsuite/gas/macros/repeat.d
+index 3392bfd7..4245a004 100644
+--- a/gas/testsuite/gas/macros/repeat.d
++++ b/gas/testsuite/gas/macros/repeat.d
+@@ -1,7 +1,8 @@
+ #objdump: -r
+ #name: nested irp/irpc/rept
+ # darwin (mach-o) reverse relocs.
+-#xfail: *-*-darwin*
++# The i51 assembler folds symbol names to upper case.
++#xfail: *-*-darwin* i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/macros/rept.d b/gas/testsuite/gas/macros/rept.d
+index 1e553181..18dd7006 100644
+--- a/gas/testsuite/gas/macros/rept.d
++++ b/gas/testsuite/gas/macros/rept.d
+@@ -1,7 +1,8 @@
+ #objdump: -r
+ #name: macro rept
+ #darwin (mach-o) reverses relocs.
+-#xfail: *-*-darwin* nds32*-*-*
++# The i51 assembler folds symbol names to upper case.
++#xfail: *-*-darwin* nds32*-*-* i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/macros/test1.d b/gas/testsuite/gas/macros/test1.d
+index fe164347..c84610da 100644
+--- a/gas/testsuite/gas/macros/test1.d
++++ b/gas/testsuite/gas/macros/test1.d
+@@ -1,5 +1,7 @@
+ #nm: --extern-only
+ #name: macro test 1
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ 0+01 A s_not_a_reg_1
+diff --git a/gas/testsuite/gas/macros/test2.d b/gas/testsuite/gas/macros/test2.d
+index 9d5cc6c0..1aaf4171 100644
+--- a/gas/testsuite/gas/macros/test2.d
++++ b/gas/testsuite/gas/macros/test2.d
+@@ -1,7 +1,8 @@
+ #objdump: -r
+ #name: macro test 2
+ # darwin(mach-o) reverses the order of relocs.
+-#xfail: *-*-darwin*
++# The i51 assembler folds symbol names to upper case.
++#xfail: *-*-darwin* i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/macros/test3.d b/gas/testsuite/gas/macros/test3.d
+index 054cf233..6dcf1603 100644
+--- a/gas/testsuite/gas/macros/test3.d
++++ b/gas/testsuite/gas/macros/test3.d
+@@ -1,5 +1,7 @@
+ #objdump: -r
+ #name: macro test 3
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/macros/vararg.d b/gas/testsuite/gas/macros/vararg.d
+index c83d9397..f2045d50 100644
+--- a/gas/testsuite/gas/macros/vararg.d
++++ b/gas/testsuite/gas/macros/vararg.d
+@@ -1,7 +1,8 @@
+ #objdump: -r
+ #name: macro vararg
+ # darwin (mach-o) reverses relocs.
+-#xfail: *-*-darwin*
++# The i51 assembler folds symbol names to upper case.
++#xfail: *-*-darwin* i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/gas/testsuite/gas/symver/symver.exp b/gas/testsuite/gas/symver/symver.exp
+index 6ec6979f..70170e28 100644
+--- a/gas/testsuite/gas/symver/symver.exp
++++ b/gas/testsuite/gas/symver/symver.exp
+@@ -53,7 +53,10 @@ if { [is_elf_format] } then {
+ 	run_dump_test [file rootname $t]
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     run_error_test "symver2" ""
++    setup_xfail "i51-*-*"
+     run_error_test "symver3" ""
+     # We have to comment out symver4 and symver5, which check the
+     # missing version name, since some tests in ld/testsuite/ld-elfvers
+@@ -61,7 +64,10 @@ if { [is_elf_format] } then {
+     # version name.
+ #    run_error_test "symver4" ""
+ #    run_error_test "symver5" ""
++    setup_xfail "i51-*-*"
+     run_error_test "symver14" ""
++    setup_xfail "i51-*-*"
+     run_error_test "symver15" ""
++    setup_xfail "i51-*-*"
+     run_error_test "symver17" ""
+ }
+diff --git a/gas/testsuite/gas/symver/symver0.d b/gas/testsuite/gas/symver/symver0.d
+index c7accc78..8d3d900b 100644
+--- a/gas/testsuite/gas/symver/symver0.d
++++ b/gas/testsuite/gas/symver/symver0.d
+@@ -1,5 +1,7 @@
+ #nm: -n
+ #name: symver symver0
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ #
+ # The #... and #pass are there to match extra symbols inserted by
+ # some toolchains, eg arm-elf toolchain will add $d.
+diff --git a/gas/testsuite/gas/symver/symver1.d b/gas/testsuite/gas/symver/symver1.d
+index b480e370..8c7b9550 100644
+--- a/gas/testsuite/gas/symver/symver1.d
++++ b/gas/testsuite/gas/symver/symver1.d
+@@ -1,5 +1,7 @@
+ #nm: -n
+ #name: symver symver1
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ #
+ # The #... and #pass are there to match extra symbols inserted by
+ # some toolchains, eg arm-elf toolchain will add $d.
+diff --git a/gas/testsuite/gas/symver/symver10a.d b/gas/testsuite/gas/symver/symver10a.d
+index e9bd1594..09944965 100644
+--- a/gas/testsuite/gas/symver/symver10a.d
++++ b/gas/testsuite/gas/symver/symver10a.d
+@@ -1,6 +1,8 @@
+ #source: symver10.s
+ #readelf: -sW
+ #name: symver symver10a
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+ +1 +OBJECT +GLOBAL +DEFAULT +[0-9]+ +foo@version1
+diff --git a/gas/testsuite/gas/symver/symver11.d b/gas/testsuite/gas/symver/symver11.d
+index 10f8ef81..df7e0a66 100644
+--- a/gas/testsuite/gas/symver/symver11.d
++++ b/gas/testsuite/gas/symver/symver11.d
+@@ -1,2 +1,4 @@
+ #name: symver symver11
+ #error: .*: symbol 'foo' with multiple versions cannot be used in relocation
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+diff --git a/gas/testsuite/gas/symver/symver12.d b/gas/testsuite/gas/symver/symver12.d
+index 3878f4dd..f38586ea 100644
+--- a/gas/testsuite/gas/symver/symver12.d
++++ b/gas/testsuite/gas/symver/symver12.d
+@@ -1,5 +1,7 @@
+ #readelf: -sW
+ #name: symver symver12
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+d +1 +FUNC +GLOBAL +DEFAULT +[0-9]+ +foo
+diff --git a/gas/testsuite/gas/symver/symver13.d b/gas/testsuite/gas/symver/symver13.d
+index dce8579f..fb921aaa 100644
+--- a/gas/testsuite/gas/symver/symver13.d
++++ b/gas/testsuite/gas/symver/symver13.d
+@@ -1,5 +1,7 @@
+ #readelf: -sW
+ #name: symver symver13
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+d +1 +FUNC +GLOBAL +HIDDEN +[0-9]+ +foo
+diff --git a/gas/testsuite/gas/symver/symver16.d b/gas/testsuite/gas/symver/symver16.d
+index ef335d5b..45422440 100644
+--- a/gas/testsuite/gas/symver/symver16.d
++++ b/gas/testsuite/gas/symver/symver16.d
+@@ -1,5 +1,7 @@
+ #name: symver symver16
+ #readelf: -srW
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+ Relocation section .*
+diff --git a/gas/testsuite/gas/symver/symver6.d b/gas/testsuite/gas/symver/symver6.d
+index cddf7ec7..a6c21bcc 100644
+--- a/gas/testsuite/gas/symver/symver6.d
++++ b/gas/testsuite/gas/symver/symver6.d
+@@ -1,5 +1,7 @@
+ #nm: -n
+ #name: symver symver6
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ #
+ 
+ #...
+diff --git a/gas/testsuite/gas/symver/symver7.d b/gas/testsuite/gas/symver/symver7.d
+index 2e956a6a..4d95075f 100644
+--- a/gas/testsuite/gas/symver/symver7.d
++++ b/gas/testsuite/gas/symver/symver7.d
+@@ -1,5 +1,7 @@
+ #readelf: -sW
+ #name: symver symver7
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+ +1 +OBJECT +GLOBAL +HIDDEN +[0-9]+ +foo
+diff --git a/gas/testsuite/gas/symver/symver8.d b/gas/testsuite/gas/symver/symver8.d
+index 8938aecb..293ffc93 100644
+--- a/gas/testsuite/gas/symver/symver8.d
++++ b/gas/testsuite/gas/symver/symver8.d
+@@ -1,5 +1,7 @@
+ #readelf: -sW
+ #name: symver symver8
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+ +1 +OBJECT +LOCAL +DEFAULT +[0-9]+ +foo
+diff --git a/gas/testsuite/gas/symver/symver9a.d b/gas/testsuite/gas/symver/symver9a.d
+index 1cdbce8e..0690d97c 100644
+--- a/gas/testsuite/gas/symver/symver9a.d
++++ b/gas/testsuite/gas/symver/symver9a.d
+@@ -1,6 +1,8 @@
+ #source: symver9.s
+ #readelf: -sW
+ #name: symver symver9a
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ #...
+  +[0-9]+: +0+ +1 +OBJECT +GLOBAL +DEFAULT +[0-9]+ +foo@version1
+diff --git a/ld/Makefile.am b/ld/Makefile.am
+index 3ae3d7f1..7d57bef0 100644
+--- a/ld/Makefile.am
++++ b/ld/Makefile.am
+@@ -235,6 +235,7 @@ ALL_EMULATION_SOURCES = \
+ 	eelf32frv.c \
+ 	eelf32frvfd.c \
+ 	eelf32ft32.c \
++	eelf32i51.c \
+ 	eelf32ip2k.c \
+ 	eelf32iq10.c \
+ 	eelf32iq2000.c \
+diff --git a/ld/Makefile.in b/ld/Makefile.in
+index d879f04a..ae282e3e 100644
+--- a/ld/Makefile.in
++++ b/ld/Makefile.in
+@@ -750,6 +750,7 @@ ALL_EMULATION_SOURCES = \
+ 	eelf32frv.c \
+ 	eelf32frvfd.c \
+ 	eelf32ft32.c \
++	eelf32i51.c \
+ 	eelf32ip2k.c \
+ 	eelf32iq10.c \
+ 	eelf32iq2000.c \
+@@ -1376,6 +1377,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32frv.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32frvfd.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32ft32.Po@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32i51.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32ip2k.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32iq10.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32iq2000.Po@am__quote@
+diff --git a/ld/NEWS b/ld/NEWS
+index 53394fee..9d78de46 100644
+--- a/ld/NEWS
++++ b/ld/NEWS
+@@ -2,6 +2,10 @@
+ 
+ Changes in 2.47:
+ 
++* Add support for the Intel MCS-51 (8051) microcontroller, target i51-elf,
++  with a default linker script that keeps each of its memory spaces at its
++  own addresses.
++
+ * Add a linker optimization level of zero.  Using "-O 0" on the linker command
+   line will stop it from combining the contents of mergeable sections.  This
+   can significantly speed up the link process at the cost of producing larger
+diff --git a/ld/configure.tgt b/ld/configure.tgt
+index 60b62e69..276b96e0 100644
+--- a/ld/configure.tgt
++++ b/ld/configure.tgt
+@@ -428,6 +428,8 @@ i[3-7]86-*-chaos)	targ_emul=elf_i386_chaos
+ ia16-*-elf*)		targ_emul=elf_i386
+ 			targ_extra_emuls=i386msdos
+ 			;;
++i51-*-*)		targ_emul=elf32i51
++			;;
+ ia64-*-elf*)		targ_emul=elf64_ia64
+ 			;;
+ ia64-*-freebsd* | ia64-*-kfreebsd*-gnu)
+diff --git a/ld/po/BLD-POTFILES.in b/ld/po/BLD-POTFILES.in
+index d7d0c517..133990ff 100644
+--- a/ld/po/BLD-POTFILES.in
++++ b/ld/po/BLD-POTFILES.in
+@@ -110,6 +110,7 @@ eelf32fr30.c
+ eelf32frv.c
+ eelf32frvfd.c
+ eelf32ft32.c
++eelf32i51.c
+ eelf32ip2k.c
+ eelf32iq10.c
+ eelf32iq2000.c
+diff --git a/ld/testsuite/ld-archive/archive.exp b/ld/testsuite/ld-archive/archive.exp
+index 0815064e..abd4ae5a 100644
+--- a/ld/testsuite/ld-archive/archive.exp
++++ b/ld/testsuite/ld-archive/archive.exp
+@@ -38,6 +38,11 @@ run_ld_link_tests {
+ 
+ set old_ldflags $LDFLAGS
+ 
++# i51 folds symbol names to upper case, so -e ff and the lower-case names
++# the link tests expect never match, and it refuses the initialised .data
++# of abc.s, which nothing loads on that target.
++set xfail_links "i51-*-*"
++
+ # Prevent our otherwise unused data symbols from being GC'd on XCOFF targets.
+ if { [is_xcoff_format] } {
+     append LDFLAGS " -unix"
+@@ -69,7 +74,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"abc" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -103,7 +108,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"absc" \
+     ] \
+-]
++] $xfail_links
+ 
+ # Single whole archive tests.
+ run_ld_link_tests [list \
+@@ -115,7 +120,7 @@ run_ld_link_tests [list \
+ 				  {nm "" x.nd}}] \
+ 	"abwc" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33600" "alpha*-*-*vms*"
+ if { [is_xcoff_format] } {
+@@ -148,7 +153,7 @@ run_ld_link_tests [list \
+ 				  {nm "" x.nd}}] \
+ 	"abwsc" \
+     ] \
+-]
++] $xfail_links
+ 
+ # Group archive tests.
+ run_ld_link_tests [list \
+@@ -185,7 +190,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"abcg" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -220,7 +225,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"abscfg" \
+     ] \
+-]
++] $xfail_links
+ 
+ # Dual archive tests.
+ run_ld_link_tests [list \
+@@ -232,7 +237,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abcde" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -262,7 +267,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abcdse" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -275,7 +280,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abtcde" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -288,7 +293,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abtcdte" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -302,7 +307,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abtcdfe" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -332,7 +337,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abscde" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33485" "cris-*-*aout*" "i\[3-7\]86-*-bsd*" \
+     "i\[3-7\]86-*-msdos*" "ns32k-*-*" "pdp11-*-*"
+@@ -363,7 +368,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abscdse" \
+     ] \
+-]
++] $xfail_links
+ 
+ # Dual whole archive tests.
+ run_ld_link_tests [list \
+@@ -375,7 +380,7 @@ run_ld_link_tests [list \
+ 				  {nm "" y.nd}}] \
+ 	"abcdwe" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ run_ld_link_tests [list \
+     [list "Regular archive plus whole thin link" \
+@@ -396,7 +401,7 @@ run_ld_link_tests [list \
+ 				  {nm "" y.nd}}] \
+ 	"abcdwfe" \
+     ] \
+-]
++] $xfail_links
+ 
+ # Single non-index archive accept tests.
+ run_ld_link_tests [list \
+@@ -407,7 +412,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"abnc" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ run_ld_link_tests [list \
+     [list "Thin archive w/o index link accept" \
+@@ -432,7 +437,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"abnsc" \
+     ] \
+-]
++] $xfail_links
+ 
+ # Dual non-index archive accept tests.
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+@@ -447,7 +452,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abncdte" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ run_ld_link_tests [list \
+     [list "Thin archive w/o index plus regular link accept" \
+@@ -458,7 +463,7 @@ run_ld_link_tests [list \
+ 				  {nm "" ny.nd}}] \
+ 	"abntcde" \
+     ] \
+-]
++] $xfail_links
+ 
+ # Group non-index archive tests.
+ run_ld_link_tests [list \
+@@ -482,7 +487,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"abncng" \
+     ] \
+-]
++] $xfail_links
+ setup_xfail "binutils/33484" "alpha*-*-linux*ecoff*" "alpha*-*-osf*"
+ setup_xfail "binutils/33600" "alpha*-*-*vms*"
+ if { [is_xcoff_format] } {
+@@ -498,7 +503,7 @@ run_ld_link_tests [list \
+ 				  {nm "" nx.nd}}] \
+ 	"abntcntg" \
+     ] \
+-]
++] $xfail_links
+ 
+ set LDFLAGS $old_ldflags
+ 
+diff --git a/ld/testsuite/ld-checks/checks.exp b/ld/testsuite/ld-checks/checks.exp
+index abfb01cc..6f9b55fb 100644
+--- a/ld/testsuite/ld-checks/checks.exp
++++ b/ld/testsuite/ld-checks/checks.exp
+@@ -28,7 +28,9 @@ proc section_check {} {
+     global subdir
+ 
+     # The usage of .lcomm in asm.s is incompatible with ia64 and ppc xcoff.
+-    if { [istarget ia64-*-*] || [is_xcoff_format] } {
++    # The MCS-51 default script loads none of its RAM spaces, and the
++    # linker refuses the initialized .data this object carries.
++    if { [istarget ia64-*-*] || [istarget i51-*-*] || [is_xcoff_format] } {
+ 	return
+     }
+     set test "check sections 1"
+diff --git a/ld/testsuite/ld-discard/extern.d b/ld/testsuite/ld-discard/extern.d
+index 0d5bca97..7759de8d 100644
+--- a/ld/testsuite/ld-discard/extern.d
++++ b/ld/testsuite/ld-discard/extern.d
+@@ -2,7 +2,8 @@
+ #ld: -T discard.ld
+ #error: .*data.* referenced in section `\.text' of tmpdir/extern.o: defined in discarded section `\.data\.exit' of tmpdir/extern.o
+ #objdump: -p
+-#xfail: [is_generic]
++#xfail: [is_generic] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ #pass
+ # The expected warning used to start with "`data' referenced..." but
+ # this has two problems: 1) It does not include the name of the linker
+diff --git a/ld/testsuite/ld-discard/start.d b/ld/testsuite/ld-discard/start.d
+index f77f95d5..6f9ac73f 100644
+--- a/ld/testsuite/ld-discard/start.d
++++ b/ld/testsuite/ld-discard/start.d
+@@ -3,5 +3,6 @@
+ #ld: -T discard.ld
+ #error: `data' referenced in section `\.text' of tmpdir/start.o: defined in discarded section `\.data\.exit' of tmpdir/exit.o
+ #objdump: -p
+-#xfail: [is_generic]
++#xfail: [is_generic] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ #pass
+diff --git a/ld/testsuite/ld-discard/zero-range.d b/ld/testsuite/ld-discard/zero-range.d
+index 26b709e3..8794179f 100644
+--- a/ld/testsuite/ld-discard/zero-range.d
++++ b/ld/testsuite/ld-discard/zero-range.d
+@@ -1,6 +1,8 @@
+ #source: zero-range.s
+ #ld: -T discard.ld
+ #objdump: -s -j .debug_ranges
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ .*:     file format .*elf.*
+ 
+diff --git a/ld/testsuite/ld-discard/zero-rel.d b/ld/testsuite/ld-discard/zero-rel.d
+index 1f73775b..3c563cc2 100644
+--- a/ld/testsuite/ld-discard/zero-rel.d
++++ b/ld/testsuite/ld-discard/zero-rel.d
+@@ -1,6 +1,8 @@
+ #source: zero-rel.s
+ #ld: -T discard.ld
+ #objdump: -s -j .debug_info
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ .*:     file format .*elf.*
+ 
+diff --git a/ld/testsuite/ld-elf/anno-sym.d b/ld/testsuite/ld-elf/anno-sym.d
+index f1ce21f9..38599de9 100644
+--- a/ld/testsuite/ld-elf/anno-sym.d
++++ b/ld/testsuite/ld-elf/anno-sym.d
+@@ -5,3 +5,5 @@
+ #skip: *-*-irix*
+ # The .align generate a local symbol .Lla-relax-align.
+ #skip: loongarch*-*-*
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+diff --git a/ld/testsuite/ld-elf/attributes.d b/ld/testsuite/ld-elf/attributes.d
+index 58b595ab..af6ca949 100644
+--- a/ld/testsuite/ld-elf/attributes.d
++++ b/ld/testsuite/ld-elf/attributes.d
+@@ -1,7 +1,8 @@
+ #name: Symbol flags copy
+ #ld: -T attributes.ld
+ #objdump: -t
+-#xfail: [is_generic]
++#xfail: [is_generic] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0+0000000 g     F .text	0+0000000 __start
+diff --git a/ld/testsuite/ld-elf/comm-data4.d b/ld/testsuite/ld-elf/comm-data4.d
+index 024cfd8d..d1c03a47 100644
+--- a/ld/testsuite/ld-elf/comm-data4.d
++++ b/ld/testsuite/ld-elf/comm-data4.d
+@@ -1,5 +1,7 @@
+ #source: comm-data4.s
+ #ld: 
+ #readelf: -r
++#notarget: i51-*-*
++# The MCS-51 linker refuses initialized data in RAM nothing loads.
+ 
+ There are no relocations in this file.
+diff --git a/ld/testsuite/ld-elf/compress1a.d b/ld/testsuite/ld-elf/compress1a.d
+index 8e29d01f..ff9b95cf 100644
+--- a/ld/testsuite/ld-elf/compress1a.d
++++ b/ld/testsuite/ld-elf/compress1a.d
+@@ -4,7 +4,8 @@
+ #readelf: -S --wide
+ #xfail: alpha-*-*ecoff
+ # PR ld/25802
+-#xfail: sparcv9-*-solaris2*
++#xfail: sparcv9-*-solaris2* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #failif
+ #...
+diff --git a/ld/testsuite/ld-elf/compressed1a.d b/ld/testsuite/ld-elf/compressed1a.d
+index 2ffe9413..4950ccf5 100644
+--- a/ld/testsuite/ld-elf/compressed1a.d
++++ b/ld/testsuite/ld-elf/compressed1a.d
+@@ -4,7 +4,8 @@
+ #readelf: -t
+ #xfail: alpha-*-*ecoff
+ # PR ld/25802
+-#xfail: sparcv9-*-solaris2*
++#xfail: sparcv9-*-solaris2* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #failif
+ #...
+diff --git a/ld/testsuite/ld-elf/elf.exp b/ld/testsuite/ld-elf/elf.exp
+index 2500d90e..83b690d9 100644
+--- a/ld/testsuite/ld-elf/elf.exp
++++ b/ld/testsuite/ld-elf/elf.exp
+@@ -122,7 +122,8 @@ if [is_elf64 tmpdir/symbol3w.a] {
+ 
+ 
+ 
+-# Targets that use _bfd_generic_link_add_symbols won't pass pr21703 tests
++# Targets that use _bfd_generic_link_add_symbols won't pass pr21703 tests.
++# i51 folds symbol and version names to upper case, so foo@FOO is FOO@FOO.
+ run_ld_link_tests {
+       {"PR ld/21703"
+ 	"--allow-multiple-definition tmpdir/pr21703-1.o tmpdir/pr21703-2.o" "" "" \
+@@ -130,7 +131,7 @@ run_ld_link_tests {
+       {"PR ld/21703 -r"
+ 	"-r --allow-multiple-definition tmpdir/pr21703-3.o tmpdir/pr21703-4.o" "" "" \
+ 	{pr21703-3.s pr21703-4.s} {{readelf {-s} pr21703-r.sd}} "pr21703.o" }
+-} \[is_generic\]
++} \[is_generic\] i51-*-*
+ 
+ if [is_underscore_target] {
+     set ASFLAGS "$ASFLAGS --defsym UNDERSCORE=1"
+@@ -395,6 +396,8 @@ if {   [istarget *-*-*linux*]
+     rename old_prune_warnings_extra prune_warnings_extra
+ }
+ 
++# i51 folds _start to _START, and has nowhere to put the writable
++# __patchable_function_entries: only code is loaded.
+ if [check_gc_sections_available] {
+     run_ld_link_tests [list \
+ 	[list "__patchable_function_entries section 2" \
+@@ -432,7 +435,7 @@ if [check_gc_sections_available] {
+ 	    {pr25490-6.s} \
+ 	    [list [list "readelf" {-SW} $pr25490_6_exp]] \
+ 	    "pr25490-6.exe"] \
+-	]
++	] i51-*-*
+ }
+ 
+ set LDFLAGS $old_ldflags
+diff --git a/ld/testsuite/ld-elf/empty.d b/ld/testsuite/ld-elf/empty.d
+index 836206ef..bad02a5b 100644
+--- a/ld/testsuite/ld-elf/empty.d
++++ b/ld/testsuite/ld-elf/empty.d
+@@ -1,6 +1,8 @@
+ #source: empty.s
+ #ld:
+ #readelf: -s
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  +[0-9]+: +[0-9a-f]+ +[0-9]+ +FUNC +GLOBAL +DEFAULT +[1-9] _start
+diff --git a/ld/testsuite/ld-elf/empty2.d b/ld/testsuite/ld-elf/empty2.d
+index d91569ec..07a03f3f 100644
+--- a/ld/testsuite/ld-elf/empty2.d
++++ b/ld/testsuite/ld-elf/empty2.d
+@@ -1,6 +1,8 @@
+ #source: empty2.s
+ #ld:
+ #readelf: -s
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [ 	]+[0-9]+:[ 	]+0+[ 	]+0[ 	]+FILE[	 ]+LOCAL[ 	]+DEFAULT[ 	]+ABS empty2.s
+diff --git a/ld/testsuite/ld-elf/endsym.d b/ld/testsuite/ld-elf/endsym.d
+index 39667e37..ff8b9adf 100644
+--- a/ld/testsuite/ld-elf/endsym.d
++++ b/ld/testsuite/ld-elf/endsym.d
+@@ -3,7 +3,8 @@
+ #ld: --sort-common
+ #nm: -n
+ #xfail: m68hc1*-* xgate-* cr16-*-* crx-*-* dlx-*-* nds32*-*-* visium-*-* s12z-*-*
+-#xfail: pru-*-*
++#xfail: pru-*-* i51-*-*
++# i51 folds symbol names to upper case, and its script defines no _end.
+ 
+ #...
+ .* end
+diff --git a/ld/testsuite/ld-elf/group1.d b/ld/testsuite/ld-elf/group1.d
+index 84e14473..44df4922 100644
+--- a/ld/testsuite/ld-elf/group1.d
++++ b/ld/testsuite/ld-elf/group1.d
+@@ -2,7 +2,8 @@
+ #source: group1b.s
+ #ld: -T group.ld
+ #readelf: -s
+-#xfail: [is_generic] i?86-*-solaris* x86_64-*-solaris*
++#xfail: [is_generic] i?86-*-solaris* x86_64-*-solaris* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # generic linker targets don't comply with all symbol merging rules
+ 
+ Symbol table '.symtab' contains .* entries:
+diff --git a/ld/testsuite/ld-elf/group10.d b/ld/testsuite/ld-elf/group10.d
+index 6dbe49e0..b8ee2f42 100644
+--- a/ld/testsuite/ld-elf/group10.d
++++ b/ld/testsuite/ld-elf/group10.d
+@@ -1,6 +1,8 @@
+ #source: group10.s
+ #ld: -r -T group.ld
+ #readelf: -Sg --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ group section \[[ 0-9]+\] `\.group' \[foo_group\] contains . sections:
+diff --git a/ld/testsuite/ld-elf/group2.d b/ld/testsuite/ld-elf/group2.d
+index 08d23d2a..64959bd9 100644
+--- a/ld/testsuite/ld-elf/group2.d
++++ b/ld/testsuite/ld-elf/group2.d
+@@ -1,6 +1,8 @@
+ #source: ../../../binutils/testsuite/binutils-all/group.s
+ #ld: -r
+ #readelf: -Sg --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+   \[[ 0-9]+\] \.group[ \t]+GROUP[ \t]+.*
+diff --git a/ld/testsuite/ld-elf/group3a.d b/ld/testsuite/ld-elf/group3a.d
+index 10c0cf2e..86848138 100644
+--- a/ld/testsuite/ld-elf/group3a.d
++++ b/ld/testsuite/ld-elf/group3a.d
+@@ -2,6 +2,8 @@
+ #source: group3b.s
+ #ld: -T group.ld
+ #readelf: -s
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ Symbol table '.symtab' contains .* entries:
+ #...
+ .*: 0+1000 +0 +OBJECT +GLOBAL +HIDDEN +. foo
+diff --git a/ld/testsuite/ld-elf/group3b.d b/ld/testsuite/ld-elf/group3b.d
+index 14ba5a3b..16b29b47 100644
+--- a/ld/testsuite/ld-elf/group3b.d
++++ b/ld/testsuite/ld-elf/group3b.d
+@@ -2,7 +2,8 @@
+ #source: group3a.s
+ #ld: -T group.ld
+ #readelf: -s
+-#xfail: [is_generic]
++#xfail: [is_generic] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # generic linker targets don't comply with all symbol merging rules
+ 
+ Symbol table '.symtab' contains .* entries:
+diff --git a/ld/testsuite/ld-elf/group5.d b/ld/testsuite/ld-elf/group5.d
+index 4b952275..cdd9d6f9 100644
+--- a/ld/testsuite/ld-elf/group5.d
++++ b/ld/testsuite/ld-elf/group5.d
+@@ -1,6 +1,8 @@
+ #source: ../../../binutils/testsuite/binutils-all/group-3.s
+ #ld: -r
+ #readelf: -Sg --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+   \[[ 0-9]+\] .group[ \t]+GROUP[ \t]+.*
+diff --git a/ld/testsuite/ld-elf/group6.d b/ld/testsuite/ld-elf/group6.d
+index 5010f09b..356dcf55 100644
+--- a/ld/testsuite/ld-elf/group6.d
++++ b/ld/testsuite/ld-elf/group6.d
+@@ -1,6 +1,8 @@
+ #source: ../../../binutils/testsuite/binutils-all/group-4.s
+ #ld: -r
+ #readelf: -Sg --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+   \[[ 0-9]+\] .group[ \t]+GROUP[ \t]+.*
+diff --git a/ld/testsuite/ld-elf/group7.d b/ld/testsuite/ld-elf/group7.d
+index e4ee270e..0907c111 100644
+--- a/ld/testsuite/ld-elf/group7.d
++++ b/ld/testsuite/ld-elf/group7.d
+@@ -4,6 +4,8 @@
+ #source: ../../../binutils/testsuite/binutils-all/group-4.s
+ #ld: -r
+ #readelf: -g --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ COMDAT group section \[[ 0-9]+\] `\.group' \[foo_group\] contains . sections:
+diff --git a/ld/testsuite/ld-elf/group8a.d b/ld/testsuite/ld-elf/group8a.d
+index 09320f6c..33ede7e3 100644
+--- a/ld/testsuite/ld-elf/group8a.d
++++ b/ld/testsuite/ld-elf/group8a.d
+@@ -2,7 +2,8 @@
+ #ld: -r --gc-sections --entry foo
+ #readelf: -g --wide
+ # generic linker targets don't support --gc-sections, nor do a bunch of others
+-#xfail: [is_generic] mep-*-* mn10200-*-*
++#xfail: [is_generic] mep-*-* mn10200-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ COMDAT group section \[[ 0-9]+\] `.group' \[foo\] contains . sections:
+    \[Index\]    Name
+diff --git a/ld/testsuite/ld-elf/group8b.d b/ld/testsuite/ld-elf/group8b.d
+index a3851d00..fc1add8c 100644
+--- a/ld/testsuite/ld-elf/group8b.d
++++ b/ld/testsuite/ld-elf/group8b.d
+@@ -2,7 +2,8 @@
+ #ld: -r --gc-sections --entry bar
+ #readelf: -g --wide
+ # generic linker targets don't support --gc-sections, nor do a bunch of others
+-#xfail: [is_generic] mep-*-* mn10200-*-*
++#xfail: [is_generic] mep-*-* mn10200-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ COMDAT group section \[[ 0-9]+\] `.group' \[bar\] contains . sections:
+    \[Index\]    Name
+diff --git a/ld/testsuite/ld-elf/group9a.d b/ld/testsuite/ld-elf/group9a.d
+index 9b481637..b068b20d 100644
+--- a/ld/testsuite/ld-elf/group9a.d
++++ b/ld/testsuite/ld-elf/group9a.d
+@@ -2,7 +2,8 @@
+ #ld: -r --gc-sections --entry foo
+ #readelf: -g --wide
+ # generic linker targets don't support --gc-sections, nor do a bunch of others
+-#xfail: [is_generic] mep-*-* mn10200-*-*
++#xfail: [is_generic] mep-*-* mn10200-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ COMDAT group section \[[ 0-9]+\] `.group' \[foo\] contains . sections:
+    \[Index\]    Name
+diff --git a/ld/testsuite/ld-elf/group9b.d b/ld/testsuite/ld-elf/group9b.d
+index 09cdb1f2..05ee6e61 100644
+--- a/ld/testsuite/ld-elf/group9b.d
++++ b/ld/testsuite/ld-elf/group9b.d
+@@ -2,7 +2,8 @@
+ #ld: -r --gc-sections --entry bar
+ #readelf: -g --wide
+ # generic linker targets don't support --gc-sections, nor do a bunch of others
+-#xfail: [is_generic] mep-*-* mn10200-*-*
++#xfail: [is_generic] mep-*-* mn10200-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ COMDAT group section \[[ 0-9]+\] `.group' \[foo\] contains . sections:
+    \[Index\]    Name
+diff --git a/ld/testsuite/ld-elf/merge5.d b/ld/testsuite/ld-elf/merge5.d
+index 38c67546..21741193 100644
+--- a/ld/testsuite/ld-elf/merge5.d
++++ b/ld/testsuite/ld-elf/merge5.d
+@@ -4,6 +4,8 @@
+ #source: merge5.b.s
+ #ld: -T merge.ld -O 2 -O - -O 99 -O default -O fast -O 0
+ #nm: -s
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ 0+1100 R .merge1
+ 0+1104 R .merge2
+diff --git a/ld/testsuite/ld-elf/nobits-1.d b/ld/testsuite/ld-elf/nobits-1.d
+index b869475d..cb47263a 100644
+--- a/ld/testsuite/ld-elf/nobits-1.d
++++ b/ld/testsuite/ld-elf/nobits-1.d
+@@ -1,5 +1,7 @@
+ #ld: -Tnobits-1.t --no-warn-rwx-segments
+ #readelf: -l --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  Section to Segment mapping:
+diff --git a/ld/testsuite/ld-elf/note-1.d b/ld/testsuite/ld-elf/note-1.d
+index ddf3606e..7295dbb3 100644
+--- a/ld/testsuite/ld-elf/note-1.d
++++ b/ld/testsuite/ld-elf/note-1.d
+@@ -1,5 +1,7 @@
+ #ld: -Tnote-1.t --no-warn-rwx-segments
+ #readelf: -l --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  Section to Segment mapping:
+diff --git a/ld/testsuite/ld-elf/note-2.d b/ld/testsuite/ld-elf/note-2.d
+index ed81703d..fe7ef6a7 100644
+--- a/ld/testsuite/ld-elf/note-2.d
++++ b/ld/testsuite/ld-elf/note-2.d
+@@ -1,6 +1,8 @@
+ #ld: -Tnote-2.t --no-warn-rwx-segments
+ #objcopy_linked_file: -R .foo 
+ #readelf: -l --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ Program Headers:
+diff --git a/ld/testsuite/ld-elf/pr12851.d b/ld/testsuite/ld-elf/pr12851.d
+index 9880e4a1..aa132a4b 100644
+--- a/ld/testsuite/ld-elf/pr12851.d
++++ b/ld/testsuite/ld-elf/pr12851.d
+@@ -2,7 +2,8 @@
+ #source: start.s
+ #ld: --gc-sections
+ #readelf: -s --wide
+-#xfail: [is_generic] mep-*-* mn10200-*-*
++#xfail: [is_generic] mep-*-* mn10200-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # generic linker targets don't support --gc-sections, nor do a bunch of others
+ 
+ #...
+diff --git a/ld/testsuite/ld-elf/pr14156a.d b/ld/testsuite/ld-elf/pr14156a.d
+index 535ac3e1..5b53cb98 100644
+--- a/ld/testsuite/ld-elf/pr14156a.d
++++ b/ld/testsuite/ld-elf/pr14156a.d
+@@ -5,6 +5,8 @@
+ #source: initn.s
+ #ld: --sort-section=alignment
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, and its RAM symbols share addresses with code.
+ 
+ #...
+ [0-9a-f]+ [TD] foo
+diff --git a/ld/testsuite/ld-elf/pr14156b.d b/ld/testsuite/ld-elf/pr14156b.d
+index 27da0166..4cdcff50 100644
+--- a/ld/testsuite/ld-elf/pr14156b.d
++++ b/ld/testsuite/ld-elf/pr14156b.d
+@@ -5,6 +5,8 @@
+ #source: finin.s
+ #ld: --sort-section=alignment
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, and its RAM symbols share addresses with code.
+ 
+ #...
+ [0-9a-f]+ [TD] foo
+diff --git a/ld/testsuite/ld-elf/pr14156c.d b/ld/testsuite/ld-elf/pr14156c.d
+index 90ca4018..cac30983 100644
+--- a/ld/testsuite/ld-elf/pr14156c.d
++++ b/ld/testsuite/ld-elf/pr14156c.d
+@@ -5,6 +5,8 @@
+ #source: foon.s
+ #ld: --sort-section=alignment -T pr14156c.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T foo
+diff --git a/ld/testsuite/ld-elf/pr17550c.d b/ld/testsuite/ld-elf/pr17550c.d
+index 55749fc7..6935ba95 100644
+--- a/ld/testsuite/ld-elf/pr17550c.d
++++ b/ld/testsuite/ld-elf/pr17550c.d
+@@ -2,6 +2,7 @@
+ #source: pr17550-3.s
+ #ld: -r
+ #error: .*: defined in discarded section `\.data\[foo_group\]'
+-#xfail: alpha-*-* [is_generic]
++#xfail: alpha-*-* [is_generic] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # Disabled on alpha because alpha has a different .set directive.
+ # Generic linker targets don't support comdat group sections.
+diff --git a/ld/testsuite/ld-elf/pr17550d.d b/ld/testsuite/ld-elf/pr17550d.d
+index 3dd108d5..c5beb5e7 100644
+--- a/ld/testsuite/ld-elf/pr17550d.d
++++ b/ld/testsuite/ld-elf/pr17550d.d
+@@ -4,7 +4,8 @@
+ #readelf: -s --wide
+ # Disabled on alpha because alpha has a different .set directive.
+ # Generic linker targets don't support comdat group sections.
+-#xfail: alpha-*-* [is_generic]
++#xfail: alpha-*-* [is_generic] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  +[0-9]+: +[0-9a-f]+ +0 +OBJECT +GLOBAL +DEFAULT +UND y
+diff --git a/ld/testsuite/ld-elf/pr18735.d b/ld/testsuite/ld-elf/pr18735.d
+index 5f64818d..469b1913 100644
+--- a/ld/testsuite/ld-elf/pr18735.d
++++ b/ld/testsuite/ld-elf/pr18735.d
+@@ -1,5 +1,7 @@
+ #ld: -r
+ #readelf: -s
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Symbol table '.symtab' contains .* entries:
+ #...
+diff --git a/ld/testsuite/ld-elf/pr21884.d b/ld/testsuite/ld-elf/pr21884.d
+index 3d44ccfe..130b2c4e 100644
+--- a/ld/testsuite/ld-elf/pr21884.d
++++ b/ld/testsuite/ld-elf/pr21884.d
+@@ -3,7 +3,8 @@
+ #ld: -T pr21884.t
+ #objdump: -b binary -s
+ #xfail: aarch64*-*-* arm*-*-* avr-*-* ia64-*-* m68hc1*-*-* nds32*-*-*
+-#xfail: riscv*-*-* score-*-* v850-*-*
++#xfail: riscv*-*-* score-*-* v850-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # Skip targets which can't change output format to binary.
+ 
+ .*:     file format binary
+diff --git a/ld/testsuite/ld-elf/pr21904.d b/ld/testsuite/ld-elf/pr21904.d
+index 1d464fc7..8be75009 100644
+--- a/ld/testsuite/ld-elf/pr21904.d
++++ b/ld/testsuite/ld-elf/pr21904.d
+@@ -1,5 +1,7 @@
+ #ld: -d -r
+ #readelf: -s
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ .*: [0-9a-f]+ +4 +OBJECT +GLOBAL +DEFAULT +[0-9]+ foo
+diff --git a/ld/testsuite/ld-elf/pr22450.d b/ld/testsuite/ld-elf/pr22450.d
+index f24da987..cb6b952a 100644
+--- a/ld/testsuite/ld-elf/pr22450.d
++++ b/ld/testsuite/ld-elf/pr22450.d
+@@ -1,7 +1,8 @@
+ #source: pr22450.s
+ #readelf: --notes --wide
+ #ld: -r
+-#xfail: avr-*-* crx-*-* h8300-*-* ip2k-*-* m68hc11-*-* z80-*-*
++#xfail: avr-*-* crx-*-* h8300-*-* ip2k-*-* m68hc11-*-* z80-*-* i51-*-*
++# i51 addresses are 16 bits, too small for a stack-size property.
+ # Fails on H8300 because it does not generate the correct relocs for the size fields.
+ # Fails on AVR, IP2K, and M68HC11 because the assembler does not calculate the correct values for the differences of local symbols.
+ # Fails on CRX because readelf does not know how to apply CRX reloc number 20 (R_CRX_SWITCH32).
+diff --git a/ld/testsuite/ld-elf/pr22677.d b/ld/testsuite/ld-elf/pr22677.d
+index f2f21e4c..18ad7698 100644
+--- a/ld/testsuite/ld-elf/pr22677.d
++++ b/ld/testsuite/ld-elf/pr22677.d
+@@ -2,7 +2,8 @@
+ #readelf: -S --wide
+ # generic linker targets don't support --gc-sections, nor do a bunch of
+ # others.
+-#xfail: [is_generic] mep-*-* mn10200-*-*
++#xfail: [is_generic] mep-*-* mn10200-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+   \[[ 0-9]+\] \.preinit_array\.01000[ \t]+PREINIT_ARRAY[ \t0-9a-f]+WA?.*
+diff --git a/ld/testsuite/ld-elf/pr22836-2.d b/ld/testsuite/ld-elf/pr22836-2.d
+index 10133e4b..052f8cea 100644
+--- a/ld/testsuite/ld-elf/pr22836-2.d
++++ b/ld/testsuite/ld-elf/pr22836-2.d
+@@ -1,6 +1,8 @@
+ #source: pr22836-2.s
+ #ld: -r -S
+ #readelf: -g --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ group section \[[ 0-9]+\] `\.group' \[foo\] contains 1 section.*
+    \[Index\]    Name
+diff --git a/ld/testsuite/ld-elf/pr23591.d b/ld/testsuite/ld-elf/pr23591.d
+index a97935eb..6b70bc7a 100644
+--- a/ld/testsuite/ld-elf/pr23591.d
++++ b/ld/testsuite/ld-elf/pr23591.d
+@@ -3,7 +3,8 @@
+ #source: pr23591c.s
+ #ld: -e _start
+ #readelf: -sW
+-#xfail: bfin-*-linux* frv-*-linux* lm32-*-linux*
++#xfail: bfin-*-linux* frv-*-linux* lm32-*-linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # bfin, frv, and lm32 fail with complaints about emitting dynamic
+ # relocations in read-only sections.
+ 
+diff --git a/ld/testsuite/ld-elf/pr23648.d b/ld/testsuite/ld-elf/pr23648.d
+index 848ebd91..c6c08848 100644
+--- a/ld/testsuite/ld-elf/pr23648.d
++++ b/ld/testsuite/ld-elf/pr23648.d
+@@ -1,6 +1,7 @@
+ #ld: --gc-sections -T pr23648.t
+ #target: [check_gc_sections_available]
+-#xfail: bfin-*-linux* frv-*-linux* lm32-*-linux*
++#xfail: bfin-*-linux* frv-*-linux* lm32-*-linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ #nm: -B
+ 
+ #failif
+diff --git a/ld/testsuite/ld-elf/pr24511.d b/ld/testsuite/ld-elf/pr24511.d
+index f77a43b9..d0bd4481 100644
+--- a/ld/testsuite/ld-elf/pr24511.d
++++ b/ld/testsuite/ld-elf/pr24511.d
+@@ -5,7 +5,8 @@
+ # thus don't define __init/fini_array_start.
+ #xfail: avr-*-* cr16-*-* crx-*-* d10v-*-* d30v-*-* dlx-*-* ft32-*-* iq2000-*-*
+ #xfail: m68hc1*-*-* mep-*-* microblaze*-*-elf* s12z-*-* v850-*-* visium-*-*
+-#xfail: xgate-*-* xstormy*-*-*
++#xfail: xgate-*-* xstormy*-*-* i51-*-*
++# i51's script places no .init_array/.fini_array and loads only code.
+ # Some targets with their own scripts haven't kept up with elf.sc and
+ # PROVIDE __init_array_start rather than using PROVIDE_HIDDEN.  These
+ # result in D symbols.  rx-elf makes .init/fini_array SHF_EXECINSTR so
+diff --git a/ld/testsuite/ld-elf/pr24526.d b/ld/testsuite/ld-elf/pr24526.d
+index 3faaa1e6..1bd01fc7 100644
+--- a/ld/testsuite/ld-elf/pr24526.d
++++ b/ld/testsuite/ld-elf/pr24526.d
+@@ -1,6 +1,8 @@
+ #ld: --gc-sections -e _start
+ #target: [check_gc_sections_available]
+ #readelf: -SW
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  +\[ *[0-9]+\] \.bar +PROGBITS +[0-9a-f]+ +[0-9a-f]+ [0-9a-f]+ +00 +AL .*
+diff --git a/ld/testsuite/ld-elf/pr25021.d b/ld/testsuite/ld-elf/pr25021.d
+index 1cb6a871..14ca9de3 100644
+--- a/ld/testsuite/ld-elf/pr25021.d
++++ b/ld/testsuite/ld-elf/pr25021.d
+@@ -1,6 +1,8 @@
+ #ld: --gc-sections -e _start
+ #target: [check_gc_sections_available]
+ #readelf: -SW
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  +\[ *[0-9]+\] \.stack_sizes +PROGBITS +0+ +[0-9a-f]+ 0+1 +00 +L +[0-9] .*
+diff --git a/ld/testsuite/ld-elf/pr25022.d b/ld/testsuite/ld-elf/pr25022.d
+index c99710ae..2b7bd3b3 100644
+--- a/ld/testsuite/ld-elf/pr25022.d
++++ b/ld/testsuite/ld-elf/pr25022.d
+@@ -1,7 +1,8 @@
+ #ld: -T pr25022.t
+ #readelf: -SW
+ #xfail: [is_generic]
+-#xfail: fr30-*-* frv-*-elf ft32-*-* iq2000-*-* mn10200-*-* msp*-* mt-*-*
++#xfail: fr30-*-* frv-*-elf ft32-*-* iq2000-*-* mn10200-*-* msp*-* mt-*-* i51-*-*
++# i51 uses genelf.em, as the targets above do.
+ # They don't use ldelf_before_place_orphans.
+ 
+ #failif
+diff --git a/ld/testsuite/ld-elf/pr26256-1a.d b/ld/testsuite/ld-elf/pr26256-1a.d
+index b8795c40..e8130432 100644
+--- a/ld/testsuite/ld-elf/pr26256-1a.d
++++ b/ld/testsuite/ld-elf/pr26256-1a.d
+@@ -1,6 +1,8 @@
+ #source: pr26256-1.s
+ #ld: -e _start -T pr26256-1.t --no-warn-rwx-segments
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T _start
+diff --git a/ld/testsuite/ld-elf/pr26256-1b.d b/ld/testsuite/ld-elf/pr26256-1b.d
+index c5652b1d..25bc3cb2 100644
+--- a/ld/testsuite/ld-elf/pr26256-1b.d
++++ b/ld/testsuite/ld-elf/pr26256-1b.d
+@@ -2,7 +2,8 @@
+ #ld: -e _start
+ #nm: -n
+ # s12z uses memory regions
+-#xfail: s12z-*-*
++#xfail: s12z-*-* i51-*-*
++# i51 has nowhere to put an orphan writable section: only code is loaded.
+ 
+ #...
+ [0-9a-f]+ T _start
+diff --git a/ld/testsuite/ld-elf/pr26256-2a.d b/ld/testsuite/ld-elf/pr26256-2a.d
+index 24e8e67e..87e48095 100644
+--- a/ld/testsuite/ld-elf/pr26256-2a.d
++++ b/ld/testsuite/ld-elf/pr26256-2a.d
+@@ -1,6 +1,8 @@
+ #source: pr26256-2.s
+ #ld: -e _start -T pr26256-2.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ R linkorder2
+diff --git a/ld/testsuite/ld-elf/pr26256-2b.d b/ld/testsuite/ld-elf/pr26256-2b.d
+index aa797dcc..a97026b1 100644
+--- a/ld/testsuite/ld-elf/pr26256-2b.d
++++ b/ld/testsuite/ld-elf/pr26256-2b.d
+@@ -2,6 +2,8 @@
+ #ld: -e _start $NO_ROSEGMENT_LDFLAGS
+ #nm: -n
+ #notarget: fr30-*-* iq2000-*-* ip2k-*-* xgate-*-* xstormy16-*-*
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # These targets place .linkorder sections before .text sections.
+ 
+ #...
+diff --git a/ld/testsuite/ld-elf/pr26256-3a.d b/ld/testsuite/ld-elf/pr26256-3a.d
+index 4546f0a0..ac4bb213 100644
+--- a/ld/testsuite/ld-elf/pr26256-3a.d
++++ b/ld/testsuite/ld-elf/pr26256-3a.d
+@@ -1,6 +1,8 @@
+ #source: pr26256-3.s
+ #ld: -e _start -T pr26256-3a.t
+ #readelf: -x .rodata -x .text
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Hex dump of section \'.rodata\':
+   0x[a-f0-9]+ +00010203 +040907 +.+
+diff --git a/ld/testsuite/ld-elf/pr26256-3b.d b/ld/testsuite/ld-elf/pr26256-3b.d
+index 8a5e6dd5..c3eaaf38 100644
+--- a/ld/testsuite/ld-elf/pr26256-3b.d
++++ b/ld/testsuite/ld-elf/pr26256-3b.d
+@@ -1,6 +1,8 @@
+ #source: pr26256-3.s
+ #ld: -e _start -T pr26256-3b.t
+ #readelf: -x .rodata -x .text
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Hex dump of section \'.rodata\':
+   0x[a-f0-9]+ +00020301 +040907 +.+
+diff --git a/ld/testsuite/ld-elf/pr26907.d b/ld/testsuite/ld-elf/pr26907.d
+index c046f65c..a5a51f0d 100644
+--- a/ld/testsuite/ld-elf/pr26907.d
++++ b/ld/testsuite/ld-elf/pr26907.d
+@@ -1,7 +1,8 @@
+ #ld: -T pr26907.ld --no-warn-rwx-segments
+ #readelf: -lW
+ #xfail: dlx-*-* ft32-*-* h8300-*-* ip2k-*-* m32r*-*-elf* m32r*-*-rtems*
+-#xfail: moxie-*-* msp430-*-* mt-*-* pru*-*-* visium-*-*
++#xfail: moxie-*-* msp430-*-* mt-*-* pru*-*-* visium-*-* i51-*-*
++# i51 has a page size of 1, as the targets above do.
+ 
+ #failif
+ #...
+diff --git a/ld/testsuite/ld-elf/pr27259.d b/ld/testsuite/ld-elf/pr27259.d
+index 01772947..a8318d46 100644
+--- a/ld/testsuite/ld-elf/pr27259.d
++++ b/ld/testsuite/ld-elf/pr27259.d
+@@ -1,6 +1,8 @@
+ #ld: --gc-sections -e _start
+ #target: [check_gc_sections_available]
+ #readelf: -SW
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  +\[ *[0-9]+\] \.stack_sizes +PROGBITS +0+ +[0-9a-f]+ 0+1 +00 +L +[0-9]+ .*
+diff --git a/ld/testsuite/ld-elf/pr30791a.d b/ld/testsuite/ld-elf/pr30791a.d
+index a699f2ab..8bd78486 100644
+--- a/ld/testsuite/ld-elf/pr30791a.d
++++ b/ld/testsuite/ld-elf/pr30791a.d
+@@ -3,7 +3,8 @@
+ #ld: -r
+ #readelf: -S --wide
+ #xfail: [is_generic] fr30-*-* frv-*-elf ft32-*-* iq2000-*-* mn10200-*-*
+-#xfail: msp430-* mt-*-* z80-*-*
++#xfail: msp430-* mt-*-* z80-*-* i51-*-*
++# i51 uses genelf.em, as the targets above do.
+ # Generic linker targets don't comply with all orhpan section merging
+ # rules.  z80 fails since a, b, c, d are registers for z80.
+ 
+diff --git a/ld/testsuite/ld-elf/retain1a.d b/ld/testsuite/ld-elf/retain1a.d
+index 29adb5d2..dbc5bcb7 100644
+--- a/ld/testsuite/ld-elf/retain1a.d
++++ b/ld/testsuite/ld-elf/retain1a.d
+@@ -3,6 +3,8 @@
+ #ld: -e _start --gc-sections
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
+ #DUMPPROG: nm
++#xfail: i51-*-*
++# i51 refuses initialised data in RAM sections, which nothing loads.
+ 
+ #...
+ [0-9a-f]+ . fnretain1
+diff --git a/ld/testsuite/ld-elf/retain1b.d b/ld/testsuite/ld-elf/retain1b.d
+index b1cafc9d..1f3760d7 100644
+--- a/ld/testsuite/ld-elf/retain1b.d
++++ b/ld/testsuite/ld-elf/retain1b.d
+@@ -3,6 +3,8 @@
+ #ld: -e _start --gc-sections
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
+ #nm: -n
++#xfail: i51-*-*
++# i51 refuses initialised data in RAM sections, which nothing loads.
+ 
+ #failif
+ #...
+diff --git a/ld/testsuite/ld-elf/retain2.d b/ld/testsuite/ld-elf/retain2.d
+index 1ab3d854..2cef9f47 100644
+--- a/ld/testsuite/ld-elf/retain2.d
++++ b/ld/testsuite/ld-elf/retain2.d
+@@ -3,3 +3,5 @@
+ #ld: -e _start -Map=tmpdir/retain2.map --gc-sections --script=retain2.ld --no-warn-rwx-segments
+ #map: retain2.map
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+diff --git a/ld/testsuite/ld-elf/retain3.d b/ld/testsuite/ld-elf/retain3.d
+index 3c81a88e..005bb789 100644
+--- a/ld/testsuite/ld-elf/retain3.d
++++ b/ld/testsuite/ld-elf/retain3.d
+@@ -3,6 +3,8 @@
+ #ld: -e _start --gc-sections
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
+ #DUMPPROG: nm
++#xfail: i51-*-*
++# i51 refuses initialised data in RAM sections, which nothing loads.
+ 
+ #...
+ [0-9a-f]+ . bar
+diff --git a/ld/testsuite/ld-elf/retain4.d b/ld/testsuite/ld-elf/retain4.d
+index b423fb95..355541c2 100644
+--- a/ld/testsuite/ld-elf/retain4.d
++++ b/ld/testsuite/ld-elf/retain4.d
+@@ -3,6 +3,8 @@
+ #ld: -e _start --gc-sections --orphan-handling=place
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
+ #DUMPPROG: nm
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ . orphaned_fn
+diff --git a/ld/testsuite/ld-elf/retain5.d b/ld/testsuite/ld-elf/retain5.d
+index f5026f54..1ac1837c 100644
+--- a/ld/testsuite/ld-elf/retain5.d
++++ b/ld/testsuite/ld-elf/retain5.d
+@@ -4,6 +4,8 @@
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
+ #map: retain5.map
+ #DUMPPROG: nm
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #failif
+ #...
+diff --git a/ld/testsuite/ld-elf/retain6a.d b/ld/testsuite/ld-elf/retain6a.d
+index c8a47d58..9f471d6e 100644
+--- a/ld/testsuite/ld-elf/retain6a.d
++++ b/ld/testsuite/ld-elf/retain6a.d
+@@ -3,6 +3,8 @@
+ #ld: --gc-sections -e _start -u bar -Ltmpdir -lretain6
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
+ #DUMPPROG: nm
++#xfail: i51-*-*
++# i51 refuses initialised data in RAM sections, which nothing loads.
+ 
+ #...
+ [0-9a-f]+ . bar
+diff --git a/ld/testsuite/ld-elf/retain6b.d b/ld/testsuite/ld-elf/retain6b.d
+index f29ba71d..8e123f28 100644
+--- a/ld/testsuite/ld-elf/retain6b.d
++++ b/ld/testsuite/ld-elf/retain6b.d
+@@ -3,6 +3,8 @@
+ #ld: --gc-sections -e _start -u bar -Ltmpdir -lretain6
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available]
+ #DUMPPROG: nm
++#xfail: i51-*-*
++# i51 refuses initialised data in RAM sections, which nothing loads.
+ 
+ #failif
+ #...
+diff --git a/ld/testsuite/ld-elf/retain7a.d b/ld/testsuite/ld-elf/retain7a.d
+index 406aaa40..a6dfc96f 100644
+--- a/ld/testsuite/ld-elf/retain7a.d
++++ b/ld/testsuite/ld-elf/retain7a.d
+@@ -4,6 +4,8 @@
+ # hppa-linux chooses ELFOSABI_GNU regardless of GNU feature use
+ #notarget: ![supports_gnu_osabi] ![check_gc_sections_available] hppa-*-linux* hppa[12]*-*-linux*
+ #readelf: -h
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #failif
+ ELF Header:
+diff --git a/ld/testsuite/ld-elf/sec-to-seg.exp b/ld/testsuite/ld-elf/sec-to-seg.exp
+index 9cb548d6..9a55cf1d 100644
+--- a/ld/testsuite/ld-elf/sec-to-seg.exp
++++ b/ld/testsuite/ld-elf/sec-to-seg.exp
+@@ -80,6 +80,7 @@ if {    [istarget avr-*-*]
+      || [istarget dlx-*-*]
+      || [istarget ft32-*-*]
+      || [istarget h8300-*-*]
++     || [istarget i51-*-*]
+      || [istarget ip2k-*-*]
+      || [istarget m32r-*-*]
+      || [istarget moxie-*-*]
+diff --git a/ld/testsuite/ld-elf/sec64k.exp b/ld/testsuite/ld-elf/sec64k.exp
+index 3671244d..cfa884e8 100644
+--- a/ld/testsuite/ld-elf/sec64k.exp
++++ b/ld/testsuite/ld-elf/sec64k.exp
+@@ -33,9 +33,10 @@ if { [is_generic] } {
+     return
+ }
+ 
+-# ft32, h8300, ip2k, m68hc11 and m68hc12 run out of address space.
++# ft32, h8300, i51, ip2k, m68hc11 and m68hc12 run out of address space.
+ if {[istarget "ft32-*-*"]
+     || [istarget "h8300-*-*"]
++    || [istarget "i51-*-*"]
+     || [istarget "ip2k-*-*"]
+     || [istarget "m68hc1*-*"] } {
+     return
+diff --git a/ld/testsuite/ld-elf/sizeofa.d b/ld/testsuite/ld-elf/sizeofa.d
+index 3eaa4e59..723f6650 100644
+--- a/ld/testsuite/ld-elf/sizeofa.d
++++ b/ld/testsuite/ld-elf/sizeofa.d
+@@ -1,6 +1,8 @@
+ #source: sizeof.s
+ #ld: -Ur
+ #readelf: -sW
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Symbol table '\.symtab' contains [0-9]+ entries:
+  +Num: +Value +Size Type +Bind +Vis +Ndx Name
+diff --git a/ld/testsuite/ld-elf/sizeofc.d b/ld/testsuite/ld-elf/sizeofc.d
+index 50787416..18983f03 100644
+--- a/ld/testsuite/ld-elf/sizeofc.d
++++ b/ld/testsuite/ld-elf/sizeofc.d
+@@ -1,6 +1,8 @@
+ #source: sizeof.s
+ #ld: -r
+ #readelf: -sW
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Symbol table '\.symtab' contains [0-9]+ entries:
+  +Num: +Value +Size Type +Bind +Vis +Ndx Name
+diff --git a/ld/testsuite/ld-elf/startofa.d b/ld/testsuite/ld-elf/startofa.d
+index 6a4460f0..d520ada6 100644
+--- a/ld/testsuite/ld-elf/startofa.d
++++ b/ld/testsuite/ld-elf/startofa.d
+@@ -1,6 +1,8 @@
+ #source: startof.s
+ #ld: -Ur
+ #readelf: -sW
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Symbol table '\.symtab' contains [0-9]+ entries:
+  +Num: +Value +Size Type +Bind +Vis +Ndx Name
+diff --git a/ld/testsuite/ld-elf/startofc.d b/ld/testsuite/ld-elf/startofc.d
+index 0250892c..96af0d2f 100644
+--- a/ld/testsuite/ld-elf/startofc.d
++++ b/ld/testsuite/ld-elf/startofc.d
+@@ -1,6 +1,8 @@
+ #source: startof.s
+ #ld: -r
+ #readelf: -sW
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Symbol table '\.symtab' contains [0-9]+ entries:
+  +Num: +Value +Size Type +Bind +Vis +Ndx Name
+diff --git a/ld/testsuite/ld-elf/var1.d b/ld/testsuite/ld-elf/var1.d
+index f7de7fc0..a4023d83 100644
+--- a/ld/testsuite/ld-elf/var1.d
++++ b/ld/testsuite/ld-elf/var1.d
+@@ -1,6 +1,7 @@
+ #ld:  $srcdir/$subdir/var1.t --sort-section name
+ #nm: -n
+-#xfail: d30v-*-* dlx-*-* ft32-*-*
++#xfail: d30v-*-* dlx-*-* ft32-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]* D var1
+diff --git a/ld/testsuite/ld-elf/warn1.d b/ld/testsuite/ld-elf/warn1.d
+index e8853036..ea07f284 100644
+--- a/ld/testsuite/ld-elf/warn1.d
++++ b/ld/testsuite/ld-elf/warn1.d
+@@ -4,7 +4,8 @@
+ #ld: -T group.ld --no-warn-rwx-segments
+ #warning: ^[^\n]*\): warning: witty one-liner$
+ #readelf: -s
+-#xfail: [is_generic]
++#xfail: [is_generic] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ # Check that warnings are generated for the .gnu.warning.SYMBOL
+ # construct and that the symbol still appears as expected.
+diff --git a/ld/testsuite/ld-elf/warn3.d b/ld/testsuite/ld-elf/warn3.d
+index 3015cf53..e4573316 100644
+--- a/ld/testsuite/ld-elf/warn3.d
++++ b/ld/testsuite/ld-elf/warn3.d
+@@ -2,7 +2,8 @@
+ #ld: tmpdir/symbol3w.o tmpdir/symbol3.a 
+ #warning: .*: warning: badsym warning$
+ #readelf: -s
+-#xfail: [is_generic]
++#xfail: [is_generic] i51-*-*
++# i51 refuses initialised data in RAM sections, which nothing loads.
+ # generic linker targets don't support .gnu.warning sections.
+ 
+ # Check that warnings are generated for the symbols in .gnu.warning
+diff --git a/ld/testsuite/ld-elfcomm/elfcomm.exp b/ld/testsuite/ld-elfcomm/elfcomm.exp
+index 022e297d..927a1268 100644
+--- a/ld/testsuite/ld-elfcomm/elfcomm.exp
++++ b/ld/testsuite/ld-elfcomm/elfcomm.exp
+@@ -68,6 +68,8 @@ proc test_sort_common {} {
+ 
+     # Don't know why, but the CR ports fail this test.
+     setup_xfail "cr16-*-*" "crx-*-*"
++    # i51 folds symbol names to upper case, so var_* is VAR_*.
++    setup_xfail "i51-*-*"
+ 
+     # Note: The second regexp is for targets which put small commons in a .sbss
+     #  section and large commons in a .bss section.
+@@ -90,6 +92,8 @@ proc test_sort_common {} {
+     send_log "$objdump --syms tmpdir/sort-common.ax | grep var | sort\n"
+     set exec_output [run_host_cmd "$objdump" "--syms tmpdir/sort-common.ax | grep var | sort"]
+ 
++    # i51 folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if {![regexp ".*var_1.*var_2.*var_4.*var_8.*var_16.*" $exec_output]} {      
+ 	fail "$test (variables in wrong order)"
+ 	return 0
+diff --git a/ld/testsuite/ld-gc/abi-note.d b/ld/testsuite/ld-gc/abi-note.d
+index 1f78ceaa..4415ff1b 100644
+--- a/ld/testsuite/ld-gc/abi-note.d
++++ b/ld/testsuite/ld-gc/abi-note.d
+@@ -1,6 +1,8 @@
+ #name: --gc-sections with note section
+ #ld: --gc-sections -e _start
+ #readelf: -S --wide
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ .* .note.ABI-tag[ 	]+NOTE.*
+diff --git a/ld/testsuite/ld-gc/all-debug-sections.d b/ld/testsuite/ld-gc/all-debug-sections.d
+index ebbacacb..43a2ebdc 100644
+--- a/ld/testsuite/ld-gc/all-debug-sections.d
++++ b/ld/testsuite/ld-gc/all-debug-sections.d
+@@ -3,7 +3,8 @@
+ #ld: --gc-sections -e _start
+ #nm: -B
+ # PR ld/25802
+-#xfail: sparcv9-*-solaris2*
++#xfail: sparcv9-*-solaris2* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ N +debug_aranges_main
+diff --git a/ld/testsuite/ld-gc/pr19167.d b/ld/testsuite/ld-gc/pr19167.d
+index f3024169..4afc207c 100644
+--- a/ld/testsuite/ld-gc/pr19167.d
++++ b/ld/testsuite/ld-gc/pr19167.d
+@@ -2,7 +2,8 @@
+ #source: pr19167b.s
+ #ld: --gc-sections -e _start
+ #objdump: -s -j _foo
+-#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux*
++#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ Contents of section _foo:
+diff --git a/ld/testsuite/ld-gc/pr20882.d b/ld/testsuite/ld-gc/pr20882.d
+index 1d68d05f..f5829b6a 100644
+--- a/ld/testsuite/ld-gc/pr20882.d
++++ b/ld/testsuite/ld-gc/pr20882.d
+@@ -4,6 +4,8 @@
+ #source: pr20882c.s
+ #ld: --gc-sections -e main
+ #readelf: -x .debug_info -x .debug_abbrev
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ Hex dump of section '\.debug_info':
+   0x0+ .*
+diff --git a/ld/testsuite/ld-gc/start.d b/ld/testsuite/ld-gc/start.d
+index 1f7ece59..f124ffd4 100644
+--- a/ld/testsuite/ld-gc/start.d
++++ b/ld/testsuite/ld-gc/start.d
+@@ -1,7 +1,8 @@
+ #name: --gc-sections with __start_
+ #ld: --gc-sections -e _start
+ #nm: -n
+-#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux*
++#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ D +_?__start__foo
+diff --git a/ld/testsuite/ld-gc/start3.d b/ld/testsuite/ld-gc/start3.d
+index d3d0a5fc..2122b4f0 100644
+--- a/ld/testsuite/ld-gc/start3.d
++++ b/ld/testsuite/ld-gc/start3.d
+@@ -2,7 +2,8 @@
+ #ld: --gc-sections -e _start
+ #nm: -n
+ #notarget: [is_generic]
+-#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux*
++#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T +bar
+diff --git a/ld/testsuite/ld-gc/start4.d b/ld/testsuite/ld-gc/start4.d
+index 60439a12..2762a7f0 100644
+--- a/ld/testsuite/ld-gc/start4.d
++++ b/ld/testsuite/ld-gc/start4.d
+@@ -2,7 +2,8 @@
+ #ld: --gc-sections -e _start
+ #nm: -n
+ #target: [supports_gnu_unique]
+-#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux*
++#xfail: bfin-*-linux* frv-*-*linux* lm32-*-*linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ R +bar_xx
+diff --git a/ld/testsuite/ld-gc/stop.d b/ld/testsuite/ld-gc/stop.d
+index 140d1d2f..2822c0a1 100644
+--- a/ld/testsuite/ld-gc/stop.d
++++ b/ld/testsuite/ld-gc/stop.d
+@@ -1,6 +1,8 @@
+ #name: --gc-sections removing __stop_
+ #ld: --gc-sections -e _start
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #failif
+ #...
+diff --git a/ld/testsuite/ld-libs/libs.exp b/ld/testsuite/ld-libs/libs.exp
+index ad3b527c..6ca2c17e 100644
+--- a/ld/testsuite/ld-libs/libs.exp
++++ b/ld/testsuite/ld-libs/libs.exp
+@@ -37,6 +37,9 @@ file mkdir tmpdir/libtmp
+ # for the second one.
+ run_ld_link_tests {
+     {"-l: test (preparation)" "-r" "" "" {lib-1.s} {} "libtmp/anobject"}
++}
++# i51 folds symbol names to upper case, so foo and bar are FOO and BAR.
++run_ld_link_tests {
+     {"-l: test" "-r -Ltmpdir/libtmp -l:anobject" "" "" {lib-2.s}
+      {{nm -C lib-2.d}} "lib-2"}
+-}
++} i51-*-*
+diff --git a/ld/testsuite/ld-linkonce/linkonce.exp b/ld/testsuite/ld-linkonce/linkonce.exp
+index 96c54d4a..517c5233 100644
+--- a/ld/testsuite/ld-linkonce/linkonce.exp
++++ b/ld/testsuite/ld-linkonce/linkonce.exp
+@@ -30,11 +30,18 @@ run_ld_link_tests [list \
+     [list "Build sym.a" \
+ 	"" "" \
+ 	"" {sym1.s sym2.s sym3.s ref2.s} {} "sym.a" ] \
+-    [list "pr26103" \
+-	"" "--start-group tmpdir/sym.a tmpdir/ref2.o --end-group" \
+-	"" {ref1.s} {} "pr26103" ] \
+ ]
+ 
++# The MCS-51 default script loads none of its RAM spaces, and the linker
++# refuses the initialized .data these objects carry.
++if { ![istarget i51-*-*] } {
++    run_ld_link_tests [list \
++	[list "pr26103" \
++	    "" "--start-group tmpdir/sym.a tmpdir/ref2.o --end-group" \
++	    "" {ref1.s} {} "pr26103" ] \
++    ]
++}
++
+ set rd_test_list [lsort [glob -nocomplain $srcdir/$subdir/*.d]]
+ for { set i 0 } { $i < [llength $rd_test_list] } { incr i } {
+     # We need to strip the ".d", but can leave the dirname.
+diff --git a/ld/testsuite/ld-scripts/default-script1.d b/ld/testsuite/ld-scripts/default-script1.d
+index 97758084..18afd942 100644
+--- a/ld/testsuite/ld-scripts/default-script1.d
++++ b/ld/testsuite/ld-scripts/default-script1.d
+@@ -1,6 +1,8 @@
+ #source: default-script.s
+ #ld: -defsym _START=0x800 -T default-script.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0*800 . _START
+diff --git a/ld/testsuite/ld-scripts/default-script2.d b/ld/testsuite/ld-scripts/default-script2.d
+index 39c24e00..2e72654a 100644
+--- a/ld/testsuite/ld-scripts/default-script2.d
++++ b/ld/testsuite/ld-scripts/default-script2.d
+@@ -1,6 +1,8 @@
+ #source: default-script.s
+ #ld: -T default-script.t -defsym _START=0x800
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0*800 . _START
+diff --git a/ld/testsuite/ld-scripts/default-script3.d b/ld/testsuite/ld-scripts/default-script3.d
+index 7a7dda65..43369aee 100644
+--- a/ld/testsuite/ld-scripts/default-script3.d
++++ b/ld/testsuite/ld-scripts/default-script3.d
+@@ -1,6 +1,8 @@
+ #source: default-script.s
+ #ld: -defsym _START=0x800 -dT default-script.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0*800 . _START
+diff --git a/ld/testsuite/ld-scripts/default-script4.d b/ld/testsuite/ld-scripts/default-script4.d
+index 7f905b3f..6707ae46 100644
+--- a/ld/testsuite/ld-scripts/default-script4.d
++++ b/ld/testsuite/ld-scripts/default-script4.d
+@@ -1,6 +1,8 @@
+ #source: default-script.s
+ #ld: --default-script default-script.t -defsym _START=0x800
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0*800 . _START
+diff --git a/ld/testsuite/ld-scripts/defined.exp b/ld/testsuite/ld-scripts/defined.exp
+index 0d2d8a31..d159c2c5 100644
+--- a/ld/testsuite/ld-scripts/defined.exp
++++ b/ld/testsuite/ld-scripts/defined.exp
+@@ -34,6 +34,9 @@ if { [is_pecoff_format] } then {
+     set LDFLAGS "$LDFLAGS -bnogc"
+ }
+ 
++# i51 folds symbol names to upper case, so the script's DEFINED (defined)
++# never sees the object's DEFINED.
++setup_xfail "i51-*-*"
+ if { ![ld_link $ld tmpdir/def "$LDFLAGS -T $srcdir/$subdir/defined.t tmpdir/def.o"] } {
+     fail $testname
+ } elseif { ![ld_nm $nm "" tmpdir/def] } {
+diff --git a/ld/testsuite/ld-scripts/defined3.d b/ld/testsuite/ld-scripts/defined3.d
+index 805f724f..ff953d85 100644
+--- a/ld/testsuite/ld-scripts/defined3.d
++++ b/ld/testsuite/ld-scripts/defined3.d
+@@ -2,6 +2,8 @@
+ #nm: -B
+ #source: phdrs.s
+ #source: defined.s
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ # Check that DEFINED matches only symbols defined before its location.
+ # The ellipsis account for target-specific symbols.  Matching both A and T
+diff --git a/ld/testsuite/ld-scripts/defined4.d b/ld/testsuite/ld-scripts/defined4.d
+index 7cc48dac..6ff45813 100644
+--- a/ld/testsuite/ld-scripts/defined4.d
++++ b/ld/testsuite/ld-scripts/defined4.d
+@@ -1,7 +1,8 @@
+ #ld: -Tdefined4.t
+ #nm: -B
+ #source: defined4.s
+-#xfail: mips*-*-*
++#xfail: mips*-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # We check that defined and defined1 have the same address.  MIPS targets
+ # use different address.
+ 
+diff --git a/ld/testsuite/ld-scripts/defined5.d b/ld/testsuite/ld-scripts/defined5.d
+index b5513ae9..bfd72e55 100644
+--- a/ld/testsuite/ld-scripts/defined5.d
++++ b/ld/testsuite/ld-scripts/defined5.d
+@@ -1,6 +1,8 @@
+ #ld: -Tdefined5.t --no-error-rwx-segments
+ #warning: .*multiple definition of `defined'.*
+ #nm: -B
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ # Check that a script can override an object file symbol, if multiple
+ # definitions are allowed.  See pr12356.
+diff --git a/ld/testsuite/ld-scripts/defined6.d b/ld/testsuite/ld-scripts/defined6.d
+index 8837f3b1..7da72151 100644
+--- a/ld/testsuite/ld-scripts/defined6.d
++++ b/ld/testsuite/ld-scripts/defined6.d
+@@ -1,6 +1,8 @@
+ #source: defined6.s
+ #ld: -T defined6.t
+ #nm: -B
++#xfail: i51-*-*
++# i51 folds symbol names to upper case; the script's lower-case names never match.
+ 
+ # Check that DEFINED works with various symbol types
+ #...
+diff --git a/ld/testsuite/ld-scripts/empty-address-1.d b/ld/testsuite/ld-scripts/empty-address-1.d
+index 210b70f7..81f8c73d 100644
+--- a/ld/testsuite/ld-scripts/empty-address-1.d
++++ b/ld/testsuite/ld-scripts/empty-address-1.d
+@@ -1,6 +1,7 @@
+ #ld: -T empty-address-1.t
+ #nm: -n
+-#xfail: bfin-*-linux* frv-*-*linux*
++#xfail: bfin-*-linux* frv-*-*linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ #...
+ 0+0 [AT] _start
+ #...
+diff --git a/ld/testsuite/ld-scripts/empty-address-2a.d b/ld/testsuite/ld-scripts/empty-address-2a.d
+index a619ea19..706cf68a 100644
+--- a/ld/testsuite/ld-scripts/empty-address-2a.d
++++ b/ld/testsuite/ld-scripts/empty-address-2a.d
+@@ -1,7 +1,8 @@
+ #source: empty-address-2.s
+ #ld: -Ttext 0x0000000 -Tdata 0x200 -T empty-address-2a.t
+ #nm: -n
+-#xfail: bfin-*-linux* frv-*-*linux* riscv64*-*-* tic54x-*-* [is_xcoff_format]
++#xfail: bfin-*-linux* frv-*-*linux* riscv64*-*-* tic54x-*-* [is_xcoff_format] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ #...
+ 0+0 T _start
+ #...
+diff --git a/ld/testsuite/ld-scripts/empty-address-2b.d b/ld/testsuite/ld-scripts/empty-address-2b.d
+index c9b97b8b..8af62fe7 100644
+--- a/ld/testsuite/ld-scripts/empty-address-2b.d
++++ b/ld/testsuite/ld-scripts/empty-address-2b.d
+@@ -1,7 +1,8 @@
+ #source: empty-address-2.s
+ #ld: -Ttext 0x0000000 -Tdata 0x200 -T empty-address-2b.t
+ #nm: -n
+-#xfail: bfin-*-linux* frv-*-*linux* riscv64*-*-* tic54x-*-* [is_xcoff_format]
++#xfail: bfin-*-linux* frv-*-*linux* riscv64*-*-* tic54x-*-* [is_xcoff_format] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ #...
+ 0+0 T _start
+ #...
+diff --git a/ld/testsuite/ld-scripts/empty-address-3a.d b/ld/testsuite/ld-scripts/empty-address-3a.d
+index fe87ebc3..773d2db7 100644
+--- a/ld/testsuite/ld-scripts/empty-address-3a.d
++++ b/ld/testsuite/ld-scripts/empty-address-3a.d
+@@ -1,7 +1,8 @@
+ #source: empty-address-3.s
+ #ld: -T empty-address-3a.t
+ #nm: -n
+-#xfail: [is_xcoff_format]
++#xfail: [is_xcoff_format] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0+0 T _start
+diff --git a/ld/testsuite/ld-scripts/empty-address-3b.d b/ld/testsuite/ld-scripts/empty-address-3b.d
+index 0d9babef..33f0d5b9 100644
+--- a/ld/testsuite/ld-scripts/empty-address-3b.d
++++ b/ld/testsuite/ld-scripts/empty-address-3b.d
+@@ -1,7 +1,8 @@
+ #source: empty-address-3.s
+ #ld: -T empty-address-3b.t
+ #nm: -n
+-#xfail: [is_xcoff_format]
++#xfail: [is_xcoff_format] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0+0 T _start
+diff --git a/ld/testsuite/ld-scripts/empty-address-3c.d b/ld/testsuite/ld-scripts/empty-address-3c.d
+index 7fac2f64..c0735279 100644
+--- a/ld/testsuite/ld-scripts/empty-address-3c.d
++++ b/ld/testsuite/ld-scripts/empty-address-3c.d
+@@ -1,6 +1,8 @@
+ #source: empty-address-3.s
+ #ld: -T empty-address-3c.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ #...
+ 0+0 T _start
+ #...
+diff --git a/ld/testsuite/ld-scripts/empty-address-4.d b/ld/testsuite/ld-scripts/empty-address-4.d
+index 26b058bc..e8eb89df 100644
+--- a/ld/testsuite/ld-scripts/empty-address-4.d
++++ b/ld/testsuite/ld-scripts/empty-address-4.d
+@@ -1,5 +1,7 @@
+ #ld: -T empty-address-4.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0+0 [AT] _start
+diff --git a/ld/testsuite/ld-scripts/expr2.d b/ld/testsuite/ld-scripts/expr2.d
+index d1dac5d7..8da18ff6 100644
+--- a/ld/testsuite/ld-scripts/expr2.d
++++ b/ld/testsuite/ld-scripts/expr2.d
+@@ -1,6 +1,7 @@
+ # ld: -T expr2.t
+ #nm: -B
+-#xfail: [is_xcoff_format]
++#xfail: [is_xcoff_format] i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ .* D defined
+diff --git a/ld/testsuite/ld-scripts/map-address.exp b/ld/testsuite/ld-scripts/map-address.exp
+index 1ff7a48f..1dff758b 100644
+--- a/ld/testsuite/ld-scripts/map-address.exp
++++ b/ld/testsuite/ld-scripts/map-address.exp
+@@ -141,6 +141,8 @@ if { [is_elf_format] } {
+ 
+ 	# Some ELF targets do not preserve their local symbols.
+ 	setup_xfail "d30v-*-*" "dlx-*-*" "pj-*-*" "s12z-*-*" "xgate-*-*"
++	# i51 folds symbol names to upper case, so local_sym is LOCAL_SYM.
++	setup_xfail "i51-*-*"
+     
+ 	if {[regexp_diff \
+ 		 "tmpdir/map-locals.map" \
+diff --git a/ld/testsuite/ld-scripts/pr14962-2.d b/ld/testsuite/ld-scripts/pr14962-2.d
+index 8b464da6..9250c40a 100644
+--- a/ld/testsuite/ld-scripts/pr14962-2.d
++++ b/ld/testsuite/ld-scripts/pr14962-2.d
+@@ -1,7 +1,8 @@
+ #ld: -T pr14962-2.t
+ #source: pr14962a.s
+ #nm: -n
+-#xfail: bfin-*-linux* frv-*-*linux*
++#xfail: bfin-*-linux* frv-*-*linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0+2000 [AT] _start
+diff --git a/ld/testsuite/ld-scripts/pr14962.d b/ld/testsuite/ld-scripts/pr14962.d
+index 9bdd474e..26d9cd7e 100644
+--- a/ld/testsuite/ld-scripts/pr14962.d
++++ b/ld/testsuite/ld-scripts/pr14962.d
+@@ -5,7 +5,8 @@
+ #xfail: mmix-knuth-mmixware
+ # The reference to x would normally generate a cross-reference error
+ # but the linker script converts x to absolute to avoid the error.
+-#xfail: bfin-*-linux*
++#xfail: bfin-*-linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # The bfinfd backend complains about fixups in read-only sections.
+ 
+ #...
+diff --git a/ld/testsuite/ld-scripts/pr22267.d b/ld/testsuite/ld-scripts/pr22267.d
+index b46fec3e..c4414656 100644
+--- a/ld/testsuite/ld-scripts/pr22267.d
++++ b/ld/testsuite/ld-scripts/pr22267.d
+@@ -1,6 +1,7 @@
+ #ld: -T pr22267.t
+ #nm: -n
+-#xfail: bfin-*-linux* frv-*-linux*
++#xfail: bfin-*-linux* frv-*-linux* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0*ff A foo
+diff --git a/ld/testsuite/ld-scripts/provide-1.d b/ld/testsuite/ld-scripts/provide-1.d
+index 1bc3c1e4..12e4cec3 100644
+--- a/ld/testsuite/ld-scripts/provide-1.d
++++ b/ld/testsuite/ld-scripts/provide-1.d
+@@ -1,7 +1,8 @@
+ #source: provide-1.s
+ #ld: -T provide-1.t
+ #objdump: -s -j .data
+-#xfail: tic54x-*-*
++#xfail: tic54x-*-* i51-*-*
++# i51 folds symbol names to upper case; the script's lower-case names never match.
+ 
+ .*:     file format .*
+ 
+diff --git a/ld/testsuite/ld-scripts/provide-2.d b/ld/testsuite/ld-scripts/provide-2.d
+index 0b94e29f..36c5695e 100644
+--- a/ld/testsuite/ld-scripts/provide-2.d
++++ b/ld/testsuite/ld-scripts/provide-2.d
+@@ -1,7 +1,8 @@
+ #source: provide-2.s
+ #ld: -T provide-2.t
+ #nm: -B
+-#xfail: tic54x-*-*
++#xfail: tic54x-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0+3 A baz
+diff --git a/ld/testsuite/ld-scripts/provide-4.d b/ld/testsuite/ld-scripts/provide-4.d
+index 8efc8a65..b3b25d57 100644
+--- a/ld/testsuite/ld-scripts/provide-4.d
++++ b/ld/testsuite/ld-scripts/provide-4.d
+@@ -2,7 +2,8 @@
+ #ld: -T provide-4.t
+ #nm: -B
+ #map: provide-4.map
+-#xfail: tic54x-*-*
++#xfail: tic54x-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ 0+3 A baz
+diff --git a/ld/testsuite/ld-scripts/section-order-1a.d b/ld/testsuite/ld-scripts/section-order-1a.d
+index 40730b82..8b44dc6f 100644
+--- a/ld/testsuite/ld-scripts/section-order-1a.d
++++ b/ld/testsuite/ld-scripts/section-order-1a.d
+@@ -4,6 +4,8 @@
+ #source: start.s
+ #ld: --section-ordering-file section-order-1a.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T yyy
+diff --git a/ld/testsuite/ld-scripts/section-order-1b.d b/ld/testsuite/ld-scripts/section-order-1b.d
+index caf713dd..9c3dc6e9 100644
+--- a/ld/testsuite/ld-scripts/section-order-1b.d
++++ b/ld/testsuite/ld-scripts/section-order-1b.d
+@@ -4,6 +4,8 @@
+ #source: start.s
+ #ld: --section-ordering-file section-order-1b.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T yyy
+diff --git a/ld/testsuite/ld-scripts/section-order-1c.d b/ld/testsuite/ld-scripts/section-order-1c.d
+index ad06d4ac..43fadf09 100644
+--- a/ld/testsuite/ld-scripts/section-order-1c.d
++++ b/ld/testsuite/ld-scripts/section-order-1c.d
+@@ -4,6 +4,8 @@
+ #source: start.s
+ #ld: --section-ordering-file section-order-1a.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ D small
+diff --git a/ld/testsuite/ld-scripts/section-order-1d.d b/ld/testsuite/ld-scripts/section-order-1d.d
+index d0165056..d93935a5 100644
+--- a/ld/testsuite/ld-scripts/section-order-1d.d
++++ b/ld/testsuite/ld-scripts/section-order-1d.d
+@@ -4,6 +4,8 @@
+ #source: start.s
+ #ld: --section-ordering-file section-order-1a.t
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ D small
+diff --git a/ld/testsuite/ld-scripts/sort.exp b/ld/testsuite/ld-scripts/sort.exp
+index 826521a8..d2fcba7f 100644
+--- a/ld/testsuite/ld-scripts/sort.exp
++++ b/ld/testsuite/ld-scripts/sort.exp
+@@ -33,5 +33,8 @@ if [istarget "h8300-*-*"] {
+ set sort_test_list [lsort [glob -nocomplain $srcdir/$subdir/sort*.d]]
+ for { set i 0 } { $i < [llength $sort_test_list] } { incr i } {
+     verbose [file rootname [lindex $sort_test_list $i]]
++    # i51 folds symbol names to upper case, so the lower-case names the
++    # tests expect never match.
++    setup_xfail "i51-*-*"
+     run_dump_test [file rootname [lindex $sort_test_list $i]]
+ }
+diff --git a/ld/testsuite/ld-scripts/sysroot-prefix.exp b/ld/testsuite/ld-scripts/sysroot-prefix.exp
+index acf59daf..41717f58 100644
+--- a/ld/testsuite/ld-scripts/sysroot-prefix.exp
++++ b/ld/testsuite/ld-scripts/sysroot-prefix.exp
+@@ -19,7 +19,10 @@
+ 
+ # Don't run on alpha-vms which requires linking with other libraries,
+ # or on targets that complain about relocations in read-only sections.
++# The MCS-51 default script loads none of its RAM spaces, and the linker
++# refuses the initialized .data these objects carry.
+ if { [istarget *-*-vms]
++     || [istarget i51-*-*]
+      || [istarget bfin-*-*]
+      || [istarget frv-*-*]
+      || [istarget lm32-*-*] } then {
+diff --git a/ld/testsuite/ld-selective/keepdot.d b/ld/testsuite/ld-selective/keepdot.d
+index aadd5d44..13213b91 100644
+--- a/ld/testsuite/ld-selective/keepdot.d
++++ b/ld/testsuite/ld-selective/keepdot.d
+@@ -1,6 +1,8 @@
+ #ld: --gc-sections -Bstatic -e _start -T keepdot.ld
+ #name: Preserve default . = 0
+ #objdump: -h
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ # Check that GC:ing does not mess up the default value for dot.
+ 
+diff --git a/ld/testsuite/ld-selective/keepdot0.d b/ld/testsuite/ld-selective/keepdot0.d
+index 4432a011..305aa1c9 100644
+--- a/ld/testsuite/ld-selective/keepdot0.d
++++ b/ld/testsuite/ld-selective/keepdot0.d
+@@ -2,6 +2,8 @@
+ #ld: --gc-sections -Bstatic -e _start -T keepdot0.ld
+ #name: Preserve explicit . = 0
+ #objdump: -h
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ # Check that GC:ing does not mess up the value for dot when specified
+ # as 0.
+diff --git a/ld/testsuite/ld-undefined/entry-1.d b/ld/testsuite/ld-undefined/entry-1.d
+index 551042ef..37cf7e1d 100644
+--- a/ld/testsuite/ld-undefined/entry-1.d
++++ b/ld/testsuite/ld-undefined/entry-1.d
+@@ -2,6 +2,8 @@
+ #source: dummy.s
+ #ld: --entry foo tmpdir/libentry.a
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T +foo
+diff --git a/ld/testsuite/ld-undefined/entry-2.d b/ld/testsuite/ld-undefined/entry-2.d
+index 9122313f..398e9636 100644
+--- a/ld/testsuite/ld-undefined/entry-2.d
++++ b/ld/testsuite/ld-undefined/entry-2.d
+@@ -2,6 +2,8 @@
+ #source: dummy.s
+ #ld: --entry foo -u foo tmpdir/libentry.a
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T +foo
+diff --git a/ld/testsuite/ld-undefined/entry-5.d b/ld/testsuite/ld-undefined/entry-5.d
+index fc36e822..b44a0d20 100644
+--- a/ld/testsuite/ld-undefined/entry-5.d
++++ b/ld/testsuite/ld-undefined/entry-5.d
+@@ -2,6 +2,8 @@
+ #source: entry.s
+ #ld: --entry foo
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T +foo
+diff --git a/ld/testsuite/ld-undefined/entry-6.d b/ld/testsuite/ld-undefined/entry-6.d
+index c013a1af..a76d3bf3 100644
+--- a/ld/testsuite/ld-undefined/entry-6.d
++++ b/ld/testsuite/ld-undefined/entry-6.d
+@@ -2,6 +2,8 @@
+ #source: entry.s
+ #ld: --entry foo -u foo
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T +foo
+diff --git a/ld/testsuite/ld-undefined/require-defined-2.d b/ld/testsuite/ld-undefined/require-defined-2.d
+index e770eeab..460606d0 100644
+--- a/ld/testsuite/ld-undefined/require-defined-2.d
++++ b/ld/testsuite/ld-undefined/require-defined-2.d
+@@ -2,6 +2,8 @@
+ #source: require-defined.s
+ #ld: -e _start --gc-sections --require-defined=bar
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T bar
+diff --git a/ld/testsuite/ld-undefined/require-defined-3.d b/ld/testsuite/ld-undefined/require-defined-3.d
+index c61ed341..280d8468 100644
+--- a/ld/testsuite/ld-undefined/require-defined-3.d
++++ b/ld/testsuite/ld-undefined/require-defined-3.d
+@@ -2,6 +2,8 @@
+ #source: require-defined.s
+ #ld: -e _start --require-defined=bar
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T bar
+diff --git a/ld/testsuite/ld-undefined/require-defined-4.d b/ld/testsuite/ld-undefined/require-defined-4.d
+index 2922c99f..bd0b74d3 100644
+--- a/ld/testsuite/ld-undefined/require-defined-4.d
++++ b/ld/testsuite/ld-undefined/require-defined-4.d
+@@ -2,6 +2,8 @@
+ #source: require-defined.s
+ #ld: -e _start --require-defined=foo tmpdir/libfoo.a
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T foo
+diff --git a/ld/testsuite/ld-undefined/require-defined-5.d b/ld/testsuite/ld-undefined/require-defined-5.d
+index ea288a9f..7ee07ff0 100644
+--- a/ld/testsuite/ld-undefined/require-defined-5.d
++++ b/ld/testsuite/ld-undefined/require-defined-5.d
+@@ -2,6 +2,8 @@
+ #source: require-defined.s
+ #ld: -e _start --gc-sections --require-defined=bar --require-defined=foo tmpdir/libfoo.a
+ #nm: -n
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+ [0-9a-f]+ T foo
+diff --git a/ld/testsuite/ld-unique/pr21529.d b/ld/testsuite/ld-unique/pr21529.d
+index fb637943..b0c220cf 100644
+--- a/ld/testsuite/ld-unique/pr21529.d
++++ b/ld/testsuite/ld-unique/pr21529.d
+@@ -1,6 +1,7 @@
+ #ld: --oformat binary -T pr21529.ld -e main
+ #objdump: -s -b binary
+-#xfail: aarch64*-*-* arm*-*-* avr-*-* ia64-*-* m68hc1*-*-* nds32*-*-* riscv*-*-* score-*-* v850-*-*
++#xfail: aarch64*-*-* arm*-*-* avr-*-* ia64-*-* m68hc1*-*-* nds32*-*-* riscv*-*-* score-*-* v850-*-* i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ # Skip targets which can't change output format to binary.
+ 
+ #pass
+diff --git a/ld/testsuite/ld-unique/unique.d b/ld/testsuite/ld-unique/unique.d
+index 77422d5e..d574628a 100644
+--- a/ld/testsuite/ld-unique/unique.d
++++ b/ld/testsuite/ld-unique/unique.d
+@@ -1,6 +1,8 @@
+ #ld: -r
+ #readelf: -sh
+ #name: Linker setting GNU OSABI on STB_GNU_UNIQUE symbol (PR 10549)
++#xfail: i51-*-*
++# i51 folds symbol names to upper case, so the lower-case names here never match.
+ 
+ #...
+  *OS/ABI: +UNIX - GNU
+diff --git a/ld/testsuite/lib/ld-lib.exp b/ld/testsuite/lib/ld-lib.exp
+index 5da81424..50efca9e 100644
+--- a/ld/testsuite/lib/ld-lib.exp
++++ b/ld/testsuite/lib/ld-lib.exp
+@@ -1214,6 +1214,7 @@ proc uses_genelf { } {
+ 	 || [istarget "fr30-*-*"]
+ 	 || ([istarget "frv-*-*"] && ![istarget "frv-*-linux*"])
+ 	 || [istarget "ft32-*-*"]
++	 || [istarget "i51-*-*"]
+ 	 || [istarget "iq2000-*-*"]
+ 	 || [istarget "mn10200-*-*"]
+ 	 || [istarget "moxie-*-moxiebox*"]
+diff --git a/opcodes/Makefile.am b/opcodes/Makefile.am
+index a0fcf4d5..183b4d80 100644
+--- a/opcodes/Makefile.am
++++ b/opcodes/Makefile.am
+@@ -156,6 +156,7 @@ TARGET32_LIBOPCODES_CFILES = \
+ 	h8300-dis.c \
+ 	hppa-dis.c \
+ 	i386-dis.c \
++	i51-dis.c \
+ 	ip2k-asm.c \
+ 	ip2k-desc.c \
+ 	ip2k-dis.c \
+diff --git a/opcodes/Makefile.in b/opcodes/Makefile.in
+index c5449beb..64d1ce68 100644
+--- a/opcodes/Makefile.in
++++ b/opcodes/Makefile.in
+@@ -562,6 +562,7 @@ TARGET32_LIBOPCODES_CFILES = \
+ 	h8300-dis.c \
+ 	hppa-dis.c \
+ 	i386-dis.c \
++	i51-dis.c \
+ 	ip2k-asm.c \
+ 	ip2k-desc.c \
+ 	ip2k-dis.c \
+@@ -933,6 +934,7 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/h8300-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hppa-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i386-dis.Plo@am__quote@
++@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i51-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ia64-dis.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ia64-opc.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ip2k-asm.Plo@am__quote@
+diff --git a/opcodes/configure b/opcodes/configure
+index 8299ef7e..0db2cc72 100755
+--- a/opcodes/configure
++++ b/opcodes/configure
+@@ -14345,6 +14345,7 @@ if test x${all_targets} = xfalse ; then
+ 	bfd_hppa_arch)		ta="$ta hppa-dis.lo" ;;
+ 	bfd_i386_arch|bfd_iamcu_arch)
+ 				ta="$ta i386-dis.lo" ;;
++	bfd_i51_arch)		ta="$ta i51-dis.lo" ;;
+ 	bfd_ia64_arch)		ta="$ta ia64-dis.lo ia64-opc.lo" ;;
+ 	bfd_ip2k_arch)		ta="$ta ip2k-asm.lo ip2k-desc.lo ip2k-dis.lo ip2k-ibld.lo ip2k-opc.lo" using_cgen=yes ;;
+ 	bfd_epiphany_arch)	ta="$ta epiphany-asm.lo epiphany-desc.lo epiphany-dis.lo epiphany-ibld.lo epiphany-opc.lo" using_cgen=yes ;;
+diff --git a/opcodes/configure.ac b/opcodes/configure.ac
+index 2c255659..025e1b8c 100644
+--- a/opcodes/configure.ac
++++ b/opcodes/configure.ac
+@@ -284,6 +284,7 @@ if test x${all_targets} = xfalse ; then
+ 	bfd_hppa_arch)		ta="$ta hppa-dis.lo" ;;
+ 	bfd_i386_arch|bfd_iamcu_arch)
+ 				ta="$ta i386-dis.lo" ;;
++	bfd_i51_arch)		ta="$ta i51-dis.lo" ;;
+ 	bfd_ia64_arch)		ta="$ta ia64-dis.lo ia64-opc.lo" ;;
+ 	bfd_ip2k_arch)		ta="$ta ip2k-asm.lo ip2k-desc.lo ip2k-dis.lo ip2k-ibld.lo ip2k-opc.lo" using_cgen=yes ;;
+ 	bfd_epiphany_arch)	ta="$ta epiphany-asm.lo epiphany-desc.lo epiphany-dis.lo epiphany-ibld.lo epiphany-opc.lo" using_cgen=yes ;;
+diff --git a/opcodes/disassemble.c b/opcodes/disassemble.c
+index 77d44bb0..f89ddac9 100644
+--- a/opcodes/disassemble.c
++++ b/opcodes/disassemble.c
+@@ -55,6 +55,7 @@
+ #define ARCH_h8300
+ #define ARCH_hppa
+ #define ARCH_i386
++#define ARCH_i51
+ #define ARCH_ip2k
+ #define ARCH_iq2000
+ #define ARCH_kvx
+@@ -214,6 +215,11 @@ disassembler (enum bfd_architecture a,
+       disassemble = print_insn_i386;
+       break;
+ #endif
++#ifdef ARCH_i51
++    case bfd_arch_i51:
++      disassemble = print_insn_i51;
++      break;
++#endif
+ #ifdef ARCH_ia64
+     case bfd_arch_ia64:
+       disassemble = print_insn_ia64;
+@@ -627,6 +633,12 @@ disassemble_init_for_target (struct disassemble_info * info)
+       info->created_styled_output = true;
+       break;
+ #endif
++#ifdef ARCH_i51
++    case bfd_arch_i51:
++      info->symbol_is_valid = i51_symbol_is_valid;
++      info->created_styled_output = true;
++      break;
++#endif
+ #ifdef ARCH_ia64
+     case bfd_arch_ia64:
+       info->skip_zeroes = 16;
+diff --git a/opcodes/disassemble.h b/opcodes/disassemble.h
+index 2157790c..ca446e94 100644
+--- a/opcodes/disassemble.h
++++ b/opcodes/disassemble.h
+@@ -47,6 +47,8 @@ extern int print_insn_hppa		(bfd_vma, disassemble_info *);
+ extern int print_insn_i386		(bfd_vma, disassemble_info *);
+ extern int print_insn_i386_att		(bfd_vma, disassemble_info *);
+ extern int print_insn_i386_intel	(bfd_vma, disassemble_info *);
++extern int print_insn_i51		(bfd_vma, disassemble_info *);
++extern bool i51_symbol_is_valid		(asymbol *, struct disassemble_info *);
+ extern int print_insn_ia64		(bfd_vma, disassemble_info *);
+ extern int print_insn_ip2k		(bfd_vma, disassemble_info *);
+ extern int print_insn_iq2000		(bfd_vma, disassemble_info *);
+diff --git a/opcodes/po/POTFILES.in b/opcodes/po/POTFILES.in
+index c8f83622..4cd83ae1 100644
+--- a/opcodes/po/POTFILES.in
++++ b/opcodes/po/POTFILES.in
+@@ -66,6 +66,7 @@ ft32-opc.c
+ h8300-dis.c
+ hppa-dis.c
+ i386-dis.c
++i51-dis.c
+ i386-opc.h
+ ia64-asmtab.h
+ ia64-dis.c
