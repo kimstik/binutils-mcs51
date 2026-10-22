@@ -48,10 +48,10 @@ index 00000000..ab3d9f53
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..69d64c45
+index 00000000..b1bb4225
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1086 @@
+@@ -0,0 +1,1116 @@
 +/* MCS-51 specific support for 32-bit ELF
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -442,6 +442,8 @@ index 00000000..69d64c45
 +  { ".ibss",	I51_SPACE_INDIRECT },
 +  { ".bitdata",	I51_SPACE_BIT },
 +  { ".bitbss",	I51_SPACE_BIT },
++  { ".bit",	I51_SPACE_BIT },	/* The output section of the default
++					   linker script.  */
 +  { ".xdata",	I51_SPACE_XDATA },
 +  { ".xbss",	I51_SPACE_XDATA },
 +  { ".edata",	I51_SPACE_EDATA },
@@ -745,6 +747,33 @@ index 00000000..69d64c45
 +	}
 +    }
 +
++  return true;
++}
++
++/* A linked image carries the RAM spaces as sections that are not
++   allocated, the way the default linker script emits them.  Their
++   contents are data all the same, which is what nm and the like are told:
++   a symbol there is `d', not `?'.  */
++
++static bool
++i51_elf_section_flags (const Elf_Internal_Shdr *hdr)
++{
++  asection *sec = hdr->bfd_section;
++
++  if ((sec->flags & (SEC_ALLOC | SEC_HAS_CONTENTS)) == SEC_HAS_CONTENTS)
++    switch (i51_section_space (sec))
++      {
++      case I51_SPACE_DIRECT:
++      case I51_SPACE_INDIRECT:
++      case I51_SPACE_BIT:
++      case I51_SPACE_XDATA:
++      case I51_SPACE_EDATA:
++      case I51_SPACE_EEPROM:
++	sec->flags |= SEC_DATA;
++	break;
++      default:
++	break;
++      }
 +  return true;
 +}
 +
@@ -1133,6 +1162,7 @@ index 00000000..69d64c45
 +#define elf_backend_rela_normal		     1
 +
 +#define elf_backend_section_from_shdr		i51_elf_section_from_shdr
++#define elf_backend_section_flags		i51_elf_section_flags
 +#define elf_backend_symbol_processing		elf32_i51_symbol_processing
 +#define elf_backend_section_from_bfd_section	elf32_i51_section_from_bfd_section
 +#define elf_backend_add_symbol_hook		elf32_i51_add_symbol_hook
@@ -1140,10 +1170,10 @@ index 00000000..69d64c45
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..55d8cc8b
+index 00000000..e9c23b1c
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2352 @@
+@@ -0,0 +1,2353 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -2284,6 +2314,7 @@ index 00000000..55d8cc8b
 +      }
 +
 +  i51_build_ins (opc, regno, exprs[0], exprs[1]);
++  dwarf2_emit_insn (opc->insn_size & 0x03);
 +}
 +
 +void
@@ -3692,10 +3723,10 @@ index 00000000..1e2eaa7e
 +#define tc_init_after_args() i51_init_after_args ()
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..73e3bc26
+index 00000000..fc008a17
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,807 @@
+@@ -0,0 +1,819 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -3739,6 +3770,12 @@ index 00000000..73e3bc26
 +@command{@value{AS}} has no machine-specific command-line options for the
 +MCS-51.  In particular there is no @option{-EB} or @option{-EL}: section
 +contents are always big endian.  @xref{i51 Byte Order}.
++
++@cindex debugging information, MCS-51
++@option{-g} produces DWARF line information, and @code{.file} and
++@code{.loc} are accepted, so @command{addr2line} and @samp{objdump -l} can
++map code addresses to source lines.  Addresses in debugging information are
++four bytes wide, relocated with @code{R_I51_32}.
 +
 +@node i51 Syntax
 +@section Syntax
@@ -4129,6 +4166,12 @@ index 00000000..73e3bc26
 +@option{--no-check-sections}, and its image has to be extracted one space at
 +a time, with @samp{objcopy -j .text} and @samp{objcopy -j .eeprom}: a copy of
 +the whole file writes the spaces over one another.
++
++@command{nm} shows the symbols of the RAM spaces of a linked image as data,
++@samp{d}, except that the generic symbol classes take @code{.idata} for the
++import section of a PE file and show its symbols as @samp{i}.
++@command{size} counts the program image, which holds the code space only;
++@samp{size -A} lists every space.
 +
 +@cindex address spaces of relocations, MCS-51
 +The linker also refuses an operand that names the wrong space: a jump or
@@ -5140,6 +5183,36 @@ index 00000000..a4a87573
 +	push	acc acc
 +	sjmp	lbl xret
 +	nop	a
+diff --git a/gas/testsuite/gas/i51/truncated.d b/gas/testsuite/gas/i51/truncated.d
+new file mode 100644
+index 00000000..4ce707dc
+--- /dev/null
++++ b/gas/testsuite/gas/i51/truncated.d
+@@ -0,0 +1,13 @@
++#name: i51 disassembly of a truncated instruction
++#as:
++#objdump: -d
++
++.*: +file format elf32-i51
++
++
++Disassembly of section .text:
++
++0+ <.text>:
++ +0:	00 +	nop
++ +1:	02 +	.byte	0x02.*
++ +2:	12 +	.byte	0x12.*
+diff --git a/gas/testsuite/gas/i51/truncated.s b/gas/testsuite/gas/i51/truncated.s
+new file mode 100644
+index 00000000..77a2112f
+--- /dev/null
++++ b/gas/testsuite/gas/i51/truncated.s
+@@ -0,0 +1,5 @@
++; An instruction the section ends inside of disassembles as the bytes it
++; has.
++	.text
++	nop
++	.byte	0x02, 0x12
 diff --git a/include/elf/i51.h b/include/elf/i51.h
 new file mode 100644
 index 00000000..4528f4d2
@@ -5834,6 +5907,32 @@ index 00000000..57a42e6e
 +	.idata
 +	.global	buf
 +buf:	.space	4
+diff --git a/ld/testsuite/ld-i51/dwarf.d b/ld/testsuite/ld-i51/dwarf.d
+new file mode 100644
+index 00000000..ef1898dd
+--- /dev/null
++++ b/ld/testsuite/ld-i51/dwarf.d
+@@ -0,0 +1,20 @@
++#name: i51 line information
++#source: image.s
++#as: -g
++#ld:
++#objdump: -dl
++
++.*: +file format elf32-i51
++
++
++Disassembly of section .text:
++
++0+ <_START>:
++_START\(\):
++.*image.s:4
++ +0:	74 01 +	mov	A, #0x01.*
++.*image.s:5
++ +2:	04 +	inc	A
++.*image.s:6
++ +3:	12 00 08 +	lcall	8 <SUB>
++#pass
 diff --git a/ld/testsuite/ld-i51/eeprom.d b/ld/testsuite/ld-i51/eeprom.d
 new file mode 100644
 index 00000000..e7fbb723
@@ -5929,6 +6028,26 @@ index 00000000..9af7ebd2
 +foreach test [lsort [glob -nocomplain $srcdir/$subdir/*.d]] {
 +    run_dump_test [file rootname $test]
 +}
+diff --git a/ld/testsuite/ld-i51/image.s b/ld/testsuite/ld-i51/image.s
+new file mode 100644
+index 00000000..d4f45d76
+--- /dev/null
++++ b/ld/testsuite/ld-i51/image.s
+@@ -0,0 +1,14 @@
++; A linked image: code, RAM in three spaces, and line information.
++	.text
++	.global	_START
++_START:	mov	a,#1
++	inc	a
++	lcall	sub
++	sjmp	_START
++sub:	ret
++	.data
++v:	.space	1
++	.xdata
++x:	.space	2
++	.bitdata
++f:	.bit	0
 diff --git a/ld/testsuite/ld-i51/init.d b/ld/testsuite/ld-i51/init.d
 new file mode 100644
 index 00000000..7e30c6c3
@@ -6002,6 +6121,26 @@ index 00000000..757a79f9
 +	.section .rodata.str1.1,"aMS",@progbits,1
 +s3:	.asciz	"XYZ"
 +s4:	.asciz	"WORLD"
+diff --git a/ld/testsuite/ld-i51/nm.d b/ld/testsuite/ld-i51/nm.d
+new file mode 100644
+index 00000000..bde3d7e1
+--- /dev/null
++++ b/ld/testsuite/ld-i51/nm.d
+@@ -0,0 +1,14 @@
++#name: i51 nm classes of the RAM spaces
++#source: image.s
++#ld:
++#nm: -n
++
++#...
++0+ d F
++#...
++0+ d X
++#...
++0+8 t SUB
++#...
++0+21 d V
++#pass
 diff --git a/ld/testsuite/ld-i51/overflow.d b/ld/testsuite/ld-i51/overflow.d
 new file mode 100644
 index 00000000..5c994b45
@@ -6251,10 +6390,10 @@ index 00000000..690501bb
 +	ret
 diff --git a/opcodes/i51-dis.c b/opcodes/i51-dis.c
 new file mode 100644
-index 00000000..c035f4ab
+index 00000000..751f6de0
 --- /dev/null
 +++ b/opcodes/i51-dis.c
-@@ -0,0 +1,395 @@
+@@ -0,0 +1,382 @@
 +/* Disassemble MCS-51 instructions.
 +   Copyright 2001 Free Software Foundation, Inc.
 +
@@ -6279,6 +6418,7 @@ index 00000000..c035f4ab
 +#include "dis-asm.h"
 +#include "disassemble.h"
 +#include "opintl.h"
++#include "libiberty.h"
 +
 +
 +struct i51_opcodes_s
@@ -6298,34 +6438,6 @@ index 00000000..c035f4ab
 +  #include "opcode/i51.h"
 +  {NULL, NULL, 0, 0, 0}
 +};
-+
-+static int
-+i51dis_opcode (bfd_vma addr, disassemble_info *info)
-+{
-+  bfd_byte buffer[1];
-+  int status;
-+  status = info->read_memory_func(addr, buffer, 1, info);
-+  if (status != 0)
-+    {
-+      info->memory_error_func(status, addr, info);
-+      return -1;
-+    }
-+  return buffer[0];
-+}
-+
-+static int
-+i51dis_op16 (bfd_vma addr, disassemble_info *info)
-+{
-+  bfd_byte buffer[2];
-+  int status;
-+  status = info->read_memory_func(addr, buffer, 2, info);
-+  if (status != 0)
-+    {
-+      info->memory_error_func(status, addr, info);
-+      return -1;
-+    }
-+  return bfd_getb16(buffer);
-+}
 +
 +/* Which symbols may name an address in disassembly.
 +
@@ -6397,16 +6509,34 @@ index 00000000..c035f4ab
 +     in op1 is the fallback for a consumer that supplies no such hook.  */
 +  bfd_vma code_target = 0;
 +  int op1_is_code_addr = 0;
++  bfd_byte buf[3];
++  const bfd_byte *next;
 +
-+  insn = i51dis_opcode (addr, info);
-+  if (insn < 0)
-+    return -1;
-+  addr++;  
++  if (info->read_memory_func (addr, buf, 1, info) != 0)
++    {
++      info->memory_error_func (-1, addr, info);
++      return -1;
++    }
++  insn = buf[0];
 +  for (opcode = i51_opcodes; opcode->name; opcode++)
 +    {
 +      if ((insn & opcode->bin_mask) == opcode->bin_opcode)
 +	break;
 +    }
++
++  /* The rest of the instruction, in one read.  An instruction the section
++     ends inside of is shown as the byte it starts with.  */
++  if (opcode->name
++      && (opcode->insn_size & 0x03) > 1
++      && info->read_memory_func (addr + 1, buf + 1,
++				 (opcode->insn_size & 0x03) - 1, info) != 0)
++    opcode = &i51_opcodes[ARRAY_SIZE (i51_opcodes) - 1];
++  addr++;
++  next = buf + 1;
++
++  info->insn_info_valid = 1;
++  info->insn_type = dis_nonbranch;
++  info->target = 0;
 +  
 +  op1[0] = 0;
 +  op2[0] = 0;
@@ -6441,9 +6571,7 @@ index 00000000..c035f4ab
 +	  break;
 +	case 'D':	//data
 +	case 'B':	//bit
-+	  opdata = i51dis_opcode (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = *next++;
 +	  addr++;
 +	  offset++;
 +	  sprintf (op1,"0x%02X",opdata);
@@ -6455,9 +6583,7 @@ index 00000000..c035f4ab
 +	  sprintf (op1,"@R%c",(insn&0x01)+'0');
 +	  break;
 +	case 'J':	//jump rel
-+	  opdata = i51dis_opcode (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = *next++;
 +	  addr++;
 +	  /* Sign-extend the encoded displacement before deciding its sign:
 +	     testing bit 7 of (displacement + insn length) turns the largest
@@ -6470,20 +6596,18 @@ index 00000000..c035f4ab
 +	    sprintf (op1,".+0x%02X",rel_addr);
 +	  sprintf (comment1, "0x%04lX",
 +		   (unsigned long) ((addr + disp) & 0xFFFF));
++	  info->target = (addr + disp) & 0xFFFF;
 +	  break;
 +	case '1':	//jump addr 11
-+	  opdata = i51dis_opcode (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = *next++;
 +	  addr++;
 +	  code_target = (addr & 0xF800) + (((insn >> 5) & 0x07) << 8) + opdata;
 +	  op1_is_code_addr = 1;
 +	  sprintf (op1,"0x%04lX", (unsigned long) code_target);
 +	  break;
 +	case '6':	//jump addr 16
-+	  opdata = i51dis_op16 (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = bfd_getb16 (next);
++	  next += 2;
 +	  addr += 2;
 +	  code_target = (bfd_vma) (unsigned) opdata;
 +	  op1_is_code_addr = 1;
@@ -6506,9 +6630,7 @@ index 00000000..c035f4ab
 +	  sprintf (op2,"@A+PC");
 +	  break;
 +	case '/':	// /bit
-+	  opdata = i51dis_opcode (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = *next++;
 +	  addr++;
 +	  offset++;
 +	  sprintf (op2,"/0x%02X",opdata);
@@ -6518,9 +6640,7 @@ index 00000000..c035f4ab
 +	  break;
 +	case 'B':	//bit
 +	case 'D':	//data
-+	  opdata = i51dis_opcode (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = *next++;
 +	  addr++;
 +	  offset++;
 +	  sprintf (op2,"0x%02X",opdata);
@@ -6541,9 +6661,7 @@ index 00000000..c035f4ab
 +	  sprintf (op2,"@R%c",(insn&0x01)+'0');
 +	  break;
 +	case 'J':	//jump rel
-+	  opdata = i51dis_opcode (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = *next++;
 +	  addr++;
 +	  /* Sign-extend the encoded displacement before deciding its sign:
 +	     testing bit 7 of (displacement + insn length) turns the largest
@@ -6556,18 +6674,16 @@ index 00000000..c035f4ab
 +	    sprintf (op2,".+0x%02X",rel_addr);
 +	  sprintf (comment1, "0x%04lX",
 +		   (unsigned long) ((addr + disp) & 0xFFFF));
++	  info->target = (addr + disp) & 0xFFFF;
 +	  break;
 +	case '#':	//#data
 +	  if(opcode->args[0] == 'P') {
-+	    opdata = i51dis_op16 (addr, info);
-+	    if (opdata < 0)
-+	      return -1;
++	    opdata = bfd_getb16 (next);
++	    next += 2;
 +	    addr+=2;
 +	    sprintf (op2,"#0x%04X",(unsigned) opdata);
 +	  } else {
-+	    opdata = i51dis_opcode (addr, info);
-+	    if (opdata < 0)
-+	      return -1;
++	    opdata = *next++;
 +	    addr++;
 +	    offset++;
 +	    sprintf (op2,"#0x%02X",opdata);
@@ -6583,9 +6699,7 @@ index 00000000..c035f4ab
 +	case 'N':	//none
 +	  break;
 +	case 'J':	//jump rel
-+	  opdata = i51dis_opcode (addr, info);
-+	  if (opdata < 0)
-+	    return -1;
++	  opdata = *next++;
 +	  addr++;
 +	  /* Sign-extend the encoded displacement before deciding its sign:
 +	     testing bit 7 of (displacement + insn length) turns the largest
@@ -6598,13 +6712,25 @@ index 00000000..c035f4ab
 +	    sprintf (op3,".+0x%02X",rel_addr);
 +	  sprintf (comment1, "0x%04lX",
 +		   (unsigned long) ((addr + disp) & 0xFFFF));
++	  info->target = (addr + disp) & 0xFFFF;
 +	  break;
 +      }
++
++      /* Branch information, for --visualize-jumps and the like.  */
++      if (strchr (opcode->args, 'J') != NULL)
++	info->insn_type = (strcmp (opcode->name, "sjmp") == 0
++			   ? dis_branch : dis_condbranch);
++      else if (op1_is_code_addr)
++	{
++	  info->target = code_target;
++	  info->insn_type = opcode->name[1] == 'c' ? dis_jsr : dis_branch;
++	}
 +    }
 +
 +  if (!ok)
 +    {
-+      /* Unknown opcode, or invalid combination of operands.  */
++      /* Unknown opcode, or an instruction the section ends inside of.  */
++      info->insn_type = dis_noninsn;
 +      sprintf (op1, "0x%02X", insn);
 +      sprintf (comment1, "????");
 +      comment2[0] = 0;
