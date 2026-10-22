@@ -48,10 +48,10 @@ index 00000000..4ac47a3e
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..dccd9af4
+index 00000000..85a77602
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1167 @@
+@@ -0,0 +1,1209 @@
 +/* MCS-51 specific support for 32-bit ELF.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -435,6 +435,8 @@ index 00000000..dccd9af4
 +					   space, where the default
 +					   linker script puts it.  */
 +  { ".gnu.linkonce.r.", I51_SPACE_CODE },
++  { ".vectors",	I51_SPACE_CODE },	/* Kept at the start of .text.  */
++  { "vectors",	I51_SPACE_CODE },
 +  { ".regbank",	I51_SPACE_DIRECT },
 +  { ".data",	I51_SPACE_DIRECT },
 +  { ".bss",	I51_SPACE_DIRECT },
@@ -1026,6 +1028,41 @@ index 00000000..dccd9af4
 +   Two memory-space commons have to be of one section.  An ordinary .comm
 +   is internal RAM, and may meet a symbol of any part of it.  */
 +
++/* The directives' family of SEC: a memory-space common is satisfied only
++   by a definition in its own space's sections, .bdata or .bbss for a
++   .bcomm, and so on.  -1 for a section of no family.  */
++
++static int
++i51_section_family (const asection *sec)
++{
++  static const struct
++  {
++    const char *prefix;
++    int family;
++  } families[] =
++  {
++    { ".rbss", 1 },   { ".rdata", 1 },
++    { ".bbss", 2 },   { ".bdata", 2 },
++    { ".ibss", 3 },   { ".idata", 3 },
++    { ".xbss", 4 },   { ".xdata", 4 },
++    { ".ebss", 5 },   { ".edata", 5 },
++    { ".bitbss", 6 }, { ".bitdata", 6 }, { ".bit", 6 },
++    { ".regbank", 7 },
++    { ".data", 8 },   { ".bss", 8 },
++  };
++  size_t i;
++
++  for (i = 0; i < ARRAY_SIZE (families); i++)
++    {
++      size_t len = strlen (families[i].prefix);
++
++      if (strncmp (sec->name, families[i].prefix, len) == 0
++	  && (sec->name[len] == 0 || sec->name[len] == '.'))
++	return families[i].family;
++    }
++  return -1;
++}
++
 +/* The memory space of SEC, where an ordinary common is internal RAM.  */
 +
 +static enum i51_space
@@ -1074,6 +1111,11 @@ index 00000000..dccd9af4
 +  if (spacecom && oldspacecom)
 +    {
 +      if (strcmp (sec->name, oldsec->name) == 0)
++	return true;
++    }
++  else if ((spacecom || oldspacecom) && !plain && !oldplain)
++    {
++      if (i51_section_family (sec) == i51_section_family (oldsec))
 +	return true;
 +    }
 +  else if (space == oldspace)
@@ -7084,6 +7126,61 @@ index 00000000..45718f72
 +_START:	nop
 +	.bbss
 +	.space	0x11
+diff --git a/ld/testsuite/ld-i51/bdef-ok.d b/ld/testsuite/ld-i51/bdef-ok.d
+new file mode 100644
+index 00000000..d6b8ea7e
+--- /dev/null
++++ b/ld/testsuite/ld-i51/bdef-ok.d
+@@ -0,0 +1,9 @@
++#name: i51 .bcomm against a .bdata definition
++#source: bdef1.s
++#source: bdef3.s
++#ld:
++#nm: -n
++
++#...
++0+2[0-9a-f] . F
++#pass
+diff --git a/ld/testsuite/ld-i51/bdef.d b/ld/testsuite/ld-i51/bdef.d
+new file mode 100644
+index 00000000..9fb3fad7
+--- /dev/null
++++ b/ld/testsuite/ld-i51/bdef.d
+@@ -0,0 +1,5 @@
++#name: i51 .bcomm against a .data definition
++#source: bdef1.s
++#source: bdef2.s
++#ld:
++#error: .*symbol `F' is in internal RAM \(.data\) here and in internal RAM \(.bbss\).*
+diff --git a/ld/testsuite/ld-i51/bdef1.s b/ld/testsuite/ld-i51/bdef1.s
+new file mode 100644
+index 00000000..40ee72e3
+--- /dev/null
++++ b/ld/testsuite/ld-i51/bdef1.s
+@@ -0,0 +1,5 @@
++; A memory-space common is satisfied by a definition of its own space only.
++	.bcomm	f,1
++	.text
++	.global	_START
++_START:	setb	b2b(f,0)
+diff --git a/ld/testsuite/ld-i51/bdef2.s b/ld/testsuite/ld-i51/bdef2.s
+new file mode 100644
+index 00000000..021dae47
+--- /dev/null
++++ b/ld/testsuite/ld-i51/bdef2.s
+@@ -0,0 +1,3 @@
++	.data
++	.global	f
++f:	.byte	0
+diff --git a/ld/testsuite/ld-i51/bdef3.s b/ld/testsuite/ld-i51/bdef3.s
+new file mode 100644
+index 00000000..05362646
+--- /dev/null
++++ b/ld/testsuite/ld-i51/bdef3.s
+@@ -0,0 +1,3 @@
++	.bdata
++	.global	f
++f:	.byte	0
 diff --git a/ld/testsuite/ld-i51/bitfull.d b/ld/testsuite/ld-i51/bitfull.d
 new file mode 100644
 index 00000000..41d0816d
@@ -8432,6 +8529,29 @@ index 00000000..2b6e1e38
 +	mov	a,xs
 +	.section .xdata.foo,"aw"
 +xs:	.byte	0
+diff --git a/ld/testsuite/ld-i51/vectors.d b/ld/testsuite/ld-i51/vectors.d
+new file mode 100644
+index 00000000..4d5448e8
+--- /dev/null
++++ b/ld/testsuite/ld-i51/vectors.d
+@@ -0,0 +1,4 @@
++#name: i51 .vectors is code
++#source: vectors.s
++#ld:
++#error: .*a direct address cannot name code memory.*
+diff --git a/ld/testsuite/ld-i51/vectors.s b/ld/testsuite/ld-i51/vectors.s
+new file mode 100644
+index 00000000..7f856d6a
+--- /dev/null
++++ b/ld/testsuite/ld-i51/vectors.s
+@@ -0,0 +1,7 @@
++; The interrupt vectors are code.
++	.section .vectors,"a"
++	.global	_START
++_START:	.byte	0
++v:	.byte	0
++	.text
++	mov	a,v
 diff --git a/ld/testsuite/ld-i51/weak.d b/ld/testsuite/ld-i51/weak.d
 new file mode 100644
 index 00000000..ffdc64a5
