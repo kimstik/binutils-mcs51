@@ -20,7 +20,13 @@ r9-quality.md / r9-tests.md (open, list below).
       assignment hook that tells a definition from a reference; overriding
       .equ/.set is not worth it); `.pcode 0x200@1` accepted (the scrubber
       drops the blank; the address rule is "one term").
-- [ ] r10-tests.md when it lands; then round 11 if anything above LOW remains.
+- [x] r10-tests: M1 was fbc931d; the untested rules, README, manual ranges,
+      gen.py line numbers: b4d6940.
+- [?] proposal, not a defect: a second pass of the generic suites with
+      -mcase-sensitive would turn ~270 folding XFAILs into real coverage, but
+      needs the i51 xfail markings made conditional on folding (~200 files).
+- [ ] round 11 (quality + tests lanes): round 10 still found a CRITICAL
+      (fbc931d), so one more round is due.
 Commits: author and committer kimstik <kimstik@github.com>, no attribution
 trailers (owner's request); the clone's user.name/user.email are set.
 
