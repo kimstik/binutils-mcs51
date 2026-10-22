@@ -3666,10 +3666,10 @@ index 00000000..89e993a7
 +#define tc_canonicalize_symbol_name(NAME) i51_canonicalize_symbol_name (NAME)
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..1d4939f6
+index 00000000..09bd763e
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,905 @@
+@@ -0,0 +1,906 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -4315,10 +4315,11 @@ index 00000000..1d4939f6
 +Assemble one entry of a byte-coded call format.  @var{address} is the code
 +address to execute; it has
 +thirteen bits, so it must be at least @code{0x100} and at most
-+@code{0x1FFF}.  It is one term - a number, a name, or an expression in
-+parentheses - so the first operand, which follows it after white space,
-+may begin with a sign; the operands are separated from each other by
-+commas.  Up to three
++@code{0x1FFF}.  It is one term - a number, a name, @code{HIGH ()},
++@code{LOW ()} or @code{B2B ()} of something, or an expression in
++parentheses - and the first operand starts where that term ends, after
++white space, so it may begin with a sign or a parenthesis; the operands
++are separated from each other by commas.  Up to three
 +operands follow, each an expression optionally prefixed by a keyword,
 +matched without regard to case, that says how much of it to store and in
 +which order:
