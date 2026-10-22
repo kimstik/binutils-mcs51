@@ -97,7 +97,8 @@ Two layers:
   DejaGnu suites binutils itself runs. They hold regression tests and the
   tests of what has to be refused - an operand form the instruction set does
   not have, a value that does not fit, an operand in the wrong memory space.
-  `make -C tb dejagnu` runs them.
+  `make -C tb dejagnu BUILD=<build tree>` runs them with the generic gas,
+  ld and binutils suites.
 - `tb/`: the ten projects built and compared byte for byte with reference
   ROMs and, byte class by byte class, with the 2001 images; the instruction
   set against third-party tables; a simulator run; linker-script coverage;

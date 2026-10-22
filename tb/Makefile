@@ -113,14 +113,15 @@ TOOLS := mcs51-as:gas/as-new \
 # with lib/libw80.a assembled from source, and oracle, which compares it
 # against the 2001 www8051.hex.
 #
-# MUTGATE is what a mutant has to survive: TOOLGATE and check. It does not also
+# MUTGATE is what a mutant has to survive: TOOLGATE without doctruth, which
+# reads the patch rather than the mutated tree, and check. It does not also
 # add oracle - oracle builds the same ten projects with the same tools and judges
 # them against a fixed 2001 image, so against a mutated toolchain it can only
 # repeat what check already says, at twice the cost.
 TOOLGATE := isa roundtrip branch bits reloc guard sim defaultlink commons script disasm \
             doctruth dejagnu
 GATE     := $(TOOLGATE) check libsrc oracle
-MUTGATE  := $(TOOLGATE) check
+MUTGATE  := $(filter-out doctruth,$(TOOLGATE)) check
 
 # CIGATE is $(GATE) in the order gate.yml runs it, with check-canary spliced in
 # behind `check' instead of tacked onto the end: the canary sabotages the
@@ -529,27 +530,32 @@ disasm:
 doctruth:
 	python3 $(HERE)/doctruth.py --patch $(HERE)/../mcs51/additions.patch
 
-# The port's own DejaGnu suites, gas/testsuite/gas/i51 and ld/testsuite/ld-i51:
-# the regression tests binutils itself would run, including the tests of what
-# an operand, a relocation or the default linker script has to refuse, which
-# the stages above do not cover.  BUILD has to be a configured build tree, which `make build'
-# leaves.  Green means every test passed and at least one ran: runtest that
-# reports nothing is a broken setup, not a pass.
+# The DejaGnu suites of gas, ld and binutils: the port's own tests
+# (gas/testsuite/gas/i51, ld/testsuite/ld-i51), including those of what an
+# operand, a relocation or the default linker script has to refuse, and the
+# generic tests, which hold the port to what every target does.  BUILD has
+# to be a configured build tree, which `make build' leaves.  Green means no
+# FAIL, XPASS, ERROR or UNRESOLVED, and that the port's own tests ran:
+# runtest that reports nothing is a broken setup, not a pass.  UNTESTED is
+# what the generic suites report for a feature the target lacks.
 dejagnu:
 	@test -f "$(BUILD)/gas/Makefile" || { echo "no build tree in $(BUILD)"; exit 2; }
 	@command -v runtest > /dev/null || { echo "dejagnu: runtest is not installed"; exit 2; }
 	@mkdir -p $(WORK)
 	@rc=0; \
-	for t in gas ld; do \
+	for t in gas ld binutils; do \
 		rm -f $(BUILD)/$$t/$$t.sum $(BUILD)/$$t/testsuite/$$t.sum; \
-		$(MAKE) -C $(BUILD)/$$t check RUNTESTFLAGS=i51.exp \
+		$(MAKE) -C $(BUILD)/$$t check-DEJAGNU \
 			> $(WORK)/dejagnu-$$t.log 2>&1; \
 		sum=$$(ls $(BUILD)/$$t/$$t.sum $(BUILD)/$$t/testsuite/$$t.sum 2> /dev/null | head -1); \
 		if [ -z "$$sum" ]; then echo "== $$t: no $$t.sum"; rc=1; continue; fi; \
 		pass=$$(grep -c '^PASS:' "$$sum"); \
-		bad=$$(grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED|UNTESTED):' "$$sum"); \
-		echo "== $$t: $$pass passed"; \
-		if [ -n "$$bad" ] || [ "$$pass" -eq 0 ]; then echo "$$bad"; rc=1; fi; \
+		own=$$(grep -c '^PASS: i51 ' "$$sum"); \
+		xfail=$$(grep -c '^XFAIL:' "$$sum"); \
+		bad=$$(grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED):' "$$sum"); \
+		echo "== $$t: $$pass passed ($$own of the port's own), $$xfail expected failures"; \
+		if [ -n "$$bad" ]; then echo "$$bad"; rc=1; fi; \
+		if [ $$t != binutils ] && [ "$$own" -eq 0 ]; then echo "== $$t: none of the port's own tests ran"; rc=1; fi; \
 	done; \
 	exit $$rc
 
@@ -743,7 +749,7 @@ release-vars:
 
 # The stage list a release is allowed to claim, straight out of $(GATE) plus the
 # canary, which is in no list above. release.yml runs `gate' and `check-canary'
-# and then requires this list to be exactly the sixteen names it names in the
+# and then requires this list to be exactly the seventeen names it names in the
 # release body, so a stage added without saying so in the release note fails
 # the publish.
 gate-list:

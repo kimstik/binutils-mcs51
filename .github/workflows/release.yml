@@ -76,7 +76,7 @@ jobs:
       - name: Build the port
         run: make -C tb build
 
-      # $(GATE): the thirteen toolchain stages, then check and oracle. Stops at the
+      # $(GATE): the thirteen toolchain stages, then check, libsrc and oracle. Stops at the
       # first failure, which for a release is the whole answer.
       - name: The gate
         run: make -C tb gate BUILD=$GITHUB_WORKSPACE/work/modern/build
