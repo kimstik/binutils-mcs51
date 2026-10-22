@@ -35,7 +35,7 @@ def acase(name, src, want, msg=None):
 
 
 NOTBIT = 'not bit addressable'
-NOTRANGE = 'out of bit range'
+NOTRANGE = 'is not 0..7'
 
 ASM_CASES = [
     # ---- `.b' suffix on a numeric byte address -----------------------
@@ -58,9 +58,9 @@ ASM_CASES = [
     # ---- B2B(byte,bit) on a constant --------------------------------
     acase('b2b-ram-first',   'setb B2B(0x20,0)', 'd2 00'),
     acase('b2b-ram-last',    'setb B2B(0x2f,7)', 'd2 7f'),
-    acase('b2b-below-ram',   'setb B2B(0x1f,0)', None, NOTRANGE),
-    acase('b2b-above-ram',   'setb B2B(0x30,0)', None, NOTRANGE),
-    acase('b2b-gap',         'setb B2B(0x7f,0)', None, NOTRANGE),
+    acase('b2b-below-ram',   'setb B2B(0x1f,0)', None, NOTBIT),
+    acase('b2b-above-ram',   'setb B2B(0x30,0)', None, NOTBIT),
+    acase('b2b-gap',         'setb B2B(0x7f,0)', None, NOTBIT),
     acase('b2b-sfr-first',   'setb B2B(0x80,0)', 'd2 80'),
     acase('b2b-sfr-mid',     'setb B2B(0x88,1)', 'd2 89'),
     acase('b2b-sfr-last',    'setb B2B(0xf8,7)', 'd2 ff'),
@@ -77,15 +77,15 @@ ASM_CASES = [
     # address 0x85, which is P0.5 and has nothing to do with the byte at
     # 0x84, even though the same operand through md_apply_fix or through
     # the linker is refused.
-    acase('b2b-sfr-unalign', 'setb B2B(0x84,1)', None, NOTRANGE),
-    acase('b2b-sfr-top',     'setb B2B(0xff,0)', None, NOTRANGE),
+    acase('b2b-sfr-unalign', 'setb B2B(0x84,1)', None, NOTBIT),
+    acase('b2b-sfr-top',     'setb B2B(0xff,0)', None, NOTBIT),
 
     # ---- B2B on a symbol already known: the constant path of fixup8 --
     acase('b2b-sym-ram',     'BD = 0x20\n\tsetb B2B(BD,1)',  'd2 01'),
     acase('b2b-sym-ram-top', 'BD = 0x2f\n\tsetb B2B(BD,7)',  'd2 7f'),
     acase('b2b-sym-sfr',     'BD = 0x88\n\tsetb B2B(BD,1)',  'd2 89'),
-    acase('b2b-sym-bad',     'BD = 0x40\n\tsetb B2B(BD,0)',  None, NOTRANGE),
-    acase('b2b-sym-unalign', 'BD = 0x84\n\tsetb B2B(BD,1)',  None, NOTRANGE),
+    acase('b2b-sym-bad',     'BD = 0x40\n\tsetb B2B(BD,0)',  None, NOTBIT),
+    acase('b2b-sym-unalign', 'BD = 0x84\n\tsetb B2B(BD,1)',  None, NOTBIT),
 
     # ---- B2B on a symbol defined later: the fold in md_apply_fix -----
     acase('b2b-fwd-ram',     'setb B2B(BD,1)\nBD = 0x20',     'd2 01'),
@@ -114,18 +114,16 @@ LINK_CASES = [
     lcase('link-sfr-first',  0x80, 0, 0x80),
     lcase('link-sfr-mid',    0x88, 1, 0x89),
     lcase('link-sfr-last',   0xf8, 7, 0xff),
-    lcase('link-below-ram',  0x10, 0, None, 'out of range'),
-    lcase('link-above-ram',  0x30, 0, None, 'out of range'),
-    lcase('link-gap',        0x7f, 0, None, 'out of range'),
-    lcase('link-past-ram-top', 0x2f, 9, None, 'relocation truncated'),
-    lcase('link-ram-past-bit7', 0x20, 8, None, 'relocation truncated'),
-    lcase('link-sfr-past-bit7', 0xf8, 8, None, 'relocation truncated'),
+    lcase('link-below-ram',  0x10, 0, None, NOTBIT),
+    lcase('link-above-ram',  0x30, 0, None, NOTBIT),
+    lcase('link-gap',        0x7f, 0, None, NOTBIT),
+    # A bit number past 7 is refused where it is written, by the
+    # assembler (b2b-fwd-*-past-* above), so no object carries one for
+    # the linker to fold.
     # Above the SFR space there is no byte address left to fold, so this is
-    # refused like every other non-bit-addressable byte: R_I51_8_B2B must
-    # return bfd_reloc_outofrange for srel >= 0x100 rather than
-    # bfd_reloc_ok, which would leave the byte unfolded and silently
-    # contradict the rule at the top of this file.
-    lcase('link-offchip',    0x100, 1, None, 'out of range'),
+    # refused like every other non-bit-addressable byte rather than left
+    # unfolded.
+    lcase('link-offchip',    0x100, 1, None, NOTBIT),
 ]
 
 # The .bit directive takes one bit, says so when it is handed anything

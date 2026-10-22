@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Run the literal-branch cases of tb/isa/branch.py against the port.
 
-Every case is assembled at its stated .text offset and the raw section
-bytes are compared with the hand-derived encoding; a case without
-expected bytes must make the assembler exit nonzero.
+Every case is assembled at its stated .text offset, linked with .text at
+address 0, and the linked bytes are compared with the hand-derived
+encoding; a case without expected bytes must make the assembler or the
+linker exit nonzero.  A branch to a constant address is only final once
+the address of the branch is, so its range is the linker's to judge.
 """
 
 import argparse
@@ -16,14 +18,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, os.pardir, 'isa'))
 import branch
 
-def assemble(as_, objcopy, source, work):
-    """Return (.text bytes, None) or (None, assembler error line)."""
-    s, o, b = (os.path.join(work, n) for n in ('in.s', 'in.o', 'in.bin'))
+def assemble(as_, ld, objcopy, source, work):
+    """Return (linked .text bytes, None) or (None, the error line)."""
+    s, o, e, b = (os.path.join(work, n)
+                  for n in ('in.s', 'in.o', 'in.elf', 'in.bin'))
     open(s, 'w').write(source + '\n')
-    r = subprocess.run([as_, '-o', o, s], capture_output=True, text=True)
-    if r.returncode:
-        return None, (r.stderr.strip().splitlines() or ['as failed'])[-1]
-    r = subprocess.run([objcopy, '-O', 'binary', '--only-section=.text', o, b],
+    for cmd in ([as_, '-o', o, s], [ld, '-o', e, o]):
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode:
+            return None, (r.stderr.strip().splitlines()
+                          or ['%s failed' % cmd[0]])[-1]
+    r = subprocess.run([objcopy, '-O', 'binary', '--only-section=.text', e, b],
                        capture_output=True, text=True)
     if r.returncode:
         sys.exit('objcopy failed: %s' % r.stderr.strip())
@@ -35,8 +40,9 @@ def main():
     args = ap.parse_args()
 
     as_ = os.path.join(args.build, 'gas', 'as-new')
+    ld = os.path.join(args.build, 'ld', 'ld-new')
     objcopy = os.path.join(args.build, 'binutils', 'objcopy')
-    for t in (as_, objcopy):
+    for t in (as_, ld, objcopy):
         if not os.path.exists(t):
             sys.exit('missing %s' % t)
 
@@ -54,7 +60,7 @@ def main():
         for c in branch.CASES:
             pad = c['skip']
             source = ('.skip 0x%x\n' % pad if pad else '') + c['src']
-            got, err = assemble(as_, objcopy, source, work)
+            got, err = assemble(as_, ld, objcopy, source, work)
 
             if c['want'] is None:
                 if err is None:
@@ -65,7 +71,7 @@ def main():
             want = bytes(pad) + bytes.fromhex(c['want'])
             if err is not None:
                 fail(c['name'], '%-22s %s' % (c['src'], err))
-            elif got != want:
+            elif got[:len(want)] != want:
                 if got[:pad] == want[:pad]:
                     what = 'want %s got %s' % (want[pad:].hex(),
                                                got[pad:].hex() or 'nothing')

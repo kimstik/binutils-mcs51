@@ -115,7 +115,7 @@ index 0e919246..a17bc3d0 100644
      &bfd_ip2k_arch,
      &bfd_iq2000_arch,
 diff --git a/bfd/bfd-in2.h b/bfd/bfd-in2.h
-index e49d6731..e760b812 100644
+index e49d6731..293e39a5 100644
 --- a/bfd/bfd-in2.h
 +++ b/bfd/bfd-in2.h
 @@ -1467,6 +1467,7 @@ enum bfd_architecture
@@ -126,16 +126,10 @@ index e49d6731..e760b812 100644
    bfd_arch_romp,      /* IBM ROMP PC/RT.  */
    bfd_arch_convex,    /* Convex.  */
    bfd_arch_m98k,      /* Motorola 98xxx.  */
-@@ -5190,6 +5191,45 @@ enum bfd_reloc_code_real
+@@ -5190,6 +5191,37 @@ enum bfd_reloc_code_real
       as a global register.  It does not modify contents.  */
    BFD_RELOC_MMIX_LOCAL,
  
-+  /* This is a 1 bit relocation for the MCS-51/8051 microcontroller.  */
-+  BFD_RELOC_I51_R1,
-+
-+  /* This is a 3 bit relocation for the MCS-51/8051 microcontroller.  */
-+  BFD_RELOC_I51_R3,
-+
 +  /* This is a 7 bit PC relative relocation for the MCS-51/8051 microcontroller.  */
 +  BFD_RELOC_I51_7_PCREL,
 +
@@ -145,17 +139,15 @@ index e49d6731..e760b812 100644
 +  /* This is an 8 bit relocation for bit addressing in the MCS-51/8051 microcontroller.  */
 +  BFD_RELOC_I51_8_BIT,
 +
-+  /* This is an 8 bit relocation for the MCS-51/8051 microcontroller.  */
-+  BFD_RELOC_I51_8,
-+
 +  /* This is an 8 bit low byte relocation for the MCS-51/8051 microcontroller.  */
 +  BFD_RELOC_I51_8_LOW,
 +
 +  /* This is an 8 bit high byte relocation for the MCS-51/8051 microcontroller.  */
 +  BFD_RELOC_I51_8_HIGH,
 +
-+  /* This is a 16 bit relocation for the MCS-51/8051 microcontroller.  */
-+  BFD_RELOC_I51_16,
++  /* This is a 16 bit code address relocation for the MCS-51/8051
++     microcontroller: the target of an LJMP or LCALL.  */
++  BFD_RELOC_I51_16_CODE,
 +
 +  /* This is an 8 bit byte-to-bit relocation for the MCS-51/8051 microcontroller.  */
 +  BFD_RELOC_I51_8_B2B,
@@ -212,22 +204,19 @@ index c30a75ba..0c628f12 100644
      ia64_elf32_hpux_be_vec)	 tb="$tb elf32-ia64.lo elfxx-ia64.lo elf32.lo $elf" ;;
      ia64_elf64_be_vec)		 tb="$tb elf64-ia64.lo elfxx-ia64.lo elf64.lo $elf"; target_size=64 ;;
 diff --git a/bfd/libbfd.h b/bfd/libbfd.h
-index 27bc0875..1f476b07 100644
+index 27bc0875..01579dea 100644
 --- a/bfd/libbfd.h
 +++ b/bfd/libbfd.h
-@@ -2252,6 +2252,19 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
+@@ -2252,6 +2252,16 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
    "BFD_RELOC_MMIX_REG",
    "BFD_RELOC_MMIX_BASE_PLUS_OFFSET",
    "BFD_RELOC_MMIX_LOCAL",
-+  "BFD_RELOC_I51_R1",
-+  "BFD_RELOC_I51_R3",
 +  "BFD_RELOC_I51_7_PCREL",
 +  "BFD_RELOC_I51_11",
 +  "BFD_RELOC_I51_8_BIT",
-+  "BFD_RELOC_I51_8",
 +  "BFD_RELOC_I51_8_LOW",
 +  "BFD_RELOC_I51_8_HIGH",
-+  "BFD_RELOC_I51_16",
++  "BFD_RELOC_I51_16_CODE",
 +  "BFD_RELOC_I51_8_B2B",
 +  "BFD_RELOC_I51_13_PCODE",
 +  "BFD_RELOC_I51_8_DIR",
@@ -256,21 +245,13 @@ index 40632924..da8a9f21 100644
  elf32-iq2000.c
  elf32-lm32.c
 diff --git a/bfd/reloc.c b/bfd/reloc.c
-index 6b9e00da..d689e2c4 100644
+index 6b9e00da..153340bd 100644
 --- a/bfd/reloc.c
 +++ b/bfd/reloc.c
-@@ -4484,6 +4484,59 @@ ENUMDOC
+@@ -4484,6 +4484,48 @@ ENUMDOC
    This relocation is an assertion that the expression is not allocated
    as a global register.  It does not modify contents.
  
-+ENUM
-+  BFD_RELOC_I51_R1
-+ENUMDOC
-+  This is a 1 bit relocation for the MCS-51/8051 microcontroller.
-+ENUM
-+  BFD_RELOC_I51_R3
-+ENUMDOC
-+  This is a 3 bit relocation for the MCS-51/8051 microcontroller.
 +ENUM
 +  BFD_RELOC_I51_7_PCREL
 +ENUMDOC
@@ -284,10 +265,6 @@ index 6b9e00da..d689e2c4 100644
 +ENUMDOC
 +  This is an 8 bit relocation for bit addressing in the MCS-51/8051 microcontroller.
 +ENUM
-+  BFD_RELOC_I51_8
-+ENUMDOC
-+  This is an 8 bit relocation for the MCS-51/8051 microcontroller.
-+ENUM
 +  BFD_RELOC_I51_8_LOW
 +ENUMDOC
 +  This is an 8 bit low byte relocation for the MCS-51/8051 microcontroller.
@@ -296,9 +273,10 @@ index 6b9e00da..d689e2c4 100644
 +ENUMDOC
 +  This is an 8 bit high byte relocation for the MCS-51/8051 microcontroller.
 +ENUM
-+  BFD_RELOC_I51_16
++  BFD_RELOC_I51_16_CODE
 +ENUMDOC
-+  This is a 16 bit relocation for the MCS-51/8051 microcontroller.
++  This is a 16 bit code address relocation for the MCS-51/8051
++  microcontroller: the target of an LJMP or LCALL.
 +ENUM
 +  BFD_RELOC_I51_8_B2B
 +ENUMDOC

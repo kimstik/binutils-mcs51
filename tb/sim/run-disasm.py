@@ -23,8 +23,7 @@ prints beside a code address.
 The probe puts two symbols the filter has to refuse below a code address:
 
   RAMMARK   .rdata, 0x40   a RAM-space symbol: not absolute, not code
-  P1        *ABS*, 0x90    an SFR equate - md_undefined_symbol builds those
-                           with symbol_new (..., absolute_section, ...)
+  P1        *ABS*, 0x90    an SFR equate, defined with .equ
 
 and branches to 0x50 and 0x98, code addresses with no symbol of their own,
 each just above one of them.  The nearest preceding symbol is therefore the
@@ -62,14 +61,13 @@ SCRIPT = os.path.join(HERE, 'disasm.ld')
 # of their own, each just above a symbol the filter has to refuse.
 TEXT_SIZE = 0xa0
 RDATA_VMA = 0x40                # RAMMARK sits at the start of .rdata
-SFR_VMA   = 0x90                # P1, from the operand table in tc-i51.c
+SFR_VMA   = 0x90                # P1
 T_RAM     = 0x50                # code address just above RAMMARK
 T_ABS     = 0x98                # code address just above P1
 
-# `.global P1' is the whole SFR equate: the name is not a symbol yet, so
-# symbol_find_or_make hands it to md_undefined_symbol, which builds it in
-# absolute_section at the value the operand table gives it.  The .global
-# only makes sure the linker keeps it.
+# P1 is an SFR equate made a symbol: the assembler knows the name without
+# one, so it is defined here with .equ, and .global makes sure the linker
+# keeps it.
 #
 # The three bytes in .rdata are `ljmp T_RAM' as data: they name the same
 # code address from a section that carries none.
@@ -81,11 +79,12 @@ _START:
 \tljmp\t0x%04X
 \t.skip\t0x%X
 \t.global\tP1
+\t.equ\tP1, 0x%X
 \t.rdata
 \t.global\tRAMMARK
 RAMMARK:
 \t.byte\t0x02, 0x%02X, 0x%02X
-""" % (T_RAM, T_ABS, TEXT_SIZE - 6, T_RAM >> 8, T_RAM & 0xFF)
+""" % (T_RAM, T_ABS, TEXT_SIZE - 6, SFR_VMA, T_RAM >> 8, T_RAM & 0xFF)
 
 # name, section, address, mnemonic, the name objdump has to print beside the
 # operand, and the name it prints when the filter accepts what it must

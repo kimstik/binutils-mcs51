@@ -17,13 +17,9 @@ the build under test, its single relocation is found by walking the section
 headers, and r_offset alone is rewritten.  Nothing else about the object
 differs, so a case that fails can only be about the offset.
 
-What is asserted is the diagnostic, not the exit status.  A refused
-relocation reaches ld through info->callbacks->warning, whose ld end is a
-plain einfo carrying neither %X nor %F: the link SUCCEEDS, ld exits 0 and
-writes an output file, and the message on stderr is the only thing that says
-the check fired at all.  That weakness is the port's, it is deliberately not
-papered over here, and this stage is keyed on the one signal that today
-tells a checked write from an unchecked one.
+What is asserted is the diagnostic and the failed link: a refused
+relocation is an error, so ld names the relocation, exits nonzero and
+writes no output file.
 
   usage: run-guard.py --build BUILD-DIR
 """
@@ -81,9 +77,8 @@ PROBES = [
 WILD_OFFSET = 0xffff
 
 # What ld prints for bfd_reloc_outofrange, from the switch in
-# elf32_i51_relocate_section ().  Matched loosely on purpose: a fix that
-# turns the warning into an error is free to reword the rest of the line.
-DIAG = 'out of range'
+# elf32_i51_relocate_section ().
+DIAG = 'relocation applies outside section'
 
 
 def rd(buf, end, off, fmt):
@@ -214,7 +209,7 @@ def main():
                 mangled = t.path('%s-%s.o' % (tag, case))
                 open(mangled, 'wb').write(e.with_r_offset(base, offset))
                 rc, log = t.link(mangled, '%s-%s' % (tag, case), defs)
-                if (DIAG in log) == want:
+                if (DIAG in log and rc != 0) == want:
                     continue
                 if want:
                     fail('%s/%s' % (tag, case),

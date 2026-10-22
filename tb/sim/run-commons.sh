@@ -433,14 +433,10 @@ else
     cat "$W/spacesw.err"
 fi
 
-# A memory-space common declared local would be allocated in the space's
-# section directly, the way .lcomm is allocated in .bss, and would meet
-# the same real section.  It never is: .local in this port drops a
-# built-in operand name from the hash table so user code can redefine a
-# register name with .equ, and nothing else marks a symbol local, so a
-# common stays external whatever precedes it.  Pinned here, because a
-# .local that started marking symbols local instead would route commons
-# through a path nothing else in this file reaches.
+# A memory-space common declared .local is allocated in the space's
+# section directly, the way .lcomm is allocated in .bss, and meets the
+# real section of that name the file filled itself: both have to keep
+# their bytes.
 cat > "$W/localcom.s" <<'EOF'
 ; real bytes in a space, then a common of that space declared .local
 
@@ -459,19 +455,22 @@ EOF
 "$AS" -o "$W/localcom.o" "$W/localcom.s" \
     || { echo "run-commons: as-new failed on localcom.s" >&2; exit 1; }
 
+# .local makes LCVAR local, and a local common is allocated where it is
+# declared: four zero bytes of .rbss after the two the file put there, and
+# LCVAR a local symbol of .rbss rather than a common.
 sz=$(secfield "$W/localcom.o" .rbss 5)
 if [ -z "$sz" ]; then
     fail "localcom: .rbss not in the object"
-elif [ $((0x$sz)) -ne 2 ]; then
-    fail "localcom: .rbss is 0x$sz bytes, expected 2"
+elif [ $((0x$sz)) -ne 6 ]; then
+    fail "localcom: .rbss is 0x$sz bytes, expected 6"
 fi
-expect_bytes "localcom" "$W/localcom.o" .rbss dead
-lndx=$("$READELF" -s --wide "$W/localcom.o" | tr -d '\r' \
-       | awk '$NF == "LCVAR" { print $(NF-1); exit }')
-if [ -z "$lndx" ]; then
+expect_bytes "localcom" "$W/localcom.o" .rbss dead00000000
+lsym=$("$READELF" -s --wide "$W/localcom.o" | tr -d '\r' \
+       | awk '$NF == "LCVAR" { print $2, $3, $5; exit }')
+if [ -z "$lsym" ]; then
     fail "localcom: symbol LCVAR not in the object"
-elif [ "$lndx" != 'PRC[0xff01]' ]; then
-    fail "localcom: LCVAR has Ndx $lndx, expected PRC[0xff01] - .local now marks symbols local, and the local-common path needs a probe of its own"
+elif [ "$lsym" != '00000002 4 LOCAL' ]; then
+    fail "localcom: LCVAR is \`$lsym', expected value 2, size 4, LOCAL"
 fi
 
 # The data-space directives take the same route.  This space section is

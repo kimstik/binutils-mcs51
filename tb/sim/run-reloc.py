@@ -77,7 +77,7 @@ WANT_RELOCS = [
     (0x09, 'R_I51_8_B2B',   'BDVAR'),
     (0x0b, 'R_I51_7_PCREL', 'NEAR'),
     (0x0c, 'R_I51_11',      'PAGE'),
-    (0x0f, 'R_I51_16',      'FAR'),
+    (0x0f, 'R_I51_16_CODE', 'FAR'),
     (0x12, 'R_I51_16',      'XSYM'),
     (0x15, 'R_I51_8_DIR',   'DVAR'),
     (0x18, 'R_I51_8_B2B',   '.bdata'),
@@ -327,7 +327,7 @@ PCODE_LINK = [
     # relocation the port cannot apply must not leave a byte meaning something
     # else behind it.  want None with a msg means ld has to refuse and say so.
     ('pcode-link-wrap',  0x2345, None, 'truncated to fit'),
-    ('pcode-link-under', 0x00ff, None, 'out of range'),
+    ('pcode-link-under', 0x00ff, None, 'truncated to fit'),
 ]
 
 A_SRC = """\
@@ -448,9 +448,9 @@ def main():
                 fail('resolve', 'image %s\n%18s expected %s' % (img, '', WANT_TEXT))
 
         # ---- kinds ----------------------------------------------------
-        # R_I51_8 still means "one byte, operand kind not recorded", and it
-        # still keeps the low byte of a value that does not fit without a
-        # word.  That is the rule the objects already on disk are linked by.
+        # R_I51_8 still means "one byte, operand kind not recorded", and a
+        # value that does not fit the byte is refused rather than cut to its
+        # low byte: a datum or an operand of 0x1234 has no one-byte form.
         bobj = t.assemble(BYTE_PROBE, 'byte')
         checks += 1
         got = t.relocs(bobj)
@@ -459,12 +459,12 @@ def main():
 
         checks += 1
         elf, log = t.link([bobj], 'trunc', {'DVAR': 0x1234})
-        if elf is None:
-            fail('byte-trunc', 'link failed: %s'
-                 % (log.splitlines()[-1] if log else ''))
-        elif t.text(elf, 'trunc')[0] != 0x34:
-            fail('byte-trunc', 'R_I51_8 of 0x1234 left 0x%02x, expected 0x34'
+        if elf is not None:
+            fail('byte-trunc', 'R_I51_8 of 0x1234 linked, left 0x%02x'
                  % t.text(elf, 'trunc')[0])
+        elif 'truncated to fit' not in log:
+            fail('byte-trunc', 'refused, but not for `truncated to fit\': %s'
+                 % (log.splitlines()[-1] if log else ''))
 
         pobj = t.assemble(PCODE_BYTE_PROBE, 'pcodebyte')
         checks += 1
