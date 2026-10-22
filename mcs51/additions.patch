@@ -48,10 +48,10 @@ index 00000000..4ac47a3e
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..aae13d16
+index 00000000..d3e31940
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1086 @@
+@@ -0,0 +1,1090 @@
 +/* MCS-51 specific support for 32-bit ELF.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -156,8 +156,8 @@ index 00000000..aae13d16
 +	 0xff,			/* dst_mask */
 +	 false),		/* pcrel_offset */
 +
-+  /* A byte: a datum or a byte operand of .pcode.  Checked as an
-+     immediate is, and added to what the byte holds, by
++  /* A byte: a datum or a byte operand of .pcode.  Checked as gas checks
++     a one-byte datum, -255..255, and added to what the byte holds, by
 +     i51_final_link_relocate ().  */
 +  HOWTO (R_I51_8,		/* type */
 +	 0,			/* rightshift */
@@ -205,7 +205,7 @@ index 00000000..aae13d16
 +	 false),		/* pcrel_offset */
 +
 +  /* A 16-bit number: MOV DPTR,#data16 and .word.  Checked by
-+     i51_final_link_relocate (): -65536..65535, as gas checks a two-byte
++     i51_final_link_relocate (): -65535..65535, as gas checks a two-byte
 +     datum.  */
 +  HOWTO (R_I51_16,		/* type */
 +	 0,			/* rightshift */
@@ -581,7 +581,11 @@ index 00000000..aae13d16
 +
 +    case R_I51_8:
 +      srel += (signed char) bfd_get_8 (input_bfd, contents);
-+      /* Fall through.  */
++      if (srel < -255 || srel > 255)
++	return bfd_reloc_overflow;
++      bfd_put_8 (input_bfd, srel, contents);
++      return bfd_reloc_ok;
++
 +    case R_I51_8_IMM:
 +      if (srel < -128 || srel > 255)
 +	return bfd_reloc_overflow;
@@ -595,7 +599,7 @@ index 00000000..aae13d16
 +      return bfd_reloc_ok;
 +
 +    case R_I51_16:
-+      if (srel < -65536 || srel > 65535)
++      if (srel < -65535 || srel > 65535)
 +	return bfd_reloc_overflow;
 +      bfd_putb16 (srel, contents);
 +      return bfd_reloc_ok;
@@ -1140,10 +1144,10 @@ index 00000000..aae13d16
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..bcd7eda4
+index 00000000..de48ec4e
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2029 @@
+@@ -0,0 +1,2040 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1569,7 +1573,8 @@ index 00000000..bcd7eda4
 +  [I51_DATA16] = BFD_RELOC_16,
 +};
 +
-+/* The range of the value each relocation stores.  */
++/* The range of the value each operand field stores.  A datum of one, two
++   or four bytes is checked by write.c as on every target.  */
 +static const struct
 +{
 +  bfd_reloc_code_real_type reloc;
@@ -1577,7 +1582,6 @@ index 00000000..bcd7eda4
 +  const char *what;
 +} i51_ranges[] =
 +{
-+  { BFD_RELOC_8,		-128, 255,	N_("byte") },
 +  { BFD_RELOC_I51_8_IMM,	-128, 255,	N_("8-bit immediate") },
 +  { BFD_RELOC_I51_8_DIR,	0, 255,		N_("direct address") },
 +  { BFD_RELOC_I51_8_BIT,	0, 255,		N_("bit address") },
@@ -1585,7 +1589,6 @@ index 00000000..bcd7eda4
 +  { BFD_RELOC_I51_7_PCREL,	-128, 127,	N_("relative branch") },
 +  { BFD_RELOC_I51_11,		0, 65535,	N_("code address") },
 +  { BFD_RELOC_I51_16_CODE,	0, 65535,	N_("code address") },
-+  { BFD_RELOC_16,		-65536, 65535,	N_("16-bit operand") },
 +};
 +
 +/* The sections of the memory-space directives.  */
@@ -1669,13 +1672,23 @@ index 00000000..bcd7eda4
 +  return 1;
 +}
 +
-+/* Symbol names are folded to upper case, as in every MCS-51 assembler.
-+   This has to be set before gas_init () defines the --defsym names.  */
++/* tc_canonicalize_symbol_name: symbol names are folded to upper case,
++   as in every MCS-51 assembler.  A section name keeps its case, and so
++   do the section symbols and the .startof. and .sizeof. symbols, which
++   carry one.  */
 +
-+void
-+i51_init_after_args (void)
++char *
++i51_canonicalize_symbol_name (char *name)
 +{
-+  symbols_case_sensitive = 0;
++  char *p;
++
++  if (startswith (name, ".startof.") || startswith (name, ".sizeof.")
++      || (name[0] == '.' && stdoutput != NULL
++	  && bfd_get_section_by_name (stdoutput, name) != NULL))
++    return name;
++  for (p = name; *p != 0; p++)
++    *p = TOUPPER (*p);
++  return name;
 +}
 +
 +/* The common section of the memory space whose commons the linker
@@ -2518,9 +2531,11 @@ index 00000000..bcd7eda4
 +  offsetT value = *valuep;
 +  long bit;
 +
-+  /* i51_check_range () states each field's own rule, which the width
-+     test in write.c cannot.  */
-+  fixp->fx_no_overflow = 1;
++  /* i51_check_range () states the rule of an operand field, which the
++     width test in write.c cannot.  */
++  fixp->fx_no_overflow = (fixp->fx_r_type != BFD_RELOC_8
++			  && fixp->fx_r_type != BFD_RELOC_16
++			  && fixp->fx_r_type != BFD_RELOC_32);
 +
 +  /* Final here: a fixup with no symbol left on it, other than an
 +     ACALL/AJMP target, whose page is only known once the code is placed;
@@ -3175,10 +3190,10 @@ index 00000000..bcd7eda4
 +}
 diff --git a/gas/config/tc-i51.h b/gas/config/tc-i51.h
 new file mode 100644
-index 00000000..7b82e6a0
+index 00000000..08e9de95
 --- /dev/null
 +++ b/gas/config/tc-i51.h
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,99 @@
 +/* tc-i51.h -- Header file for tc-i51.c, the MCS-51 assembler.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -3275,17 +3290,15 @@ index 00000000..7b82e6a0
 +#define TC_PARSE_CONS_EXPRESSION(EXP, NBYTES) \
 +  i51_parse_cons_expression (EXP, NBYTES)
 +
-+/* Turn on case folding of symbol names.  Called from gas_init (), which is
-+   early enough for the --defsym names to be folded the same way as the
-+   names read from the source.  */
-+extern void i51_init_after_args (void);
-+#define tc_init_after_args() i51_init_after_args ()
++/* Symbol names are folded to upper case.  */
++extern char *i51_canonicalize_symbol_name (char *);
++#define tc_canonicalize_symbol_name(NAME) i51_canonicalize_symbol_name (NAME)
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..2569b26b
+index 00000000..2d5dc802
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,876 @@
+@@ -0,0 +1,883 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -3753,7 +3766,13 @@ index 00000000..2569b26b
 +where the output section is not loaded, so a linker script that loads a
 +RAM space for a program that copies it into place is not affected.
 +@code{.eeprom} is not checked: its contents are what a programmer writes
-+into the part, extracted with @samp{objcopy -j .eeprom}.
++into the part.  The default script does not load it either, so an image of
++it is made by loading it on the way out:
++
++@smallexample
++objcopy -O ihex -j .eeprom --set-section-flags .eeprom=alloc,load \
++        prog.elf eeprom.hex
++@end smallexample
 +
 +The script always reserves register bank 0, which is in use from reset,
 +keeps @code{__STACK_SIZE} bytes of internal RAM free above the data for
@@ -3833,8 +3852,9 @@ index 00000000..2569b26b
 +@cindex @code{bit} directive, MCS-51
 +@item .bit @var{expressions}
 +Assemble one byte for each of the comma-separated @var{expressions}, each
-+of which must be 0 or 1.  This is how initialized data is written in the
-+bit space, where one byte of section contents describes one bit.
++of which must be 0 or 1: in the bit space one byte of section contents
++describes one bit.  The default linker script loads nothing into the bit
++space, so it refuses a @code{.bit 1} there (@pxref{i51 Memory Spaces}).
 +@code{HIGH ()} and @code{LOW ()} are not accepted here.
 +
 +@cindex @code{bitbss} directive, MCS-51
@@ -4096,8 +4116,8 @@ index 00000000..2569b26b
 +@item R_I51_8
 +An eight-bit value whose operand kind is not recorded: a byte of data from
 +@code{.byte}, or a byte operand of @code{.pcode}.  The value is added to
-+the byte at the place.  The linker accepts @minus{}128 through 255, as for
-+an immediate, and refuses anything else.
++the byte at the place.  The assembler and the linker accept @minus{}255
++through 255, as for any one-byte datum.
 +
 +@item R_I51_8_DIR
 +A direct address: one byte naming the internal RAM and special function
@@ -4137,7 +4157,7 @@ index 00000000..2569b26b
 +@item R_I51_16
 +A sixteen-bit number: the operand of @code{mov dptr,#@var{data16}}, and a
 +symbol in @code{.word}.  The assembler and the linker accept
-+@minus{}65536 through 65535, as for any two-byte datum.
++@minus{}65535 through 65535, as for any two-byte datum.
 +
 +@item R_I51_16_CODE
 +A code address: the operand of @code{ljmp} and @code{lcall}, 0 through
@@ -4362,6 +4382,36 @@ index 00000000..5dadebf2
 +	.local	lbuf
 +	.xcomm	lbuf, 3
 +	.comm	plain, 5
+diff --git a/gas/testsuite/gas/i51/direct-bad.d b/gas/testsuite/gas/i51/direct-bad.d
+new file mode 100644
+index 00000000..891f1edc
+--- /dev/null
++++ b/gas/testsuite/gas/i51/direct-bad.d
+@@ -0,0 +1,3 @@
++#name: i51 direct operand past 0x7F
++#as:
++#error_output: direct-bad.l
+diff --git a/gas/testsuite/gas/i51/direct-bad.l b/gas/testsuite/gas/i51/direct-bad.l
+new file mode 100644
+index 00000000..a99ea9a3
+--- /dev/null
++++ b/gas/testsuite/gas/i51/direct-bad.l
+@@ -0,0 +1,2 @@
++.*: Assembler messages:
++.*:6: Error: `BUF' is at 0x90, which a direct address cannot reach: 0x80 and above is the special function register page, and RAM there is reachable only through @R0/@R1
+diff --git a/gas/testsuite/gas/i51/direct-bad.s b/gas/testsuite/gas/i51/direct-bad.s
+new file mode 100644
+index 00000000..8cf3598f
+--- /dev/null
++++ b/gas/testsuite/gas/i51/direct-bad.s
+@@ -0,0 +1,7 @@
++; A direct operand cannot reach RAM the assembler placed at 0x80 or above.
++	.idata
++	.ds.b	0x90
++buf:	.ds.b	1
++	.text
++	mov	a,buf
++	mov	r0,#buf
 diff --git a/gas/testsuite/gas/i51/eflags.d b/gas/testsuite/gas/i51/eflags.d
 new file mode 100644
 index 00000000..e8d333de
@@ -4418,10 +4468,10 @@ index 00000000..0f4c7a2d
 +	.equ	fwd, 0xabcd
 diff --git a/gas/testsuite/gas/i51/i51.exp b/gas/testsuite/gas/i51/i51.exp
 new file mode 100644
-index 00000000..789fa917
+index 00000000..df80d4e1
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/i51.exp
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,25 @@
 +# Copyright (C) 2026 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -4445,6 +4495,8 @@ index 00000000..789fa917
 +}
 +
 +run_dump_tests [lsort [glob -nocomplain $srcdir/$subdir/*.d]]
++
++run_list_test "listing" "-as"
 diff --git a/gas/testsuite/gas/i51/jmp-call.d b/gas/testsuite/gas/i51/jmp-call.d
 new file mode 100644
 index 00000000..13575e8e
@@ -4517,6 +4569,31 @@ index 00000000..666bd33c
 +	jz	l
 +m:	acall	l
 +	ret
+diff --git a/gas/testsuite/gas/i51/listing.l b/gas/testsuite/gas/i51/listing.l
+new file mode 100644
+index 00000000..dc5d9ed1
+--- /dev/null
++++ b/gas/testsuite/gas/i51/listing.l
+@@ -0,0 +1,8 @@
++GAS LISTING .*
++
++
++DEFINED SYMBOLS
++ *.*listing.s:4 +\*ABS\*:000000a0 P2
++ *.*listing.s:5 +\*ABS\*:00000005 QQ
++
++NO UNDEFINED SYMBOLS
+diff --git a/gas/testsuite/gas/i51/listing.s b/gas/testsuite/gas/i51/listing.s
+new file mode 100644
+index 00000000..0a93dec8
+--- /dev/null
++++ b/gas/testsuite/gas/i51/listing.s
+@@ -0,0 +1,5 @@
++; A symbol declared with .local keeps the line that gives it a value in
++; the listing.
++	.local	P2
++	.equ	P2, 0xA0
++	.equ	QQ, 5
 diff --git a/gas/testsuite/gas/i51/long.d b/gas/testsuite/gas/i51/long.d
 new file mode 100644
 index 00000000..6b99bb2c
@@ -4701,10 +4778,10 @@ index 00000000..a5263045
 +#error_output: operators-bad.l
 diff --git a/gas/testsuite/gas/i51/operators-bad.l b/gas/testsuite/gas/i51/operators-bad.l
 new file mode 100644
-index 00000000..f2b695c4
+index 00000000..e3571fbf
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/operators-bad.l
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,16 @@
 +.*: Assembler messages:
 +.*:6: Error: HIGH\(\), LOW\(\) and B2B\(\) of a value not known here have to be the whole operand
 +.*:7: Error: HIGH\(\), LOW\(\) and B2B\(\) of a value not known here have to be the whole operand
@@ -4717,12 +4794,16 @@ index 00000000..f2b695c4
 +.*:14: Error: HIGH\(\) of a value not known here is allowed only as an instruction operand or a one\-byte datum
 +.*:15: Error: HIGH\(\), LOW\(\) and B2B\(\) need a one byte operand
 +.*:16: Error: HIGH\(\), LOW\(\) and B2B\(\) of a value not known here have to be the whole operand
++.*:17: Error: HIGH\(\), LOW\(\) and B2B\(\) of a value not known here have to be the whole operand
++.*:18: Error: HIGH\(\), LOW\(\) and B2B\(\) of a value not known here have to be the whole operand
++.*:19: Error: HIGH\(\), LOW\(\) and B2B\(\) of a value not known here have to be the whole operand
++.*:20: Error: HIGH\(\), LOW\(\) and B2B\(\) of a value not known here have to be the whole operand
 diff --git a/gas/testsuite/gas/i51/operators-bad.s b/gas/testsuite/gas/i51/operators-bad.s
 new file mode 100644
-index 00000000..22bbb7cb
+index 00000000..b80492dd
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/operators-bad.s
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,20 @@
 +; HIGH (), LOW () and B2B () of a value the assembler does not know are
 +; left for the linker, so they have to be the whole operand of an
 +; instruction or a one-byte datum.
@@ -4739,6 +4820,10 @@ index 00000000..22bbb7cb
 +	.pcode	high(x)
 +	.word	low(x)
 +	mov	c,b2b(x,3)+1
++	mov	a,#high(x)*2
++	mov	a,#-high(x)
++	mov	a,#high(x)-high(x)
++	mov	a,#~low(x)
 diff --git a/gas/testsuite/gas/i51/pcode-bad.d b/gas/testsuite/gas/i51/pcode-bad.d
 new file mode 100644
 index 00000000..f1ca11f5
@@ -4816,13 +4901,13 @@ index 00000000..c5068e9c
 +#error_output: range-fwd.l
 diff --git a/gas/testsuite/gas/i51/range-fwd.l b/gas/testsuite/gas/i51/range-fwd.l
 new file mode 100644
-index 00000000..5087278c
+index 00000000..4271c519
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/range-fwd.l
 @@ -0,0 +1,8 @@
 +.*: Assembler messages:
 +.*:3: Error: code address out of range: \-70000
-+.*:4: Error: 16\-bit operand out of range: 74565
++.*:4: Error: value of 00012345 too large for field of 2 bytes at 00000004
 +.*:5: Error: 8\-bit immediate out of range: \-200
 +.*:6: Error: direct address out of range: 256
 +.*:7: Error: bit address out of range: \-1
@@ -4861,15 +4946,15 @@ index 00000000..3b4d5281
 +#error_output: ranges-bad.l
 diff --git a/gas/testsuite/gas/i51/ranges-bad.l b/gas/testsuite/gas/i51/ranges-bad.l
 new file mode 100644
-index 00000000..68ee56b0
+index 00000000..23774681
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/ranges-bad.l
 @@ -0,0 +1,11 @@
 +.*: Assembler messages:
 +.*:11: Error: alignment too large: 0x10000 is the most
 +.*:12: Error: alignment too large: 0x10000 is the most
-+.*:3: Error: 16\-bit operand out of range: \-65537
-+.*:4: Error: 16\-bit operand out of range: 65536
++.*:3: Error: value of ffff0000 too large for field of 2 bytes at 00000001
++.*:4: Error: value of 00010000 too large for field of 2 bytes at 00000004
 +.*:5: Error: code address out of range: \-1
 +.*:6: Error: code address out of range: 65536
 +.*:7: Error: 8\-bit immediate out of range: \-129
@@ -4878,13 +4963,13 @@ index 00000000..68ee56b0
 +.*:10: Error: bit address out of range: 256
 diff --git a/gas/testsuite/gas/i51/ranges-bad.s b/gas/testsuite/gas/i51/ranges-bad.s
 new file mode 100644
-index 00000000..8ccd144f
+index 00000000..6daf3c57
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/ranges-bad.s
 @@ -0,0 +1,12 @@
 +; Just past the edges of each operand field.
 +	.text
-+	mov	dptr,#-65537
++	mov	dptr,#-65536
 +	mov	dptr,#0x10000
 +	ljmp	-1
 +	lcall	0x10000
@@ -4896,7 +4981,7 @@ index 00000000..8ccd144f
 +	.icomm	d, 4, 0x8000000000000000
 diff --git a/gas/testsuite/gas/i51/ranges.d b/gas/testsuite/gas/i51/ranges.d
 new file mode 100644
-index 00000000..b4db25fe
+index 00000000..bb5cf447
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/ranges.d
 @@ -0,0 +1,9 @@
@@ -4907,18 +4992,18 @@ index 00000000..b4db25fe
 +.*: +file format elf32-i51
 +
 +Contents of section .text:
-+ 0000 905fea90 800090ff ff02ffff 12000074  .*
++ 0000 905fea90 000190ff ff02ffff 12000074  .*
 + 0010 8074ff74 13a2e2 +.*
 diff --git a/gas/testsuite/gas/i51/ranges.s b/gas/testsuite/gas/i51/ranges.s
 new file mode 100644
-index 00000000..a09a027b
+index 00000000..b811a7dc
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/ranges.s
 @@ -0,0 +1,11 @@
 +; The edges of each operand field.
 +	.text
 +	mov	dptr,#-40982
-+	mov	dptr,#-32768
++	mov	dptr,#-65535
 +	mov	dptr,#0xffff
 +	ljmp	0xffff
 +	lcall	0
@@ -5427,10 +5512,10 @@ index 00000000..0426a2e9
 +MACHINE=
 diff --git a/ld/scripttempl/elf32i51.sc b/ld/scripttempl/elf32i51.sc
 new file mode 100644
-index 00000000..6c383c06
+index 00000000..91890a26
 --- /dev/null
 +++ b/ld/scripttempl/elf32i51.sc
-@@ -0,0 +1,284 @@
+@@ -0,0 +1,276 @@
 +# Copyright (C) 2014-2025 Free Software Foundation, Inc.
 +#
 +# Copying and distribution of this file, with or without modification,
@@ -5471,8 +5556,8 @@ index 00000000..6c383c06
 +  .edata	0 : { *(.edata) }
 +  .ebss		0 : { *(.ebss) }
 +  .eeprom	0 : { *(.eeprom) }
-+  .comment	0 : { *(.comment) }
 +EOF
++  source_sh $srcdir/scripttempl/misc-sections.sc
 +  source_sh $srcdir/scripttempl/DWARF.sc
 +  echo "}"
 +  exit 0
@@ -5696,17 +5781,9 @@ index 00000000..6c383c06
 +  ASSERT (__EDATA_END <= 0x10000, "edata overflow (past 0xFFFF)")
 +  ASSERT (__EEPROM_END <= __EEPROM_SIZE, "EEPROM overflow (past __EEPROM_SIZE)")
 +
-+  /* Stabs debugging sections */
-+  .stab          0 : { *(.stab) }
-+  .stabstr       0 : { *(.stabstr) }
-+  .stab.excl     0 : { *(.stab.excl) }
-+  .stab.exclstr  0 : { *(.stab.exclstr) }
-+  .stab.index    0 : { *(.stab.index) }
-+  .stab.indexstr 0 : { *(.stab.indexstr) }
-+  .comment       0 : { *(.comment) }
-+
 +EOF
 +
++source_sh $srcdir/scripttempl/misc-sections.sc
 +source_sh $srcdir/scripttempl/DWARF.sc
 +
 +cat <<EOF
@@ -5715,6 +5792,34 @@ index 00000000..6c383c06
 +  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }
 +}
 +EOF
+diff --git a/ld/testsuite/ld-i51/abs-branch-ok.d b/ld/testsuite/ld-i51/abs-branch-ok.d
+new file mode 100644
+index 00000000..ba7ed96f
+--- /dev/null
++++ b/ld/testsuite/ld-i51/abs-branch-ok.d
+@@ -0,0 +1,9 @@
++#name: i51 branches to absolute addresses in reach
++#source: abs-branch-ok.s
++#ld: -Ttext=0x100
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0100 800e2123 f1ff0212 3422 +.*
+diff --git a/ld/testsuite/ld-i51/abs-branch-ok.s b/ld/testsuite/ld-i51/abs-branch-ok.s
+new file mode 100644
+index 00000000..ba08f07f
+--- /dev/null
++++ b/ld/testsuite/ld-i51/abs-branch-ok.s
+@@ -0,0 +1,7 @@
++; Branches to absolute addresses in reach, linked at 0x100.
++	.text
++	.global	_START
++_START:	sjmp	0x110
++	ajmp	0x123
++	acall	0x7ff
++	ljmp	0x1234
 diff --git a/ld/testsuite/ld-i51/abs-branch.d b/ld/testsuite/ld-i51/abs-branch.d
 new file mode 100644
 index 00000000..6e21da53
@@ -5786,7 +5891,7 @@ index 00000000..9629d1ae
 +_START:	setb	b2b(w,3)
 diff --git a/ld/testsuite/ld-i51/bank0.d b/ld/testsuite/ld-i51/bank0.d
 new file mode 100644
-index 00000000..3695bfd9
+index 00000000..ab730212
 --- /dev/null
 +++ b/ld/testsuite/ld-i51/bank0.d
 @@ -0,0 +1,8 @@
@@ -5796,7 +5901,7 @@ index 00000000..3695bfd9
 +#nm: -n
 +
 +#...
-+0+8 . R
++0+8 D R
 +#pass
 diff --git a/ld/testsuite/ld-i51/bank0.s b/ld/testsuite/ld-i51/bank0.s
 new file mode 100644
@@ -5844,6 +5949,26 @@ index 00000000..57a42e6e
 +	.idata
 +	.global	buf
 +buf:	.space	4
+diff --git a/ld/testsuite/ld-i51/dirovf.d b/ld/testsuite/ld-i51/dirovf.d
+new file mode 100644
+index 00000000..44b6dc01
+--- /dev/null
++++ b/ld/testsuite/ld-i51/dirovf.d
+@@ -0,0 +1,4 @@
++#name: i51 direct address overflow
++#source: dirovf.s
++#ld: --defsym DSYM=0x100
++#error: .*relocation truncated to fit: R_I51_8_DIR against symbol `DSYM'.*
+diff --git a/ld/testsuite/ld-i51/dirovf.s b/ld/testsuite/ld-i51/dirovf.s
+new file mode 100644
+index 00000000..855f9d6f
+--- /dev/null
++++ b/ld/testsuite/ld-i51/dirovf.s
+@@ -0,0 +1,4 @@
++; A direct address is one byte.
++	.text
++	.global	_START
++_START:	mov	a,dsym
 diff --git a/ld/testsuite/ld-i51/dwarf.d b/ld/testsuite/ld-i51/dwarf.d
 new file mode 100644
 index 00000000..ef1898dd
@@ -5870,6 +5995,34 @@ index 00000000..ef1898dd
 +.*image.s:6
 + +3:	12 00 08 +	lcall	8 <SUB>
 +#pass
+diff --git a/ld/testsuite/ld-i51/eeprom-hex.d b/ld/testsuite/ld-i51/eeprom-hex.d
+new file mode 100644
+index 00000000..fb20508a
+--- /dev/null
++++ b/ld/testsuite/ld-i51/eeprom-hex.d
+@@ -0,0 +1,10 @@
++#name: i51 EEPROM image
++#source: eeprom-hex.s
++#ld:
++#objcopy_linked_file: -O ihex -j .eeprom --set-section-flags .eeprom=alloc,load
++#objdump: -s
++
++.*: +file format ihex
++
++Contents of section .sec1:
++ 0000 112233 +.*
+diff --git a/ld/testsuite/ld-i51/eeprom-hex.s b/ld/testsuite/ld-i51/eeprom-hex.s
+new file mode 100644
+index 00000000..e7ced5c5
+--- /dev/null
++++ b/ld/testsuite/ld-i51/eeprom-hex.s
+@@ -0,0 +1,6 @@
++; The EEPROM contents, extracted from a link with the default script.
++	.text
++	.global	_START
++_START:	nop
++	.eeprom
++	.byte	0x11, 0x22, 0x33
 diff --git a/ld/testsuite/ld-i51/eeprom.d b/ld/testsuite/ld-i51/eeprom.d
 new file mode 100644
 index 00000000..e7fbb723
@@ -6126,6 +6279,32 @@ index 00000000..dce29937
 +_START:	nop
 +	.ibss
 +	.space	0x70
+diff --git a/ld/testsuite/ld-i51/load.d b/ld/testsuite/ld-i51/load.d
+new file mode 100644
+index 00000000..d8f82158
+--- /dev/null
++++ b/ld/testsuite/ld-i51/load.d
+@@ -0,0 +1,9 @@
++#name: i51 initialized RAM in a loaded section
++#source: init.s
++#ld: -T load.t
++#objdump: -s -j .data
++
++.*: +file format elf32-i51
++
++Contents of section .data:
++ 0030 0005 +.*
+diff --git a/ld/testsuite/ld-i51/load.t b/ld/testsuite/ld-i51/load.t
+new file mode 100644
+index 00000000..291914f6
+--- /dev/null
++++ b/ld/testsuite/ld-i51/load.t
+@@ -0,0 +1,5 @@
++SECTIONS
++{
++  .text 0 : { *(.text) }
++  .data 0x30 : AT (0x200) { *(.data) }
++}
 diff --git a/ld/testsuite/ld-i51/merge.d b/ld/testsuite/ld-i51/merge.d
 new file mode 100644
 index 00000000..82074217
@@ -6318,6 +6497,33 @@ index 00000000..c1358d34
 +_START:	ret
 +	.bss
 +	.space	0x79
+diff --git a/ld/testsuite/ld-i51/reloc8.d b/ld/testsuite/ld-i51/reloc8.d
+new file mode 100644
+index 00000000..cd3d5e9a
+--- /dev/null
++++ b/ld/testsuite/ld-i51/reloc8.d
+@@ -0,0 +1,9 @@
++#name: i51 R_I51_8 adds the byte at the place
++#source: reloc8.s
++#ld: --defsym SYM=0x10
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 001522 +.*
+diff --git a/ld/testsuite/ld-i51/reloc8.s b/ld/testsuite/ld-i51/reloc8.s
+new file mode 100644
+index 00000000..b7cf389a
+--- /dev/null
++++ b/ld/testsuite/ld-i51/reloc8.s
+@@ -0,0 +1,6 @@
++; R_I51_8 adds the byte at the place to the value.
++	.text
++	.global	_START
++_START:	nop
++	.byte	5
++	.reloc	.-1, R_I51_8, sym
 diff --git a/ld/testsuite/ld-i51/shf.d b/ld/testsuite/ld-i51/shf.d
 new file mode 100644
 index 00000000..f058ccc2

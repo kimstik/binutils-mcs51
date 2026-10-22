@@ -159,6 +159,8 @@ DEF_DEBUG = [
     (".stab.index",     [(".stab.index",      0x45)]),
     (".stab.indexstr",  [(".stab.indexstr",   0x46)]),
     (".comment",        [(".comment",         0x47)]),
+    (".gnu.build.attributes", [(".gnu.build.attributes", 0x69),
+                               (".gnu.build.attributes.p", 0x6a)]),
     (".debug",          [(".debug",           0x48)]),
     (".line",           [(".line",            0x49)]),
     (".debug_srcinfo",  [(".debug_srcinfo",   0x4a)]),
@@ -297,7 +299,12 @@ SEC2PAT = {
     ".gnu.linkonce.wi.p": ".gnu.linkonce.wi.*",
     ".debug_line.p": ".debug_line.*",
     ".gnu.lto_.p": ".gnu.lto_*",
+    ".gnu.build.attributes.p": ".gnu.build.attributes.*",
 }
+
+# Non-allocated output sections that scripttempl/misc-sections.sc gives no
+# address of their own: where they sit is not a property of the script.
+UNADDRESSED = {".gnu.build.attributes"}
 
 # Arms no input can reach, with the reason.  Not faked and not skipped
 # silently: they are named here, printed on every run, and the audit below
@@ -524,7 +531,8 @@ def check_script(pr, ck, label, script, text_arms, text_image, etext,
     for out, group in debug:
         if not ck.true("%s: output section %s missing" % (label, out), out in secs):
             continue
-        ck.eq("%s: %s address" % (label, out), secs[out][0], 0)
+        if out not in UNADDRESSED:
+            ck.eq("%s: %s address" % (label, out), secs[out][0], 0)
         content = sorted(pr.content(elf, out))
         ck.eq("%s: %s content" % (label, out), content,
               sorted(m for _s, m in group))

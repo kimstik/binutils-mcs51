@@ -197,7 +197,7 @@ FOLD_CASES = [
     fcase('fold-high-max', 'mov a,#HIGH(S)\nS = 0xffff',    '74 ff'),
     fcase('fold-high-over', 'mov a,#HIGH(S)\nS = 0x12345', None, 'out of range'),
     fcase('fold-8-konst', 'mov a,#0x1234',                 None, '8-bit immediate out of range'),
-    fcase('fold-16-konst', 'mov dptr,#0x12345',            None, '16-bit operand out of range'),
+    fcase('fold-16-konst', 'mov dptr,#0x12345',            None, 'too large for field of 2 bytes'),
     # A branch operand names an address; HIGH/LOW/B2B on one is meaningless
     # and has to be refused rather than silently truncating the target.
     fcase('fold-prefix-ljmp', 'ljmp LOW(S)\nS = 0x1234',   None, 'not allowed'),
