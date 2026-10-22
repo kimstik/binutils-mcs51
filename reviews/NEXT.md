@@ -1,6 +1,6 @@
 # Where the work stands, and what is next
 
-Code branch: `claude/r6-fixes`, HEAD b47a487, gate green (16 stages, the
+Code branch: `r6-fixes`, HEAD b47a487, gate green (16 stages, the
 dejagnu stage runs the full gas/ld/binutils suites, 0 unexpected).
 Reviews: r8-*.md (fixed in f681863, 11c5fba, 907bdd9, b47a487) and
 r9-quality.md / r9-tests.md (open, list below).
