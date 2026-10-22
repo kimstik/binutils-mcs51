@@ -59,30 +59,46 @@ FILES = {
     'dis':  'opcodes/i51-dis.c',
     'opc':  'include/opcode/i51.h',
     'ldsc': 'ld/scripttempl/elf32i51.sc',
+    'elfh': 'include/elf/i51.h',
+    'relf': 'binutils/readelf.c',
 }
 
 # Functions worth mutating: the ones that parse operands, encode, relocate,
 # place or decode, including the operand parser and the memory-space code.
 SCOPES = {
-    'gas': ['md_apply_fix', 'fixup8', 'fixup11', 'fixup16', 'check_range',
-            'i51_fold_bit_suffix', 'i51_build_ins', 'md_pcrel_from_section',
-            'tc_gen_reloc', 'i51_bit', 'i51_arg_kind', 'i51_check_direct',
-            'i51_bit_address', 'i51_parse_operand', 'i51_row_fits',
-            'i51_find_row', 'i51_assemble', 'i51_parse_name',
-            'i51_apply_operator', 'i51_operator_args', 'i51_strip_operator',
-            'i51_cons_fix_new', 'i51_frob_symbol', 'i51_using',
-            'i51_space_section', 'i51_alloc_local', 'i51_common_parse',
-            'pcode_operand', 'pcode_byte', 'pcode_word', 'pcode_flags',
+    'gas': ['md_parse_option', 'i51_canonicalize_symbol_name',
+            'i51_common_section', 'i51_lookup_name', 'i51_user_symbol',
+            'i51_note_use', 'i51_builtin_value', 'i51_frob_symbol',
+            'i51_frob_label', 'i51_operator_args', 'i51_apply_operator',
+            'i51_parse_name', 'i51_read_expression', 'i51_fold_bit_suffix',
+            'i51_parse_operand', 'i51_row_fits', 'i51_find_row',
+            'i51_emit_field', 'i51_emit', 'i51_assemble',
+            'md_pcrel_from_section', 'i51_internal_ram', 'i51_check_direct',
+            'i51_check_range', 'md_apply_fix', 'tc_gen_reloc',
+            'i51_cons_fix_new', 'i51_bit', 'i51_using', 'i51_finish',
+            'i51_space_section', 'i51_common_parse', 'i51_check_common',
+            'pcode_keyword', 'pcode_operand', 'pcode_byte_present',
+            'pcode_byte', 'pcode_word', 'pcode_flags', 'i51_operator_name',
             'i51_pcode'],
-    'bfd': ['i51_final_link_relocate', 'elf32_i51_relocate_section',
-            'i51_info_to_howto_rela', 'elf32_i51_section_from_bfd_section',
-            'elf32_i51_add_symbol_hook', 'bfd_elf32_bfd_reloc_type_lookup',
-            'i51_section_space', 'i51_check_space', 'elf32_i51_final_link',
-            'elf32_i51_check_common_space', 'i51_common_by_shndx',
-            'i51_common_by_section', 'elf32_i51_symbol_processing',
-            'i51_elf_section_flags'],
-    'dis': ['print_insn_i51'],
+    'bfd': ['i51_info_to_howto_rela', 'i51_section_space', 'i51_value',
+            'i51_check_space', 'i51_final_link_relocate',
+            'elf32_i51_relocate_section', 'i51_elf_section_flags',
+            'i51_elf_fake_sections', 'i51_elf_section_from_shdr',
+            'elf32_i51_final_link', 'i51_common_by_shndx',
+            'i51_common_by_section', 'elf32_i51_section_from_bfd_section',
+            'elf32_i51_symbol_processing', 'i51_elf_common_section',
+            'i51_common_space', 'elf32_i51_check_common_space',
+            'elf32_i51_add_symbol_hook', 'elf32_i51_link_output_symbol_hook',
+            'elf32_i51_common_definition',
+            'elf32_i51_merge_private_bfd_data'],
+    'dis': ['i51_symbol_is_valid', 'i51_find_opcode', 'i51_fixed_operand',
+            'i51_field_size', 'i51_print_operand', 'i51_insn_type',
+            'print_insn_i51'],
 }
+
+# readelf.c is upstream's: only the line after each `case EM_8051:' is
+# the port's.
+CASE_LINE = {'relf': 'case EM_8051:'}
 
 
 def read(path):
@@ -171,6 +187,9 @@ def functions(lines):
 
 def scoped_lines(key, lines):
     """Indices of the lines this file exposes to the line operators."""
+    if key in CASE_LINE:
+        return [i + 1 for i, s in enumerate(lines[:-1])
+                if CASE_LINE[key] in s]
     names = SCOPES.get(key)
     if names is None:
         return list(range(len(lines)))
@@ -420,8 +439,8 @@ def op_ldnum(lines, _idx, code):
 
 
 OPERATORS = [
-    ('relop',     op_relop,     ('gas', 'bfd', 'dis')),
-    ('constpm1',  op_constpm1,  ('gas', 'bfd', 'dis')),
+    ('relop',     op_relop,     ('gas', 'bfd', 'dis', 'elfh')),
+    ('constpm1',  op_constpm1,  ('gas', 'bfd', 'dis', 'elfh', 'relf')),
     ('guard0',    op_guard0,    ('gas', 'bfd')),
     ('cond0',     op_cond0,     ('dis',)),
     ('retstatus', op_retstatus, ('bfd',)),

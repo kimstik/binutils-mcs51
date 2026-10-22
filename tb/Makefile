@@ -621,8 +621,8 @@ MUTSTAGES  ?= $(MUTGATE)
 MUTONLY    ?=
 # COVCAP is this target's own population, deliberately smaller than MUTCAP:
 # `mutants' runs one stage per mutant and stops at the first red, this runs
-# twelve, so the same cap costs an order of magnitude more wall clock, and
-# one hung mutant costs one timeout there and twelve here.  Raise either
+# all of $(MUTSTAGES), so the same cap costs an order of magnitude more wall
+# clock, and one hung mutant costs one timeout there and one per stage here.  Raise either
 # when the matrix is the point and the runner has the hours.
 MUTTIMEOUT ?= 300
 COVCAP     ?= 4

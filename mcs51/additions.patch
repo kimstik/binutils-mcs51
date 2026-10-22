@@ -3585,10 +3585,10 @@ index 00000000..89e993a7
 +#define tc_canonicalize_symbol_name(NAME) i51_canonicalize_symbol_name (NAME)
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..45a11864
+index 00000000..1d4939f6
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,904 @@
+@@ -0,0 +1,905 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -4121,7 +4121,8 @@ index 00000000..45a11864
 +Each memory-space directive takes an optional subsection number, and each
 +common directive takes a symbol name, a length in the units of its space,
 +and an optional alignment in bytes, a power of two.  A common is at most
-+@code{0xFFFF} units long, and a memory-space common may ask for an
++@code{0xFFFF} units long (a longer one draws a warning and is not
++declared), and a memory-space common may ask for an
 +alignment of at most @code{0x10000}.  A common that gives no alignment is
 +aligned to a byte.
 +
@@ -6897,6 +6898,29 @@ index 00000000..9629d1ae
 +	.text
 +	.global	_START
 +_START:	setb	b2b(w,3)
+diff --git a/ld/testsuite/ld-i51/b2bbit.d b/ld/testsuite/ld-i51/b2bbit.d
+new file mode 100644
+index 00000000..a758aeff
+--- /dev/null
++++ b/ld/testsuite/ld-i51/b2bbit.d
+@@ -0,0 +1,4 @@
++#name: i51 bit number of R_I51_8_B2B
++#source: b2bbit.s
++#ld:
++#error: .*R_I51_8_B2B against `F': bit number 9 is not 0..7.*
+diff --git a/ld/testsuite/ld-i51/b2bbit.s b/ld/testsuite/ld-i51/b2bbit.s
+new file mode 100644
+index 00000000..96d02769
+--- /dev/null
++++ b/ld/testsuite/ld-i51/b2bbit.s
+@@ -0,0 +1,7 @@
++; The bit number of R_I51_8_B2B is 0..7.
++	.text
++	.global	_START
++_START:	.byte	0xd2, 9
++	.reloc	.-1, R_I51_8_B2B, f
++	.bbss
++f:	.space	1
 diff --git a/ld/testsuite/ld-i51/bank0.d b/ld/testsuite/ld-i51/bank0.d
 new file mode 100644
 index 00000000..ab730212
@@ -7538,6 +7562,28 @@ index 00000000..d4f45d76
 +x:	.space	2
 +	.bitdata
 +f:	.bit	0
+diff --git a/ld/testsuite/ld-i51/imm8.d b/ld/testsuite/ld-i51/imm8.d
+new file mode 100644
+index 00000000..9bf23298
+--- /dev/null
++++ b/ld/testsuite/ld-i51/imm8.d
+@@ -0,0 +1,4 @@
++#name: i51 immediate range at the link
++#source: imm8.s
++#ld: --defsym K=-128 --defsym M=-129 --defsym N=256
++#error: .*relocation truncated to fit: R_I51_8_IMM against symbol `M'.*\n.*relocation truncated to fit: R_I51_8_IMM against symbol `N'.*
+diff --git a/ld/testsuite/ld-i51/imm8.s b/ld/testsuite/ld-i51/imm8.s
+new file mode 100644
+index 00000000..ed318051
+--- /dev/null
++++ b/ld/testsuite/ld-i51/imm8.s
+@@ -0,0 +1,6 @@
++; An immediate is -128..255 at the link too.
++	.text
++	.global	_START
++_START:	mov	a,#k
++	mov	a,#m
++	mov	a,#n
 diff --git a/ld/testsuite/ld-i51/init-bit.d b/ld/testsuite/ld-i51/init-bit.d
 new file mode 100644
 index 00000000..b6c07b19
@@ -8059,6 +8105,37 @@ index 00000000..c1358d34
 +_START:	ret
 +	.bss
 +	.space	0x79
+diff --git a/ld/testsuite/ld-i51/rdwarf.d b/ld/testsuite/ld-i51/rdwarf.d
+new file mode 100644
+index 00000000..c777488f
+--- /dev/null
++++ b/ld/testsuite/ld-i51/rdwarf.d
+@@ -0,0 +1,15 @@
++#name: i51 ld -r keeps the DWARF order
++#source: rdwarf.s
++#as: -g
++#ld: -r
++#readelf: -SW
++
++#...
++.* .debug_aranges .*
++#...
++.* .debug_info .*
++#...
++.* .debug_abbrev .*
++#...
++.* .debug_line .*
++#pass
+diff --git a/ld/testsuite/ld-i51/rdwarf.s b/ld/testsuite/ld-i51/rdwarf.s
+new file mode 100644
+index 00000000..029109ae
+--- /dev/null
++++ b/ld/testsuite/ld-i51/rdwarf.s
+@@ -0,0 +1,4 @@
++; The -r script places the DWARF sections in their order.
++	.text
++	.global	_START
++_START:	nop
 diff --git a/ld/testsuite/ld-i51/reloc8.d b/ld/testsuite/ld-i51/reloc8.d
 new file mode 100644
 index 00000000..cd3d5e9a

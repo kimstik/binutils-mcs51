@@ -15,7 +15,7 @@ free, and a hand run states what it measured against.
 
   run.py --tree WORK/modern/binutils-2.47 --build WORK/modern/build \
          --mutants mutants.json --out results.json \
-         --stages isa,roundtrip,branch,bits,reloc,guard,sim,defaultlink,commons,script,disasm,doctruth,dejagnu,check
+         --stages isa,roundtrip,branch,bits,reloc,guard,sim,defaultlink,commons,script,disasm,dejagnu,check
 
 --all-stages runs every stage against every mutant instead of stopping at
 the first red, and records each stage's verdict and wall clock separately.
@@ -56,6 +56,8 @@ REBUILD_MARK = {
     'opcodes/i51-dis.c': 'i51-dis',
     'include/opcode/i51.h': 'tc-i51',
     'ld/scripttempl/elf32i51.sc': 'eelf32i51',
+    'include/elf/i51.h': 'elf32-i51',
+    'binutils/readelf.c': 'readelf',
 }
 
 
@@ -133,8 +135,9 @@ class Harness:
         run-reloc, run-disasm via tempfile.TemporaryDirectory, run-script
         via mkdtemp with an rmtree in its finally, run-commons and
         run-defaultlink via mktemp -d with a trap, run-testall likewise),
-        and the two that do use $(WORK) - check and oracle - each begin by
-        removing their own subdirectory of it.  So a stage that has already
+        and those that use $(WORK) - check, libsrc and oracle - each begin
+        by removing their own subdirectory of it; dejagnu rewrites the .sum
+        files in $(BUILD) and its logs in $(WORK) from scratch.  So a stage that has already
         gone red cannot move the verdict of one that runs after it.
 
         Returns (first red or None, {stage: rc}, {stage: seconds}, the log
