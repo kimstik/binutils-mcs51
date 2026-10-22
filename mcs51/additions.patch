@@ -48,10 +48,10 @@ index 00000000..4ac47a3e
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..5ef37caa
+index 00000000..f4197536
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1114 @@
+@@ -0,0 +1,1131 @@
 +/* MCS-51 specific support for 32-bit ELF.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -780,6 +780,22 @@ index 00000000..5ef37caa
 +  return true;
 +}
 +
++/* A RAM space the linker script emits as a non-allocated (INFO) section
++   with nothing but uninitialized input has no contents: it is NOBITS
++   rather than a file full of zeros.  */
++
++static bool
++i51_elf_fake_sections (bfd *abfd ATTRIBUTE_UNUSED, Elf_Internal_Shdr *hdr,
++		       asection *sec)
++{
++  if (hdr->sh_type == SHT_PROGBITS
++      && (sec->flags & (SEC_ALLOC | SEC_HAS_CONTENTS)) == 0
++      && i51_section_space (sec) != I51_SPACE_ANY
++      && i51_section_space (sec) != I51_SPACE_CODE)
++    hdr->sh_type = SHT_NOBITS;
++  return true;
++}
++
 +static bool
 +i51_elf_section_from_shdr (bfd *abfd,
 +			    Elf_Internal_Shdr *hdr,
@@ -1159,6 +1175,7 @@ index 00000000..5ef37caa
 +
 +#define elf_backend_section_from_shdr		i51_elf_section_from_shdr
 +#define elf_backend_section_flags		i51_elf_section_flags
++#define elf_backend_fake_sections		i51_elf_fake_sections
 +#define elf_backend_symbol_processing		elf32_i51_symbol_processing
 +#define elf_backend_section_from_bfd_section	elf32_i51_section_from_bfd_section
 +#define elf_backend_add_symbol_hook		elf32_i51_add_symbol_hook
@@ -3488,10 +3505,10 @@ index 00000000..89e993a7
 +#define tc_canonicalize_symbol_name(NAME) i51_canonicalize_symbol_name (NAME)
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..1e73e831
+index 00000000..f8ae2749
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,888 @@
+@@ -0,0 +1,889 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -3986,7 +4003,8 @@ index 00000000..1e73e831
 +the whole file writes the spaces over one another.
 +
 +@command{nm} shows the symbols of the RAM spaces of a linked image as data,
-+@samp{d} or @samp{D}, except that the generic symbol classes take
++@samp{d} or @samp{D}, or as uninitialized data, @samp{b} or @samp{B}, in a
++space that holds nothing else, except that the generic symbol classes take
 +@code{.idata} for the import section of a PE file and show its symbols as
 +@samp{i}, or @samp{I} for a global one.
 +@command{size} counts the program image, which holds the code space only;
@@ -6327,7 +6345,7 @@ index 00000000..310968c8
 +	sjmp	0
 diff --git a/ld/testsuite/ld-i51/align.d b/ld/testsuite/ld-i51/align.d
 new file mode 100644
-index 00000000..ac972cfc
+index 00000000..12705f49
 --- /dev/null
 +++ b/ld/testsuite/ld-i51/align.d
 @@ -0,0 +1,8 @@
@@ -6337,7 +6355,7 @@ index 00000000..ac972cfc
 +#nm: -n
 +
 +#...
-+0+4 D FOUR
++0+4 B FOUR
 +#pass
 diff --git a/ld/testsuite/ld-i51/align.s b/ld/testsuite/ld-i51/align.s
 new file mode 100644
@@ -6622,7 +6640,7 @@ index 00000000..42099dac
 +l2:	ljmp	l2
 diff --git a/ld/testsuite/ld-i51/gcrb.d b/ld/testsuite/ld-i51/gcrb.d
 new file mode 100644
-index 00000000..2978bbac
+index 00000000..42638a95
 --- /dev/null
 +++ b/ld/testsuite/ld-i51/gcrb.d
 @@ -0,0 +1,10 @@
@@ -6632,9 +6650,9 @@ index 00000000..2978bbac
 +#nm: -n
 +
 +#...
-+0+ D __RB__
++0+ B __RB__
 +#...
-+0+10 D RV
++0+10 B RV
 +#pass
 diff --git a/ld/testsuite/ld-i51/gcrb.s b/ld/testsuite/ld-i51/gcrb.s
 new file mode 100644
@@ -6652,7 +6670,7 @@ index 00000000..32eedb85
 +	.rcomm	rv,2
 diff --git a/ld/testsuite/ld-i51/i51.exp b/ld/testsuite/ld-i51/i51.exp
 new file mode 100644
-index 00000000..f8202fc4
+index 00000000..0294f046
 --- /dev/null
 +++ b/ld/testsuite/ld-i51/i51.exp
 @@ -0,0 +1,84 @@
@@ -6711,7 +6729,7 @@ index 00000000..f8202fc4
 +if { ![i51_generation_object align.s 0 tmpdir/align0.o]
 +     || ![ld_link $ld tmpdir/align0 tmpdir/align0.o] } {
 +    fail $test
-+} elseif { [regexp {(^|\s)0+1 D FOUR} [i51_run $NM -n tmpdir/align0]] } {
++} elseif { [regexp {(^|\s)0+1 B FOUR} [i51_run $NM -n tmpdir/align0]] } {
 +    pass $test
 +} else {
 +    fail $test
