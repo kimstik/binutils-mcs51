@@ -5,6 +5,9 @@ dejagnu stage runs the full gas/ld/binutils suites, 0 unexpected).
 Reviews: r8-*.md (fixed in f681863, 11c5fba, 907bdd9, b47a487) and
 r9-quality.md / r9-tests.md (open, list below).
 
+## Progress
+- [x] -mcase-sensitive + dot rule: 9e66673 (gate green).
+
 ## Decision by the owner
 Symbol names: fold to upper case by default (compatibility), plus an option
 to turn folding off.  Started (uncommitted, in wip-r9-*.patch, which are the
