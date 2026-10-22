@@ -9,6 +9,8 @@ r9-quality.md / r9-tests.md (open, list below).
 - [x] -mcase-sensitive + dot rule: 9e66673 (gate green).
 - [x] bfd: M1, M2, LOW3, LOW4, LOW9, LOW14 + ld tests: 1705e45.
 - [x] gas: LOW1,2,5,6,7,8,11,12,13,15,16 + gas tests: bf7eb5c.
+- [x] harness (gen.py scopes, run.py, Makefile counts), last DejaGnu tests, docs: e3c2b4e.
+- [ ] next: clean-room build + gate, then round 10 review (quality + tests lanes).
 
 ## Decision by the owner
 Symbol names: fold to upper case by default (compatibility), plus an option
