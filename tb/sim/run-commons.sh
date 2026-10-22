@@ -556,9 +556,9 @@ expect_named __PROBE_IBSS_END 0x98
 # The spaces are disjoint address spaces of the machine, and the
 # arbitration between two commons of one name knows nothing of them: it
 # keeps the larger of the two and, at equal sizes, the one it saw first.
-# `.xcomm CONFVAR,4' in one object and `.icomm CONFVAR,4' in another
-# therefore linked with nothing said, and the order of the two files on
-# the command line alone decided whether CONFVAR was external RAM at
+# Left to it, `.xcomm CONFVAR,4' in one object and `.icomm CONFVAR,4' in
+# another would link with nothing said, and the order of the two files on
+# the command line alone would decide whether CONFVAR is external RAM at
 # 0x0000 or internal RAM at 0x0020.  No address satisfies both
 # declarations, so the link is refused.  The diagnostic has to name the
 # symbol, both spaces and both objects: that is the whole of what a
@@ -595,7 +595,7 @@ expect_says() {  # WHAT ERR-FILE WORD..., each word somewhere in the message
 
 # Both orders, because ordinary arbitration is exactly what is order
 # dependent, and a check that fires only one way round would leave half
-# the bug uncaught.
+# the cases unchecked.
 if "$LD" -o "$W/conflict.elf" "$W/confx.o" "$W/confi.o" 2> "$W/conflict.err"; then
     fail "conflict: the link succeeded - CONFVAR is .xcomm in confx.o and .icomm in confi.o"
 else
@@ -618,7 +618,7 @@ else
 fi
 
 # The control that matters: one name in the SAME space in two objects is
-# the ordinary case and has to link exactly as it does today.  Without
+# the ordinary case and has to link as an ordinary common does.  Without
 # it the check above could be refusing every repeated common and nothing
 # here would notice.
 cat > "$W/samea.s" <<'EOF'
@@ -674,11 +674,10 @@ expect_same "same space reversed" "$W/same2.elf" "$W/sameb.o" "$W/samea.o"
 # A plain .comm names no space, and one name declared .comm in one
 # object and .icomm in another still links.  That is not a nicety: the
 # objects this port is used with carry two builds of one library side by
-# side, the same names declared with .comm before the space directives
-# existed and with .bcomm or .icomm after, and 33 names in tb/base.7z
-# are declared both ways.  Which space such a pair lands in is decided
-# by link order to this day - a separate defect, and nothing here pins
-# it.  What is pinned is that the link is still allowed.
+# side, one declaring the names with .comm and the other with .bcomm or
+# .icomm, and 33 names in tb/base.7z are declared both ways.  Which space
+# such a pair lands in is decided by link order - a separate defect, and
+# nothing here pins it.  What is pinned is that the link is allowed.
 cat > "$W/plaina.s" <<'EOF'
 ; PVAR as an ordinary common
 

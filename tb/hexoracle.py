@@ -119,7 +119,7 @@ EXPECT = {
                 "and without -index 0: 1530 bytes of HTML in the ROM, 8 bytes of "
                 "extra directory, ROM 9647 bytes - 1455 over the 8 KB `text` "
                 "region www51.sc declares for the AT89S8252.  base.7z's "
-                "serial/Makefile moved them to -cpueeprom, which is why ours "
+                "serial/Makefile puts them in -cpueeprom, which is why ours "
                 "fits and the 2001 image does not."),
     "welcome": (4812,      0,  _c(264, 1, 131, 25, 402, 25), None),
     "wjava":   (4812,      0,  _c(264, 1, 131, 25, 402, 25), None),

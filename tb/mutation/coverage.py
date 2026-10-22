@@ -101,10 +101,10 @@ thing holding a defect out:
 
   * The mutation operators only express faults that fit a single-line edit
     of the port's own C source and tables.  A stage guarding anything else
-    has no mutant to catch.  `script' exists because `*(reset_network)' sat
-    commented out in base.7z's linker script with every stage green - no
-    operator in gen.py can produce that fault, so no mutant here can measure
-    the stage that catches it.
+    has no mutant to catch.  `script' guards the arms of base.7z's linker
+    script - a commented-out `*(reset_network)' is the fault it catches -
+    and no operator in gen.py can produce that fault, so no mutant here can
+    measure it.
   * A mutant is one fault at a time.  Two stages that both catch every
     single fault can still differ on a fault the other one masks.
   * The population is a sample: gen.py caps each operator per file and

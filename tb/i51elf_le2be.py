@@ -3,9 +3,9 @@
 Byte-swap a 2001 i51 ELF object: big-endian container, machine 0x7262 ->
 little-endian container, machine EM_8051 = 165.
 
-STALE.  The little-endian half is no longer a format this project uses, and
-`le2be' in the name has been backwards since the port went ELFDATA2MSB.
-Measured: all 30 loose objects in tb/base.7z are EI_DATA = 2 with e_machine
+Not used by the testbench: the port's objects are ELFDATA2MSB, so the
+little-endian output is not a format this project uses, and `le2be' in the
+name is backwards.  Measured: all 30 loose objects in tb/base.7z are EI_DATA = 2 with e_machine
 165, and this script followed by i51elf_sym_uc.py turns tb/base2001.7z's
 cgi/bd.obj into an EI_DATA = 1 object hashing 47d84c73..., against
 base.7z's 702ced5b....  It does not reproduce the staged tree in

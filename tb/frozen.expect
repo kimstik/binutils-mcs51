@@ -10,17 +10,12 @@
 #
 # THREE columns are required per project, and romdiff.py refuses a line with fewer
 # rather than defaulting the missing one. The third column, the size of the ROM the
-# frozen toolchain produced, is here because this file was able to go stale without
-# it: when `*(reset_network)' was restored in lib/www51.sc every ROM on both sides
-# grew by three bytes, so the differing-byte counts did not move and a two-column
-# file went on passing against inputs it no longer described.
+# frozen toolchain produced, catches an input change that grows the ROMs on both
+# sides alike and so leaves the differing-byte counts where they were.
 #
-# Re-derived, not copied: binutils 2.11.2 built here with `gcc -m32' (gcc 13.3.0,
-# 2026-08-26), `make -C tb check-frozen' run against base.7z as it now stands, and
-# `tb/romdiff.py' run over the result. The differing-byte counts came out byte for
-# byte the ones recorded before, which is the expected outcome of a three-byte
-# section restored identically on both sides; the ROM sizes are three bytes larger
-# than the pre-restore run and are now recorded.
+# Derived, not copied: binutils 2.11.2 built with `gcc -m32' (gcc 13.3.0),
+# `make -C tb check-frozen' run against base.7z, and `tb/romdiff.py' run over
+# the result.
 #
 # diag does not link under 2.11.2: `lib/www51.sc:266: undefined symbol `_reti_'
 # referenced in expression'. 2.11.2 folds a PROVIDE's right-hand side before it

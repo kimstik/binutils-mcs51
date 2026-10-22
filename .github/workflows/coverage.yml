@@ -64,7 +64,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y p7zip-full sdcc-ucsim
+          sudo apt-get install -y p7zip-full sdcc-ucsim dejagnu
 
       # The tree the mutants are injected into, and the baseline the run
       # refuses to start without: run.py puts the clean tree through the

@@ -2,10 +2,10 @@
 
 GNU binutils for the Intel MCS-51 / 8051.
 
-It started as a patch against **binutils 2.11.2**, published on
-http://web51.hw.cz in December 2001, and was forward-ported. The port
-now applies to **binutils 2.47** as two patches, `mcs51/additions.patch`
-(new files) and `mcs51/modifications.patch` (edits to existing files).
+It derives from the port of **binutils 2.11.2** published on
+http://web51.hw.cz in December 2001, and applies to **binutils 2.47** as two
+patches, `mcs51/additions.patch` (new files) and `mcs51/modifications.patch`
+(edits to existing files).
 
 ## Building
 
@@ -26,9 +26,9 @@ A tag matching `v*`, or a hand dispatch of `.github/workflows/release.yml`,
 publishes one stripped archive per host, both patches, and a `SHA256SUMS` over
 all of it. A push to main publishes nothing.
 
-Nothing is published from a tree that has not passed the sixteen gate stages:
-they run in the release run itself and the publishing job cannot start while
-they are red. The release note carries the binutils release, that tarball's
+Nothing is published from a tree that has not passed the gate: its fifteen
+stages and the testbench canary run in the release run itself, and the
+publishing job cannot start while any of them is red. The release note carries the binutils release, that tarball's
 sha256 and the commit built from, all of them checked before the release is
 created rather than typed into it.
 
@@ -48,23 +48,23 @@ still says what it is.
   it has no 16-bit load or store to data memory at all - so little-endian data
   is written per datum, `.byte LOW(x), HIGH(x)`. There is no `-EB`/`-EL`.
 
-## Changes from the 2001 port
+## Differences from the 2001 port
 
-`tb/ref.7z` holds the 2001 patch and `make frozen` builds it, so every claim
-below can be checked against it.
+`tb/ref.7z` holds the 2001 patch and `make frozen` builds it, so the
+comparison below can be checked against it.
 
-Already there in 2001, and not this work: `TEMPLATE_NAME=generic` in the
-emulparams file, and a custom `ld/scripttempl/elf32i51.sc` - 235 lines
-declaring six `MEMORY` regions (text, bit, data, xdata, edata, eeprom) and
-placing each section into one with `> region`. The memory spaces themselves,
-the input section names that feed them and the address arithmetic that chains
-one space to the next are 2001's as well.
+Shared with the 2001 port: `TEMPLATE_NAME=generic` in the emulparams file, and
+a custom `ld/scripttempl/elf32i51.sc` (235 lines in 2001, declaring six
+`MEMORY` regions - text, bit, data, xdata, edata, eeprom - and placing each
+section into one with `> region`). The memory spaces themselves, the input
+section names that feed them and the address arithmetic that chains one space
+to the next are the 2001 port's as well.
 
-What this work changed:
+Different in this port:
 
-- One `MEMORY` region, `rom`, now holds the code, and every RAM space -
+- One `MEMORY` region, `rom`, holds the code, and every RAM space -
   regbank, rdata/rbss, bdata/bbss, bit, data/bss, idata/ibss, xdata, edata,
-  eeprom - became a non-alloc `(INFO)` section at its real address inside its
+  eeprom - is a non-alloc `(INFO)` section at its real address inside its
   own space. Disjoint spaces may then share VMA ranges without tripping the
   linker's overlap check, and `objcopy -O ihex` extracts just the code image.
   `ASSERT`s bound the internal RAM, the bit space and the two external ones.
@@ -72,15 +72,14 @@ What this work changed:
   stack under `__IRAM_SIZE`, directly addressed RAM ends at 0x7F, and the
   EEPROM is bounded by `__EEPROM_SIZE`. Since nothing loads the RAM spaces,
   the linker refuses initialized data in them rather than drop it.
-- Compiler-independent startup hooks, absent from all 235 lines of the 2001
-  script: `.text` ends in `__I51_RET = . ; BYTE(0x22)`, and
+- Compiler-independent startup hooks, absent from the 2001 script: `.text` ends in `__I51_RET = . ; BYTE(0x22)`, and
   `__GSINIT_STARTUP`, `__EXTERNAL_STARTUP` and `__INIT_DATA` are PROVIDEd
   against it, so a runtime that leaves one undefined calls a bare RET instead
   of jumping into the reset vector. Each is PROVIDEd under its lower-case
   spelling as well - `__gsinit_startup`, `__external_startup`, `__init_data` -
   because a reference from an object built by a tool that does not fold names
   is spelled that way and the upper-case definition would never bind it.
-  `ENTRY(_START)` is new too; 2001 named no entry point.
+  The script names `ENTRY(_START)`; 2001 named no entry point.
 - The assembler folds symbol names to upper case, as MCS-51 assemblers do
   (`symbols_case_sensitive = 0`, which 2001 never set). Every symbol the
   script defines for use from code is spelled upper case accordingly -
@@ -92,19 +91,25 @@ What this work changed:
 
 ## Testing
 
-Two layers, each covering what the other cannot:
+Two layers:
 
 - `gas/testsuite/gas/i51` and `ld/testsuite/ld-i51`, inside the patches: the
-  DejaGnu suites binutils itself runs. They hold a test for each defect the
-  reviews in the `reviews` branch found, and the tests of what has to be
-  refused - an operand form the instruction set does not have, a value that
-  does not fit, an operand in the wrong memory space.
+  DejaGnu suites binutils itself runs. They hold regression tests and the
+  tests of what has to be refused - an operand form the instruction set does
+  not have, a value that does not fit, an operand in the wrong memory space.
   `make -C tb dejagnu` runs them.
 - `tb/`: the ten projects built and compared byte for byte with reference
-  ROMs and with the 2001 images, the instruction set against third-party
-  tables, a simulator run, linker-script coverage and mutation testing.
+  ROMs and, byte class by byte class, with the 2001 images; the instruction
+  set against third-party tables; a simulator run; linker-script coverage;
+  and, on demand, mutation testing.
 
-`make -C tb gate` runs all sixteen stages.
+`make -C tb gate BUILD=<build tree>` runs the fifteen gate stages (`isa
+roundtrip branch bits reloc guard sim defaultlink commons script disasm
+doctruth dejagnu check oracle`) and stops at the first failure. `BUILD` has
+to point at a configured build tree - after `make -C tb build` that is
+`work/modern/build` - because the default is the frozen 2001 build.
+`make -C tb check-canary` checks that `check` still fails on a broken
+toolchain.
 
 ## Upstream
 
@@ -115,5 +120,5 @@ entry going through config-patches@gnu.org first, and review there.
 ## References
 
 - the original port: http://web51.hw.cz
-- an independent port of the same lineage onto binutils 2.38: https://github.com/github0null/binutils-mcs51
-- sdcc-adjacent work referenced by the 2.45.1 release: https://github.com/volumit/sdcc_aurix_scr_42
+- an independent port derived from the same 2001 patch, onto binutils 2.38: https://github.com/github0null/binutils-mcs51
+- sdcc-adjacent work: https://github.com/volumit/sdcc_aurix_scr_42

@@ -62,8 +62,7 @@ FILES = {
 }
 
 # Functions worth mutating: the ones that parse operands, encode, relocate,
-# place or decode.  The operand parser and the memory-space code are here
-# because that is where the defects of the sixth review were.
+# place or decode, including the operand parser and the memory-space code.
 SCOPES = {
     'gas': ['md_apply_fix', 'fixup8', 'fixup11', 'fixup16', 'check_range',
             'i51_fold_bit_suffix', 'i51_build_ins', 'md_pcrel_from_section',
@@ -378,7 +377,7 @@ def op_howto(lines, _idx, _code):
 
 
 INS = re.compile(r'^I51_INS \("([^"]+)",\s*"([^"]*)",\s*(0x[0-9A-Fa-f]+),'
-                 r'\s*"([^"]*)",\s*\'(.)\',\s*(0x[0-9A-Fa-f]+),\s*(0x[0-9A-Fa-f]+)\)')
+                 r'\s*(0x[0-9A-Fa-f]+),\s*(0x[0-9A-Fa-f]+)\)')
 
 
 def op_opctab(lines, _idx, code):
@@ -386,12 +385,12 @@ def op_opctab(lines, _idx, code):
         m = INS.match(code[i])
         if not m:
             continue
-        name, bins, mask = m.group(1), m.group(6), m.group(7)
+        name, bins, mask = m.group(1), m.group(4), m.group(5)
         nb = '0x%02X' % (int(bins, 16) ^ 0x01)
-        yield (i, s[:m.start(6)] + nb + s[m.end(6):],
+        yield (i, s[:m.start(4)] + nb + s[m.end(4):],
                '%s opcode %s -> %s' % (name, bins, nb))
         nm = '0x%02X' % (int(mask, 16) ^ 0x01)
-        yield (i, s[:m.start(7)] + nm + s[m.end(7):],
+        yield (i, s[:m.start(5)] + nm + s[m.end(5):],
                '%s mask %s -> %s' % (name, mask, nm))
         sz = m.group(3)
         ns = '0x%02X' % (int(sz, 16) ^ 0x01)

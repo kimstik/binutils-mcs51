@@ -133,12 +133,11 @@ def gate(outcome, path):
     length - is a failure that has to be explained and then re-recorded.
 
     Three columns are required per project: outcome, differing bytes, and the
-    size of the ROM the frozen toolchain produced. The size column is what makes
-    a stale expectation impossible to sit on: when *(reset_network) was restored
-    in lib/www51.sc every ROM on both sides grew, and a file that recorded only
-    the differing-byte count went on passing because that count did not move. A
-    line with fewer than three columns is rejected rather than defaulted, so an
-    old two-column file fails loudly instead of gating on half of itself.
+    size of the ROM the frozen toolchain produced. The size column catches an
+    input change that grows the ROMs on both sides alike, which leaves the
+    differing-byte count where it was. A line with fewer than three columns is
+    rejected rather than defaulted, so an incomplete file fails instead of
+    gating on part of itself.
     """
     expect = {}
     with open(path) as fh:

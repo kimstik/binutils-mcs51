@@ -48,10 +48,10 @@ index 00000000..4ac47a3e
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..ec3d83d0
+index 00000000..aae13d16
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1110 @@
+@@ -0,0 +1,1086 @@
 +/* MCS-51 specific support for 32-bit ELF.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -781,11 +781,8 @@ index 00000000..ec3d83d0
 +  newsect = hdr->bfd_section;
 +  flags = bfd_section_flags (newsect);
 +
-+  /* A space code in the top bits of sh_flags marks a section standing in
-+     for a memory-space common: a size and an alignment, never bytes.  A
-+     section that carries contents is real data, and SEC_IS_COMMON on it
-+     makes the linker take it for a size-only placeholder and drop every
-+     byte it holds.  */
++  /* A section with a space code in sh_flags and no contents stands for
++     a memory-space common.  */
 +  if ((hdr->sh_flags & SHF_I51_SPACE) != 0 && (flags & SEC_HAS_CONTENTS) == 0)
 +    flags |= SEC_IS_COMMON;
 +
@@ -952,19 +949,11 @@ index 00000000..ec3d83d0
 +  asym->value = elfsym->internal_elf_sym.st_size;
 +}
 +
-+/* The section that collects the commons of one memory space, made on
-+   first use.  It carries the plain name of the space, because that is
-+   the name a linker script places those commons by: the scripts written
-+   for this port name the spaces without a wildcard.
-+
-+   The object may hold a real section of the same name - the assembler
-+   emits one for the space directives and for local commons - and the
-+   two must never be the same section.  Asking for a section by name
-+   alone hands back the real one, and the SEC_IS_COMMON set below then
-+   turns a section full of data into a size-only placeholder: the linker
-+   drops every byte it holds, succeeds, and says nothing.  A section the
-+   object brought along has an index in that object; the one made here
-+   has none, which is what tells them apart.  */
++/* The section that collects the commons of the memory space NAME, made
++   on first use.  It has the plain name of the space, which is what a
++   linker script places those commons by, and is never the object's own
++   section of that name: that one has a section index, this one has
++   none.  */
 +
 +static asection *
 +i51_elf_common_section (bfd *abfd, const char *name)
@@ -985,22 +974,9 @@ index 00000000..ec3d83d0
 +
 +/* Refuse a symbol NAME of ABFD in section SEC when the link already holds
 +   a symbol of that name in a different memory space and one of the two
-+   is a memory-space common.
-+
-+   The spaces are disjoint address spaces of the machine, and the
-+   arbitration between two commons, or between a common and a definition,
-+   knows nothing of them: `.xcomm BUF,4' in one object and `.icomm BUF,4'
-+   in another would link with nothing said, the order of the files
-+   deciding whether BUF is external RAM at 0x0000 or internal RAM at
-+   0x0020, and a definition of BUF in .idata would silently take over a
-+   .xcomm BUF that code reaches with MOVX.  No address satisfies both, so
-+   the pair is refused rather than arbitrated.
-+
-+   An ordinary .comm names no space and is not compared.  Objects of this
-+   port's lineage carry two builds of one library side by side - names
-+   declared with .comm before the space directives existed and with
-+   .bcomm or .icomm after - and comparing those would refuse links that
-+   work today.  */
++   is a memory-space common: the spaces are disjoint, so no address
++   satisfies both.  An ordinary .comm names no space and is not
++   compared.  */
 +
 +static bool
 +elf32_i51_check_common_space (bfd *abfd, struct bfd_link_info *info,
@@ -1164,10 +1140,10 @@ index 00000000..ec3d83d0
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..d273665f
+index 00000000..3e043f94
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2039 @@
+@@ -0,0 +1,2028 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1307,8 +1283,7 @@ index 00000000..d273665f
 +  unsigned char bin;
 +};
 +
-+#define I51_INS(NAME, ARGS, SIZE, OPCODE, MRELOC, BIN, MASK) \
-+  { NAME, ARGS, SIZE, BIN },
++#define I51_INS(NAME, ARGS, SIZE, BIN, MASK) { NAME, ARGS, SIZE, BIN },
 +
 +static const struct i51_opcode i51_opcodes[] =
 +{
@@ -2753,17 +2728,6 @@ index 00000000..d273665f
 +  demand_empty_rest_of_line ();
 +}
 +
-+/* md_elf_section_flags: a section given the register-bank space code is
-+   a common.  */
-+
-+int
-+i51_section_flags (int flags, int attr, int type ATTRIBUTE_UNUSED)
-+{
-+  if ((attr & SHF_I51_SPACE) == SHF_I51_REGBANK)
-+    flags |= SEC_IS_COMMON;
-+  return flags;
-+}
-+
 +/* .using BANK: the register bank AR0..AR7 name the registers of.  */
 +
 +static void
@@ -2905,7 +2869,8 @@ index 00000000..d273665f
 +  return symbolP;
 +}
 +
-+/* .comm, .rcomm, .xcomm and the rest.  */
++/* .rcomm, .xcomm and the rest, and .comm too, so that a name cannot be
++   a common of two spaces.  */
 +
 +static void
 +i51_common (int space)
@@ -3209,10 +3174,10 @@ index 00000000..d273665f
 +}
 diff --git a/gas/config/tc-i51.h b/gas/config/tc-i51.h
 new file mode 100644
-index 00000000..8c8cbd58
+index 00000000..7b82e6a0
 --- /dev/null
 +++ b/gas/config/tc-i51.h
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,101 @@
 +/* tc-i51.h -- Header file for tc-i51.c, the MCS-51 assembler.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -3238,15 +3203,9 @@ index 00000000..8c8cbd58
 +
 +#define TARGET_FORMAT "elf32-i51"
 +#define TARGET_ARCH bfd_arch_i51
-+#define TARGET_MACH 0
 +#define TARGET_BYTES_BIG_ENDIAN 1
 +
 +#define ONLY_STANDARD_ESCAPES
-+
-+/* A section declared with the register-bank space code is a common.  */
-+extern int i51_section_flags (int, int, int);
-+#define md_elf_section_flags(FLAGS, ATTR, TYPE) \
-+  i51_section_flags (FLAGS, ATTR, TYPE)
 +
 +#define md_operand(x)
 +
@@ -3294,7 +3253,8 @@ index 00000000..8c8cbd58
 +#define LISTING_WORD_SIZE 1
 +
 +/* `$' separates statements on one line, so it is neither a name
-+   character nor the mark of a local label.  */
++   character nor, as te-generic.h would have it, the mark of a local
++   label.  */
 +#define LEX_DOLLAR 0
 +#undef  LOCAL_LABELS_DOLLAR
 +#define LOCAL_LABELS_DOLLAR 0
@@ -4202,7 +4162,7 @@ index 00000000..0fc91e71
 +@end smallexample
 diff --git a/gas/testsuite/gas/i51/bitnames.d b/gas/testsuite/gas/i51/bitnames.d
 new file mode 100644
-index 00000000..c307cfd0
+index 00000000..e3b4c1d0
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/bitnames.d
 @@ -0,0 +1,25 @@
@@ -4216,17 +4176,17 @@ index 00000000..c307cfd0
 +Disassembly of section .text:
 +
 +0+ <.*>:
-+ +0:	d2 d3 +	setb	0xD3
-+ +2:	d2 af +	setb	0xAF
-+ +4:	d2 b9 +	setb	0xB9
-+ +6:	d2 8c +	setb	0x8C
++ +0:	d2 d3 +	setb	0xd3
++ +2:	d2 af +	setb	0xaf
++ +4:	d2 b9 +	setb	0xb9
++ +6:	d2 8c +	setb	0x8c
 + +8:	d2 98 +	setb	0x98
-+ +a:	d2 d1 +	setb	0xD1
-+ +c:	d2 e7 +	setb	0xE7
-+ +e:	d2 0b +	setb	0x0B
++ +a:	d2 d1 +	setb	0xd1
++ +c:	d2 e7 +	setb	0xe7
++ +e:	d2 0b +	setb	0x0b
 + +10:	d2 03 +	setb	0x03
 + +12:	d2 05 +	setb	0x05
-+ +14:	20 01 00 +	jb	0x01, .*
++ +14:	20 01 00 +	jb	0x01, 17 <LBL>
 +
 +0+17 <LBL>:
 + +17:	c2 02 +	clr	0x02
@@ -4295,7 +4255,7 @@ index 00000000..32a068f8
 +	.equ	k, 0x234
 diff --git a/gas/testsuite/gas/i51/branch-weak.d b/gas/testsuite/gas/i51/branch-weak.d
 new file mode 100644
-index 00000000..67c34190
+index 00000000..23edc148
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/branch-weak.d
 @@ -0,0 +1,17 @@
@@ -4313,9 +4273,9 @@ index 00000000..67c34190
 +
 +0+1 <G>:
 + +1:	00 +	nop
-+ +2:	80 00 +	sjmp	.*
++ +2:	80 00 +	sjmp	4 <G\+0x3>
 +	+3: R_I51_7_PCREL	W-0x1
-+ +4:	80 fb +	sjmp	.*
++ +4:	80 fb +	sjmp	1 <G>
 diff --git a/gas/testsuite/gas/i51/branch-weak.s b/gas/testsuite/gas/i51/branch-weak.s
 new file mode 100644
 index 00000000..3810c5bf
@@ -4485,7 +4445,7 @@ index 00000000..789fa917
 +run_dump_tests [lsort [glob -nocomplain $srcdir/$subdir/*.d]]
 diff --git a/gas/testsuite/gas/i51/jmp-call.d b/gas/testsuite/gas/i51/jmp-call.d
 new file mode 100644
-index 00000000..86d3f26e
+index 00000000..13575e8e
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/jmp-call.d
 @@ -0,0 +1,17 @@
@@ -4499,13 +4459,13 @@ index 00000000..86d3f26e
 +Disassembly of section .text:
 +
 +0+ <START>:
-+ +0:	02 00 00 +	ljmp	.*
++ +0:	02 00 00 +	ljmp	0 <START>
 +	+1: R_I51_16_CODE	START
-+ +3:	12 00 00 +	lcall	.*
++ +3:	12 00 00 +	lcall	0 <START>
 +	+4: R_I51_16_CODE	START
 + +6:	73 +	jmp	@A\+DPTR
-+ +7:	02 12 34 +	ljmp	.*
-+ +a:	12 43 21 +	lcall	.*
++ +7:	02 12 34 +	ljmp	1234 <.*>
++ +a:	12 43 21 +	lcall	4321 <.*>
 diff --git a/gas/testsuite/gas/i51/jmp-call.s b/gas/testsuite/gas/i51/jmp-call.s
 new file mode 100644
 index 00000000..75c9a2b7
@@ -4521,6 +4481,40 @@ index 00000000..75c9a2b7
 +	jmp	@a+dptr
 +	jmp	0x1234
 +	call	0x4321
+diff --git a/gas/testsuite/gas/i51/jumps.d b/gas/testsuite/gas/i51/jumps.d
+new file mode 100644
+index 00000000..e1d3fc8f
+--- /dev/null
++++ b/gas/testsuite/gas/i51/jumps.d
+@@ -0,0 +1,16 @@
++#name: i51 branch kinds for --visualize-jumps
++#as:
++#objdump: -d --visualize-jumps
++
++.*: +file format elf32-i51
++
++
++Disassembly of section .text:
++
++0+ <L>:
++ +0:	,-> 80 02 +	sjmp	4 <M>
++ +2:	'-- 60 fc +	jz	0 <L>
++
++0+4 <M>:
++ +4:	11 00 +	acall	0 <L>
++ +6:	22 +	ret
+diff --git a/gas/testsuite/gas/i51/jumps.s b/gas/testsuite/gas/i51/jumps.s
+new file mode 100644
+index 00000000..666bd33c
+--- /dev/null
++++ b/gas/testsuite/gas/i51/jumps.s
+@@ -0,0 +1,6 @@
++; Branches carry their kind and target for --visualize-jumps.
++	.text
++l:	sjmp	m
++	jz	l
++m:	acall	l
++	ret
 diff --git a/gas/testsuite/gas/i51/long.d b/gas/testsuite/gas/i51/long.d
 new file mode 100644
 index 00000000..6b99bb2c
@@ -4549,6 +4543,39 @@ index 00000000..1bb7a7c5
 +; A symbol in a four-byte datum carries R_I51_32.
 +	.data
 +	.long	sym, 0x12345678
+diff --git a/gas/testsuite/gas/i51/mcu.d b/gas/testsuite/gas/i51/mcu.d
+new file mode 100644
+index 00000000..6740cb57
+--- /dev/null
++++ b/gas/testsuite/gas/i51/mcu.d
+@@ -0,0 +1,15 @@
++#name: i51 -mmcu=8051 register names
++#as: -mmcu=8051
++#objdump: -dr
++
++.*: +file format elf32-i51
++
++
++Disassembly of section .text:
++
++0+ <.text>:
++ +0:	e5 00 +	mov	A, 0x00
++	+1: R_I51_8_DIR	T2CON
++ +2:	e5 00 +	mov	A, 0x00
++	+3: R_I51_8_DIR	WMCON
++ +4:	e5 90 +	mov	A, 0x90
+diff --git a/gas/testsuite/gas/i51/mcu.s b/gas/testsuite/gas/i51/mcu.s
+new file mode 100644
+index 00000000..cd5747ce
+--- /dev/null
++++ b/gas/testsuite/gas/i51/mcu.s
+@@ -0,0 +1,6 @@
++; -mmcu=8051 knows no timer 2 or AT89S8252 register names: they are
++; symbols like any other.
++	.text
++	mov	a,T2CON
++	mov	a,WMCON
++	mov	a,P1
 diff --git a/gas/testsuite/gas/i51/names-bad.d b/gas/testsuite/gas/i51/names-bad.d
 new file mode 100644
 index 00000000..5a4d335b
@@ -4627,12 +4654,12 @@ index 00000000..53349eea
 +.*:30: Error: invalid instruction operands
 diff --git a/gas/testsuite/gas/i51/operands-bad.s b/gas/testsuite/gas/i51/operands-bad.s
 new file mode 100644
-index 00000000..2d11e348
+index 00000000..82871f43
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/operands-bad.s
 @@ -0,0 +1,30 @@
-+; Operand forms the instruction set does not have.  Each used to assemble
-+; to the bytes of another instruction of the same mnemonic.
++; Operand forms the instruction set does not have are errors.
++
 +	.text
 +lbl:	nop
 +	add	0x45,#0x5a
@@ -5020,7 +5047,7 @@ index 00000000..a4a87573
 +	nop	a
 diff --git a/gas/testsuite/gas/i51/truncated.d b/gas/testsuite/gas/i51/truncated.d
 new file mode 100644
-index 00000000..4ce707dc
+index 00000000..3c0406d1
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/truncated.d
 @@ -0,0 +1,13 @@
@@ -5035,8 +5062,8 @@ index 00000000..4ce707dc
 +
 +0+ <.text>:
 + +0:	00 +	nop
-+ +1:	02 +	.byte	0x02.*
-+ +2:	12 +	.byte	0x12.*
++ +1:	02 +	.byte	0x02$
++ +2:	12 +	.byte	0x12$
 diff --git a/gas/testsuite/gas/i51/truncated.s b/gas/testsuite/gas/i51/truncated.s
 new file mode 100644
 index 00000000..77a2112f
@@ -5048,12 +5075,42 @@ index 00000000..77a2112f
 +	.text
 +	nop
 +	.byte	0x02, 0x12
+diff --git a/gas/testsuite/gas/i51/using-bad.d b/gas/testsuite/gas/i51/using-bad.d
+new file mode 100644
+index 00000000..2bfa17cc
+--- /dev/null
++++ b/gas/testsuite/gas/i51/using-bad.d
+@@ -0,0 +1,3 @@
++#name: i51 .using out of range
++#as:
++#error_output: using-bad.l
+diff --git a/gas/testsuite/gas/i51/using-bad.l b/gas/testsuite/gas/i51/using-bad.l
+new file mode 100644
+index 00000000..a7b1fec7
+--- /dev/null
++++ b/gas/testsuite/gas/i51/using-bad.l
+@@ -0,0 +1,3 @@
++.*: Assembler messages:
++.*:3: Error: expected a register bank number 0, 1, 2 or 3
++.*:4: Error: expected a register bank number 0, 1, 2 or 3
+diff --git a/gas/testsuite/gas/i51/using-bad.s b/gas/testsuite/gas/i51/using-bad.s
+new file mode 100644
+index 00000000..35b7508d
+--- /dev/null
++++ b/gas/testsuite/gas/i51/using-bad.s
+@@ -0,0 +1,6 @@
++; .using takes a bank number 0..3.
++	.text
++	.using	4
++	.using	-1
++	.using	3
++	mov	a,ar7
 diff --git a/include/elf/i51.h b/include/elf/i51.h
 new file mode 100644
-index 00000000..3003c916
+index 00000000..96ec3e64
 --- /dev/null
 +++ b/include/elf/i51.h
-@@ -0,0 +1,134 @@
+@@ -0,0 +1,133 @@
 +/* MCS-51 ELF support for BFD.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -5120,9 +5177,8 @@ index 00000000..3003c916
 +#define EF_I51_ABI_CURRENT	EF_I51_ABI_ALIGNED_COMMONS
 +
 +/* A memory-space code in the top three bits of sh_flags, compared whole
-+   under SHF_I51_SPACE.  Nothing writes one; a section of an older object
-+   that carries one and has no contents is a memory-space common.  The
-+   field shares bit 31 with SHF_EXCLUDE.  */
++   under SHF_I51_SPACE.  A section that carries one and has no contents
++   is a memory-space common.  The field shares bit 31 with SHF_EXCLUDE.  */
 +#define SHF_I51_SPACE	0xE0000000
 +#define SHF_I51_REGBANK	0x20000000	/* register bank */
 +#define SHF_I51_RDATA	0x40000000	/* rdata */
@@ -5190,10 +5246,10 @@ index 00000000..3003c916
 +#endif /* _ELF_I51_H */
 diff --git a/include/opcode/i51.h b/include/opcode/i51.h
 new file mode 100644
-index 00000000..233beee8
+index 00000000..8726e04d
 --- /dev/null
 +++ b/include/opcode/i51.h
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,160 @@
 +/* MCS-51 opcode table, included by gas/config/tc-i51.c and
 +   opcodes/i51-dis.c, each of which defines I51_INS first.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
@@ -5216,159 +5272,144 @@ index 00000000..233beee8
 +   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
 +   MA 02110-1301, USA.  */
 +
-+/* ARGS:
-+  A - A reg
-+  B - bit
-+  C - AB reg
-+  D - data
-+  N - none
-+  R - R0..R7
-+  r - C reg
-+  P - DPTR
-+  @ - @A+DPTR
-+  X - @A+PC
-+  I - @R0, @R1
-+  J - jump rel
-+  / - /C
-+  T - @DPTR
-+  # - #data
-+  d - data16
-+  1 - jump addr 11
-+  6 - jump addr 16
-+*/
++/* I51_INS (NAME, ARGS, SIZE, BIN, MASK): the instruction NAME with the
++   three operands ARGS, SIZE bytes long, whose first byte B has
++   (B & MASK) == BIN.  The rows of one mnemonic are adjacent, and no two
++   rows match the same first byte.
 +
-+/* MRELOC
-+  N - none                - IIIIIIII
-+  I - register indirect   - IIIIIIIr
-+  i - reg. indirect, data - IIIIIIIr dddddddd
-+  R - register            - IIIIIrrr
-+  r - register,data       - IIIIIrrr dddddddd
-+  7 - relative jump 8 bit - IIIIIIII aaaaaaaa
-+  1 - jump 11 bit         - aaaIIIII aaaaaaaa
-+  6 - data/jump 16 bit    - IIIIIIII aaaaaaaa aaaaaaaa
-+  D - data 8 bit          - IIIIIIII dddddddd
-+  d - data,data 8 bit     - IIIIIIII dddddddd dddddddd
-+  a - addr,data 8 bit     - IIIIIIII aaaaaaaa dddddddd
-+  B - bitdata 8 bit       - IIIIIIII bbbbbbbb
-+  J - bit, r. jump 8 bit  - IIIIIIII bbbbbbbb aaaaaaaa
-+  X - reg. indirect, r. jump 8 bit - IIIIIIIr dddddddd aaaaaaaa
-+  Y - register, rel. jump 8 bit    - IIIIIrrr dddddddd aaaaaaaa
-+  Z - data 8 bit, r. jump 8 bit    - IIIIIIII dddddddd aaaaaaaa
-+  W - register, rel. jump 8 bit    - IIIIIrrr aaaaaaaa
-+*/
++   The operand letters:
++     N	none
++     A	A
++     C	AB
++     r	C
++     P	DPTR
++     T	@DPTR
++     @	@A+DPTR
++     X	@A+PC
++     R	R0..R7, in the opcode byte
++     I	@R0 or @R1, in the opcode byte
++     D	a direct address
++     B	a bit address
++     /	a complemented bit address
++     #	an immediate, two bytes after DPTR and one elsewhere
++     J	a relative branch target
++     1	an 11-bit code address, three bits of it in the opcode byte
++     6	a 16-bit code address
 +
-+I51_INS ("acall", "1NN", 0x02, "aaa10001", '1', 0x11, 0x1F)
-+I51_INS ("add",   "ARN", 0x01, "00101rrr", 'R', 0x28, 0xF8)
-+I51_INS ("add",   "AIN", 0x01, "0010011r", 'I', 0x26, 0xFE)
-+I51_INS ("add",   "ADN", 0x02, "00100101", 'D', 0x25, 0xFF)
-+I51_INS ("add",   "A#N", 0x02, "00100100", 'D', 0x24, 0xFF)
-+I51_INS ("addc",  "ARN", 0x01, "00111rrr", 'R', 0x38, 0xF8)
-+I51_INS ("addc",  "AIN", 0x01, "0011011r", 'I', 0x36, 0xFE)
-+I51_INS ("addc",  "ADN", 0x02, "00110101", 'D', 0x35, 0xFF)
-+I51_INS ("addc",  "A#N", 0x02, "00110100", 'D', 0x34, 0xFF)
-+I51_INS ("ajmp",  "1NN", 0x02, "aaa00001", '1', 0x01, 0x1F)
-+I51_INS ("anl",   "ARN", 0x01, "01011rrr", 'R', 0x58, 0xF8)
-+I51_INS ("anl",   "AIN", 0x01, "0101011i", 'I', 0x56, 0xFE)
-+I51_INS ("anl",   "ADN", 0x02, "01010101", 'D', 0x55, 0xFF)
-+I51_INS ("anl",   "A#N", 0x02, "01010100", 'D', 0x54, 0xFF)
-+I51_INS ("anl",   "rBN", 0x02, "10000010", 'B', 0x82, 0xFF)
-+I51_INS ("anl",   "r/N", 0x02, "10110000", 'B', 0xB0, 0xFF)
-+I51_INS ("anl",   "DAN", 0x02, "01010010", 'D', 0x52, 0xFF)
-+I51_INS ("anl",   "D#N", 0x03, "01010011", 'a', 0x53, 0xFF)
-+I51_INS ("cjne",  "A#J", 0x03, "10110100", 'Z', 0xB4, 0xFF)
-+I51_INS ("cjne",  "R#J", 0x03, "10111rrr", 'Y', 0xB8, 0xF8)
-+I51_INS ("cjne",  "I#J", 0x03, "1011011r", 'X', 0xB6, 0xFE)
-+I51_INS ("cjne",  "ADJ", 0x03, "10110101", 'Z', 0xB5, 0xFF)
-+I51_INS ("clr",   "ANN", 0x01, "11100100", 'N', 0xE4, 0xFF)
-+I51_INS ("clr",   "rNN", 0x01, "11000011", 'N', 0xC3, 0xFF)
-+I51_INS ("clr",   "BNN", 0x02, "11000010", 'B', 0xC2, 0xFF)
-+I51_INS ("cpl",   "ANN", 0x01, "11110100", 'N', 0xF4, 0xFF)
-+I51_INS ("cpl",   "rNN", 0x01, "10110011", 'N', 0xB3, 0xFF)
-+I51_INS ("cpl",   "BNN", 0x02, "10110010", 'B', 0xB2, 0xFF)
-+I51_INS ("da",    "ANN", 0x01, "11010100", 'N', 0xD4, 0xFF)
-+I51_INS ("dec",   "ANN", 0x01, "00010100", 'N', 0x14, 0xFF)
-+I51_INS ("dec",   "RNN", 0x01, "00011rrr", 'R', 0x18, 0xF8)
-+I51_INS ("dec",   "INN", 0x01, "0001011r", 'I', 0x16, 0xFE)
-+I51_INS ("dec",   "DNN", 0x02, "00010101", 'D', 0x15, 0xFF)
-+I51_INS ("div",   "CNN", 0x01, "10000100", 'N', 0x84, 0xFF)
-+I51_INS ("djnz",  "RJN", 0x02, "11011rrr", 'W', 0xD8, 0xF8)
-+I51_INS ("djnz",  "DJN", 0x03, "11010101", 'Z', 0xD5, 0xFF)
-+I51_INS ("inc",   "ANN", 0x01, "00000100", 'N', 0x04, 0xFF)
-+I51_INS ("inc",   "RNN", 0x01, "00001rrr", 'R', 0x08, 0xF8)
-+I51_INS ("inc",   "INN", 0x01, "0000011r", 'I', 0x06, 0xFE)
-+I51_INS ("inc",   "PNN", 0x01, "10100011", 'N', 0xA3, 0xFF)
-+I51_INS ("inc",   "DNN", 0x02, "00000101", 'D', 0x05, 0xFF)
-+I51_INS ("jb",    "BJN", 0x03, "00100000", 'J', 0x20, 0xFF)
-+I51_INS ("jbc",   "BJN", 0x03, "00010000", 'J', 0x10, 0xFF)
-+I51_INS ("jc",    "JNN", 0x02, "01000000", '7', 0x40, 0xFF)
-+I51_INS ("jmp",   "@NN", 0x01, "01110011", 'N', 0x73, 0xFF)
-+I51_INS ("jnb",   "BJN", 0x03, "00110000", 'J', 0x30, 0xFF)
-+I51_INS ("jnc",   "JNN", 0x02, "01010000", '7', 0x50, 0xFF)
-+I51_INS ("jnz",   "JNN", 0x02, "01110000", '7', 0x70, 0xFF)
-+I51_INS ("jz",    "JNN", 0x02, "01100000", '7', 0x60, 0xFF)
-+I51_INS ("lcall", "6NN", 0x03, "00010010", '6', 0x12, 0xFF)
-+I51_INS ("ljmp",  "6NN", 0x03, "00000010", '6', 0x02, 0xFF)
-+I51_INS ("mov",   "ARN", 0x01, "11101rrr", 'R', 0xE8, 0xF8)
-+I51_INS ("mov",   "AIN", 0x01, "1110011r", 'I', 0xE6, 0xFE)
-+I51_INS ("mov",   "ADN", 0x02, "11100101", 'D', 0xE5, 0xFF)
-+I51_INS ("mov",   "A#N", 0x02, "01110100", 'D', 0x74, 0xFF)
-+I51_INS ("mov",   "RAN", 0x01, "11111rrr", 'R', 0xF8, 0xF8)
-+I51_INS ("mov",   "RDN", 0x02, "10101rrr", 'r', 0xA8, 0xF8)
-+I51_INS ("mov",   "R#N", 0x02, "01111rrr", 'r', 0x78, 0xF8)
-+I51_INS ("mov",   "IAN", 0x01, "1111011r", 'I', 0xF6, 0xFE)
-+I51_INS ("mov",   "IDN", 0x02, "1010011r", 'r', 0xA6, 0xFE)
-+I51_INS ("mov",   "I#N", 0x02, "0111011r", 'r', 0x76, 0xFE)
-+I51_INS ("mov",   "rBN", 0x02, "10100010", 'B', 0xA2, 0xFF)
-+I51_INS ("mov",   "P#N", 0x03, "10010000", '6', 0x90, 0xFF)
-+I51_INS ("mov",   "BrN", 0x02, "10010010", 'B', 0x92, 0xFF)
-+I51_INS ("mov",   "DAN", 0x02, "11110101", 'D', 0xF5, 0xFF)
-+I51_INS ("mov",   "DRN", 0x02, "10001rrr", 'r', 0x88, 0xF8)
-+I51_INS ("mov",   "DIN", 0x02, "1000011r", 'r', 0x86, 0xFE)
-+I51_INS ("mov",   "DDN", 0x03, "10000101", 'd', 0x85, 0xFF)
-+I51_INS ("mov",   "D#N", 0x03, "01110101", 'a', 0x75, 0xFF)
-+I51_INS ("movc",  "A@N", 0x01, "10010011", 'N', 0x93, 0xFF)
-+I51_INS ("movc",  "AXN", 0x01, "10000011", 'N', 0x83, 0xFF)
-+I51_INS ("movx",  "AIN", 0x01, "1110001r", 'I', 0xE2, 0xFE)
-+I51_INS ("movx",  "ATN", 0x01, "11100000", 'N', 0xE0, 0xFF)
-+I51_INS ("movx",  "IAN", 0x01, "1111001r", 'I', 0xF2, 0xFE)
-+I51_INS ("movx",  "TAN", 0x01, "11110000", 'N', 0xF0, 0xFF)
-+I51_INS ("mul",   "CNN", 0x01, "10100100", 'N', 0xA4, 0xFF)
-+I51_INS ("nop",   "NNN", 0x01, "00000000", 'N', 0x00, 0xFF)
-+I51_INS ("orl",   "ARN", 0x01, "01001rrr", 'R', 0x48, 0xF8)
-+I51_INS ("orl",   "AIN", 0x01, "0100011i", 'I', 0x46, 0xFE)
-+I51_INS ("orl",   "ADN", 0x02, "01000101", 'D', 0x45, 0xFF)
-+I51_INS ("orl",   "A#N", 0x02, "01000100", 'D', 0x44, 0xFF)
-+I51_INS ("orl",   "rBN", 0x02, "01110010", 'B', 0x72, 0xFF)
-+I51_INS ("orl",   "r/N", 0x02, "10100000", 'B', 0xA0, 0xFF)
-+I51_INS ("orl",   "DAN", 0x02, "01000010", 'D', 0x42, 0xFF)
-+I51_INS ("orl",   "D#N", 0x03, "01000011", 'a', 0x43, 0xFF)
-+I51_INS ("pop",   "DNN", 0x02, "11010000", 'D', 0xD0, 0xFF)
-+I51_INS ("push",  "DNN", 0x02, "11000000", 'D', 0xC0, 0xFF)
-+I51_INS ("ret",   "NNN", 0x01, "00100010", 'N', 0x22, 0xFF)
-+I51_INS ("reti",  "NNN", 0x01, "00110010", 'N', 0x32, 0xFF)
-+I51_INS ("rl",    "ANN", 0x01, "00100011", 'N', 0x23, 0xFF)
-+I51_INS ("rlc",   "ANN", 0x01, "00110011", 'N', 0x33, 0xFF)
-+I51_INS ("rr",    "ANN", 0x01, "00000011", 'N', 0x03, 0xFF)
-+I51_INS ("rrc",   "ANN", 0x01, "00010011", 'N', 0x13, 0xFF)
-+I51_INS ("setb",  "rNN", 0x01, "11010011", 'N', 0xD3, 0xFF)
-+I51_INS ("setb",  "BNN", 0x02, "11010010", 'B', 0xD2, 0xFF)
-+I51_INS ("sjmp",  "JNN", 0x02, "10000000", '7', 0x80, 0xFF)
-+I51_INS ("subb",  "ARN", 0x01, "10011rrr", 'R', 0x98, 0xF8)
-+I51_INS ("subb",  "AIN", 0x01, "1001011r", 'I', 0x96, 0xFE)
-+I51_INS ("subb",  "ADN", 0x02, "10010101", 'D', 0x95, 0xFF)
-+I51_INS ("subb",  "A#N", 0x02, "10010100", 'D', 0x94, 0xFF)
-+I51_INS ("swap",  "ANN", 0x01, "11000100", 'N', 0xC4, 0xFF)
-+I51_INS ("xch",   "ARN", 0x01, "11001rrr", 'R', 0xC8, 0xF8)
-+I51_INS ("xch",   "AIN", 0x01, "1100011r", 'I', 0xC6, 0xFE)
-+I51_INS ("xch",   "ADN", 0x02, "11000101", 'D', 0xC5, 0xFF)
-+I51_INS ("xchd",  "AIN", 0x01, "1101011r", 'I', 0xD6, 0xFE)
-+I51_INS ("xrl",   "ARN", 0x01, "01101rrr", 'R', 0x68, 0xF8)
-+I51_INS ("xrl",   "AIN", 0x01, "0110011i", 'I', 0x66, 0xFE)
-+I51_INS ("xrl",   "ADN", 0x02, "01100101", 'D', 0x65, 0xFF)
-+I51_INS ("xrl",   "A#N", 0x02, "01100100", 'D', 0x64, 0xFF)
-+I51_INS ("xrl",   "DAN", 0x02, "01100010", 'D', 0x62, 0xFF)
-+I51_INS ("xrl",   "D#N", 0x03, "01100011", 'a', 0x63, 0xFF)
++   The fields follow the opcode byte in operand order, except that
++   MOV direct,direct stores its source first.  */
 +
++I51_INS ("acall", "1NN", 0x02, 0x11, 0x1F)
++I51_INS ("add",   "ARN", 0x01, 0x28, 0xF8)
++I51_INS ("add",   "AIN", 0x01, 0x26, 0xFE)
++I51_INS ("add",   "ADN", 0x02, 0x25, 0xFF)
++I51_INS ("add",   "A#N", 0x02, 0x24, 0xFF)
++I51_INS ("addc",  "ARN", 0x01, 0x38, 0xF8)
++I51_INS ("addc",  "AIN", 0x01, 0x36, 0xFE)
++I51_INS ("addc",  "ADN", 0x02, 0x35, 0xFF)
++I51_INS ("addc",  "A#N", 0x02, 0x34, 0xFF)
++I51_INS ("ajmp",  "1NN", 0x02, 0x01, 0x1F)
++I51_INS ("anl",   "ARN", 0x01, 0x58, 0xF8)
++I51_INS ("anl",   "AIN", 0x01, 0x56, 0xFE)
++I51_INS ("anl",   "ADN", 0x02, 0x55, 0xFF)
++I51_INS ("anl",   "A#N", 0x02, 0x54, 0xFF)
++I51_INS ("anl",   "rBN", 0x02, 0x82, 0xFF)
++I51_INS ("anl",   "r/N", 0x02, 0xB0, 0xFF)
++I51_INS ("anl",   "DAN", 0x02, 0x52, 0xFF)
++I51_INS ("anl",   "D#N", 0x03, 0x53, 0xFF)
++I51_INS ("cjne",  "A#J", 0x03, 0xB4, 0xFF)
++I51_INS ("cjne",  "R#J", 0x03, 0xB8, 0xF8)
++I51_INS ("cjne",  "I#J", 0x03, 0xB6, 0xFE)
++I51_INS ("cjne",  "ADJ", 0x03, 0xB5, 0xFF)
++I51_INS ("clr",   "ANN", 0x01, 0xE4, 0xFF)
++I51_INS ("clr",   "rNN", 0x01, 0xC3, 0xFF)
++I51_INS ("clr",   "BNN", 0x02, 0xC2, 0xFF)
++I51_INS ("cpl",   "ANN", 0x01, 0xF4, 0xFF)
++I51_INS ("cpl",   "rNN", 0x01, 0xB3, 0xFF)
++I51_INS ("cpl",   "BNN", 0x02, 0xB2, 0xFF)
++I51_INS ("da",    "ANN", 0x01, 0xD4, 0xFF)
++I51_INS ("dec",   "ANN", 0x01, 0x14, 0xFF)
++I51_INS ("dec",   "RNN", 0x01, 0x18, 0xF8)
++I51_INS ("dec",   "INN", 0x01, 0x16, 0xFE)
++I51_INS ("dec",   "DNN", 0x02, 0x15, 0xFF)
++I51_INS ("div",   "CNN", 0x01, 0x84, 0xFF)
++I51_INS ("djnz",  "RJN", 0x02, 0xD8, 0xF8)
++I51_INS ("djnz",  "DJN", 0x03, 0xD5, 0xFF)
++I51_INS ("inc",   "ANN", 0x01, 0x04, 0xFF)
++I51_INS ("inc",   "RNN", 0x01, 0x08, 0xF8)
++I51_INS ("inc",   "INN", 0x01, 0x06, 0xFE)
++I51_INS ("inc",   "PNN", 0x01, 0xA3, 0xFF)
++I51_INS ("inc",   "DNN", 0x02, 0x05, 0xFF)
++I51_INS ("jb",    "BJN", 0x03, 0x20, 0xFF)
++I51_INS ("jbc",   "BJN", 0x03, 0x10, 0xFF)
++I51_INS ("jc",    "JNN", 0x02, 0x40, 0xFF)
++I51_INS ("jmp",   "@NN", 0x01, 0x73, 0xFF)
++I51_INS ("jnb",   "BJN", 0x03, 0x30, 0xFF)
++I51_INS ("jnc",   "JNN", 0x02, 0x50, 0xFF)
++I51_INS ("jnz",   "JNN", 0x02, 0x70, 0xFF)
++I51_INS ("jz",    "JNN", 0x02, 0x60, 0xFF)
++I51_INS ("lcall", "6NN", 0x03, 0x12, 0xFF)
++I51_INS ("ljmp",  "6NN", 0x03, 0x02, 0xFF)
++I51_INS ("mov",   "ARN", 0x01, 0xE8, 0xF8)
++I51_INS ("mov",   "AIN", 0x01, 0xE6, 0xFE)
++I51_INS ("mov",   "ADN", 0x02, 0xE5, 0xFF)
++I51_INS ("mov",   "A#N", 0x02, 0x74, 0xFF)
++I51_INS ("mov",   "RAN", 0x01, 0xF8, 0xF8)
++I51_INS ("mov",   "RDN", 0x02, 0xA8, 0xF8)
++I51_INS ("mov",   "R#N", 0x02, 0x78, 0xF8)
++I51_INS ("mov",   "IAN", 0x01, 0xF6, 0xFE)
++I51_INS ("mov",   "IDN", 0x02, 0xA6, 0xFE)
++I51_INS ("mov",   "I#N", 0x02, 0x76, 0xFE)
++I51_INS ("mov",   "rBN", 0x02, 0xA2, 0xFF)
++I51_INS ("mov",   "P#N", 0x03, 0x90, 0xFF)
++I51_INS ("mov",   "BrN", 0x02, 0x92, 0xFF)
++I51_INS ("mov",   "DAN", 0x02, 0xF5, 0xFF)
++I51_INS ("mov",   "DRN", 0x02, 0x88, 0xF8)
++I51_INS ("mov",   "DIN", 0x02, 0x86, 0xFE)
++I51_INS ("mov",   "DDN", 0x03, 0x85, 0xFF)
++I51_INS ("mov",   "D#N", 0x03, 0x75, 0xFF)
++I51_INS ("movc",  "A@N", 0x01, 0x93, 0xFF)
++I51_INS ("movc",  "AXN", 0x01, 0x83, 0xFF)
++I51_INS ("movx",  "AIN", 0x01, 0xE2, 0xFE)
++I51_INS ("movx",  "ATN", 0x01, 0xE0, 0xFF)
++I51_INS ("movx",  "IAN", 0x01, 0xF2, 0xFE)
++I51_INS ("movx",  "TAN", 0x01, 0xF0, 0xFF)
++I51_INS ("mul",   "CNN", 0x01, 0xA4, 0xFF)
++I51_INS ("nop",   "NNN", 0x01, 0x00, 0xFF)
++I51_INS ("orl",   "ARN", 0x01, 0x48, 0xF8)
++I51_INS ("orl",   "AIN", 0x01, 0x46, 0xFE)
++I51_INS ("orl",   "ADN", 0x02, 0x45, 0xFF)
++I51_INS ("orl",   "A#N", 0x02, 0x44, 0xFF)
++I51_INS ("orl",   "rBN", 0x02, 0x72, 0xFF)
++I51_INS ("orl",   "r/N", 0x02, 0xA0, 0xFF)
++I51_INS ("orl",   "DAN", 0x02, 0x42, 0xFF)
++I51_INS ("orl",   "D#N", 0x03, 0x43, 0xFF)
++I51_INS ("pop",   "DNN", 0x02, 0xD0, 0xFF)
++I51_INS ("push",  "DNN", 0x02, 0xC0, 0xFF)
++I51_INS ("ret",   "NNN", 0x01, 0x22, 0xFF)
++I51_INS ("reti",  "NNN", 0x01, 0x32, 0xFF)
++I51_INS ("rl",    "ANN", 0x01, 0x23, 0xFF)
++I51_INS ("rlc",   "ANN", 0x01, 0x33, 0xFF)
++I51_INS ("rr",    "ANN", 0x01, 0x03, 0xFF)
++I51_INS ("rrc",   "ANN", 0x01, 0x13, 0xFF)
++I51_INS ("setb",  "rNN", 0x01, 0xD3, 0xFF)
++I51_INS ("setb",  "BNN", 0x02, 0xD2, 0xFF)
++I51_INS ("sjmp",  "JNN", 0x02, 0x80, 0xFF)
++I51_INS ("subb",  "ARN", 0x01, 0x98, 0xF8)
++I51_INS ("subb",  "AIN", 0x01, 0x96, 0xFE)
++I51_INS ("subb",  "ADN", 0x02, 0x95, 0xFF)
++I51_INS ("subb",  "A#N", 0x02, 0x94, 0xFF)
++I51_INS ("swap",  "ANN", 0x01, 0xC4, 0xFF)
++I51_INS ("xch",   "ARN", 0x01, 0xC8, 0xF8)
++I51_INS ("xch",   "AIN", 0x01, 0xC6, 0xFE)
++I51_INS ("xch",   "ADN", 0x02, 0xC5, 0xFF)
++I51_INS ("xchd",  "AIN", 0x01, 0xD6, 0xFE)
++I51_INS ("xrl",   "ARN", 0x01, 0x68, 0xF8)
++I51_INS ("xrl",   "AIN", 0x01, 0x66, 0xFE)
++I51_INS ("xrl",   "ADN", 0x02, 0x65, 0xFF)
++I51_INS ("xrl",   "A#N", 0x02, 0x64, 0xFF)
++I51_INS ("xrl",   "DAN", 0x02, 0x62, 0xFF)
++I51_INS ("xrl",   "D#N", 0x03, 0x63, 0xFF)
 diff --git a/ld/emulparams/elf32i51.sh b/ld/emulparams/elf32i51.sh
 new file mode 100644
 index 00000000..0426a2e9
@@ -5998,6 +6039,30 @@ index 00000000..d4f45d76
 +x:	.space	2
 +	.bitdata
 +f:	.bit	0
+diff --git a/ld/testsuite/ld-i51/init-reloc.d b/ld/testsuite/ld-i51/init-reloc.d
+new file mode 100644
+index 00000000..90723c9e
+--- /dev/null
++++ b/ld/testsuite/ld-i51/init-reloc.d
+@@ -0,0 +1,4 @@
++#name: i51 relocated byte in RAM is refused
++#source: init-reloc.s
++#ld:
++#error: .*init-reloc.o\(.data\): initialized data in internal RAM, which nothing loads.*
+diff --git a/ld/testsuite/ld-i51/init-reloc.s b/ld/testsuite/ld-i51/init-reloc.s
+new file mode 100644
+index 00000000..98a2e50a
+--- /dev/null
++++ b/ld/testsuite/ld-i51/init-reloc.s
+@@ -0,0 +1,8 @@
++; A byte the linker fills in is initialized data, whatever its value.
++	.text
++	.global	_START
++_START:	nop
++	.data
++	.byte	zero
++	.equ	zero, 0
++	.global	zero
 diff --git a/ld/testsuite/ld-i51/init.d b/ld/testsuite/ld-i51/init.d
 new file mode 100644
 index 00000000..7e30c6c3
@@ -6023,6 +6088,42 @@ index 00000000..d03d0305
 +	.data
 +z:	.byte	0
 +v:	.byte	5
+diff --git a/ld/testsuite/ld-i51/iram-ok.d b/ld/testsuite/ld-i51/iram-ok.d
+new file mode 100644
+index 00000000..9c42008d
+--- /dev/null
++++ b/ld/testsuite/ld-i51/iram-ok.d
+@@ -0,0 +1,8 @@
++#name: i51 internal RAM within __IRAM_SIZE
++#source: iram.s
++#ld: --defsym __STACK_SIZE=0
++#nm: -n
++
++#...
++0+[0-9a-f]+ . STACK
++#pass
+diff --git a/ld/testsuite/ld-i51/iram.d b/ld/testsuite/ld-i51/iram.d
+new file mode 100644
+index 00000000..1a68d411
+--- /dev/null
++++ b/ld/testsuite/ld-i51/iram.d
+@@ -0,0 +1,4 @@
++#name: i51 internal RAM past __IRAM_SIZE
++#source: iram.s
++#ld: --defsym __IRAM_SIZE=0x80 --defsym __STACK_SIZE=0
++#error: .*internal RAM overflow.*
+diff --git a/ld/testsuite/ld-i51/iram.s b/ld/testsuite/ld-i51/iram.s
+new file mode 100644
+index 00000000..dce29937
+--- /dev/null
++++ b/ld/testsuite/ld-i51/iram.s
+@@ -0,0 +1,6 @@
++; Internal RAM is checked against the size of the part.
++	.text
++	.global	_START
++_START:	nop
++	.ibss
++	.space	0x70
 diff --git a/ld/testsuite/ld-i51/merge.d b/ld/testsuite/ld-i51/merge.d
 new file mode 100644
 index 00000000..82074217
@@ -6215,6 +6316,34 @@ index 00000000..c1358d34
 +_START:	ret
 +	.bss
 +	.space	0x79
+diff --git a/ld/testsuite/ld-i51/shf.d b/ld/testsuite/ld-i51/shf.d
+new file mode 100644
+index 00000000..f058ccc2
+--- /dev/null
++++ b/ld/testsuite/ld-i51/shf.d
+@@ -0,0 +1,9 @@
++#name: i51 space code on a section with contents
++#source: shf.s
++#ld:
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 00123422 +.*
+diff --git a/ld/testsuite/ld-i51/shf.s b/ld/testsuite/ld-i51/shf.s
+new file mode 100644
+index 00000000..3ed39423
+--- /dev/null
++++ b/ld/testsuite/ld-i51/shf.s
+@@ -0,0 +1,7 @@
++; A section with a space code in sh_flags is a memory-space common only
++; when it has no contents: one that has contents keeps them.
++	.text
++	.global	_START
++_START:	nop
++	.section .rodata.tab,"0x20000002",@progbits
++	.byte	0x12, 0x34
 diff --git a/ld/testsuite/ld-i51/space.d b/ld/testsuite/ld-i51/space.d
 new file mode 100644
 index 00000000..e054c0e7
@@ -6340,10 +6469,10 @@ index 00000000..690501bb
 +	ret
 diff --git a/opcodes/i51-dis.c b/opcodes/i51-dis.c
 new file mode 100644
-index 00000000..4c905ce2
+index 00000000..3037b717
 --- /dev/null
 +++ b/opcodes/i51-dis.c
-@@ -0,0 +1,383 @@
+@@ -0,0 +1,251 @@
 +/* Disassemble MCS-51 instructions.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -6365,44 +6494,34 @@ index 00000000..4c905ce2
 +   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
 +   MA 02110-1301, USA.  */
 +
++
 +#include "sysdep.h"
 +#include "dis-asm.h"
 +#include "disassemble.h"
 +#include "opintl.h"
 +#include "libiberty.h"
 +
-+
-+struct i51_opcodes_s
++struct i51_opcode
 +{
 +  const char *name;
 +  const char *args;
-+  int insn_size;		/* in bytes */
-+  unsigned char bin_opcode;
-+  unsigned char bin_mask;
++  unsigned char size;
++  unsigned char bin;
++  unsigned char mask;
 +};
 +
-+#define I51_INS(NAME, ARGS, SIZE, OPCODE, MRELOC, BIN, MASK) \
-+{NAME, ARGS, SIZE, BIN, MASK},
++#define I51_INS(NAME, ARGS, SIZE, BIN, MASK) { NAME, ARGS, SIZE, BIN, MASK },
 +
-+static struct i51_opcodes_s i51_opcodes[] =
++static const struct i51_opcode i51_opcodes[] =
 +{
-+  #include "opcode/i51.h"
-+  {NULL, NULL, 0, 0, 0}
++#include "opcode/i51.h"
 +};
 +
-+/* Which symbols may name an address in disassembly.
-+
-+   The MCS-51 has five address spaces that all start at zero, and a
-+   symbol carries no note of which one it belongs to beyond the section
-+   it sits in.  A consumer looking for the symbol nearest a code address
-+   will therefore find SFR equates - ACC, P1, TCON, thousands of them,
-+   all absolute and all below 0x100 - and data symbols from IDATA, XDATA,
-+   the bit space and the EEPROM image, and name a subroutine after one of
-+   them.  While a section carrying code is being disassembled, only a
-+   symbol from a section carrying code may name an address in it.
-+
-+   Elsewhere - `objdump -D' walking .rbss, .xbss and the rest - every
-+   symbol is let through again, so those sections keep their labels.  */
++/* Which symbols may name an address in disassembly.  The MCS-51 has
++   several address spaces that all start at zero, so while a section
++   carrying code is disassembled only a symbol of a section carrying code
++   names an address in it - not an SFR equate such as ACC, nor a data
++   symbol of another space.  Elsewhere every symbol is let through.  */
 +
 +bool
 +i51_symbol_is_valid (asymbol *sym, struct disassemble_info *info)
@@ -6415,315 +6534,193 @@ index 00000000..4c905ce2
 +      || (info->section->flags & SEC_CODE) == 0)
 +    return true;
 +
-+  /* An absolute symbol belongs to no space at all.  */
 +  if (bfd_is_abs_section (sym->section))
 +    return false;
 +
 +  return (sym->section->flags & SEC_CODE) != 0;
 +}
 +
-+/* The style an operand string is printed in.  The operand syntax is
-+   self-describing: `#' starts an immediate, `0x' a direct byte or bit
-+   address, `.' a branch displacement, `/' a complemented bit address,
-+   and everything else names a register - A, AB, C, DPTR, R0..R7, @R0,
-+   @DPTR, @A+DPTR, @A+PC.  */
++/* The row of the instruction whose first byte is INSN, or NULL.  */
 +
-+static enum disassembler_style
-+i51_operand_style (const char *op)
++static const struct i51_opcode *
++i51_find_opcode (unsigned int insn)
 +{
-+  switch (op[0])
++  size_t i;
++
++  for (i = 0; i < ARRAY_SIZE (i51_opcodes); i++)
++    if ((insn & i51_opcodes[i].mask) == i51_opcodes[i].bin)
++      return &i51_opcodes[i];
++  return NULL;
++}
++
++/* The name of an operand of kind KIND that is always the same register
++   or addressing mode, or NULL.  */
++
++static const char *
++i51_fixed_operand (char kind)
++{
++  switch (kind)
 +    {
-+    case '#':	return dis_style_immediate;
-+    case '.':	return dis_style_address_offset;
-+    case '/':	return dis_style_address;
-+    case '0':	return dis_style_address;
-+    default:	return dis_style_register;
++    case 'A': return "A";
++    case 'C': return "AB";
++    case 'r': return "C";
++    case 'P': return "DPTR";
++    case 'T': return "@DPTR";
++    case '@': return "@A+DPTR";
++    case 'X': return "@A+PC";
++    default: return NULL;
 +    }
++}
++
++/* The number of bytes after the opcode byte that operand KIND of OPC
++   takes.  */
++
++static int
++i51_field_size (const struct i51_opcode *opc, char kind)
++{
++  switch (kind)
++    {
++    case 'D':
++    case 'B':
++    case '/':
++    case 'J':
++    case '1':
++      return 1;
++    case '6':
++      return 2;
++    case '#':
++      return opc->args[0] == 'P' ? 2 : 1;
++    default:
++      return 0;
++    }
++}
++
++/* Print operand KIND of the instruction INSN, the row OPC, whose field
++   is at FIELD.  PC is the address of the following instruction.  */
++
++static void
++i51_print_operand (const struct i51_opcode *opc, char kind,
++		   const bfd_byte *insn, const bfd_byte *field, bfd_vma pc,
++		   disassemble_info *info)
++{
++  fprintf_styled_ftype prin = info->fprintf_styled_func;
++  void *stream = info->stream;
++  const char *fixed = i51_fixed_operand (kind);
++
++  if (fixed != NULL)
++    {
++      prin (stream, dis_style_register, "%s", fixed);
++      return;
++    }
++
++  switch (kind)
++    {
++    case 'R':
++      prin (stream, dis_style_register, "R%d", insn[0] & 7);
++      break;
++    case 'I':
++      prin (stream, dis_style_register, "@R%d", insn[0] & 1);
++      break;
++    case '/':
++      prin (stream, dis_style_text, "/");
++      /* Fall through.  */
++    case 'D':
++    case 'B':
++      prin (stream, dis_style_address, "0x%02x", field[0]);
++      break;
++    case '#':
++      if (i51_field_size (opc, kind) == 2)
++	prin (stream, dis_style_immediate, "#0x%04x",
++	      (unsigned int) bfd_getb16 (field));
++      else
++	prin (stream, dis_style_immediate, "#0x%02x", field[0]);
++      break;
++    case 'J':
++      info->target = (pc + (signed char) field[0]) & 0xffff;
++      info->print_address_func (info->target, info);
++      break;
++    case '1':
++      info->target = (pc & 0xf800) | ((insn[0] & 0xe0) << 3) | field[0];
++      info->print_address_func (info->target, info);
++      break;
++    case '6':
++      info->target = bfd_getb16 (field);
++      info->print_address_func (info->target, info);
++      break;
++    }
++}
++
++/* The kind of control transfer OPC is.  */
++
++static enum dis_insn_type
++i51_insn_type (const struct i51_opcode *opc)
++{
++  if (strcmp (opc->name, "acall") == 0 || strcmp (opc->name, "lcall") == 0)
++    return dis_jsr;
++  if (strcmp (opc->name, "sjmp") == 0 || strcmp (opc->name, "ajmp") == 0
++      || strcmp (opc->name, "ljmp") == 0 || strcmp (opc->name, "jmp") == 0)
++    return dis_branch;
++  if (strchr (opc->args, 'J') != NULL)
++    return dis_condbranch;
++  return dis_nonbranch;
 +}
 +
 +int
 +print_insn_i51 (bfd_vma addr, disassemble_info *info)
 +{
-+  int insn;
-+  int opdata;
-+  int disp;
-+  int rel_addr;
-+  struct i51_opcodes_s *opcode;
-+  void *stream = info->stream;
-+  fprintf_styled_ftype prin = info->fprintf_styled_func;
-+  int ok = 0;
-+  int offset = 0;
-+  char op1[16], op2[16], op3[16], comment1[40], comment2[40];
-+  int inslen = 1;
-+  /* An absolute code address in op1 is handed to print_address_func so
-+     the consumer can name it: `lcall 0x1a <helper>'.  The string built
-+     in op1 is the fallback for a consumer that supplies no such hook.  */
-+  bfd_vma code_target = 0;
-+  int op1_is_code_addr = 0;
-+  bfd_byte buf[3];
-+  const bfd_byte *next;
++  const struct i51_opcode *opc;
++  const bfd_byte *field[3];
++  bfd_byte insn[3];
++  int i, pos;
 +
-+  if (info->read_memory_func (addr, buf, 1, info) != 0)
++  if (info->read_memory_func (addr, insn, 1, info) != 0)
 +    {
 +      info->memory_error_func (-1, addr, info);
 +      return -1;
 +    }
-+  insn = buf[0];
-+  for (opcode = i51_opcodes; opcode->name; opcode++)
-+    {
-+      if ((insn & opcode->bin_mask) == opcode->bin_opcode)
-+	break;
-+    }
 +
-+  /* The rest of the instruction, in one read.  An instruction the section
-+     ends inside of is shown as the byte it starts with.  */
-+  if (opcode->name
-+      && (opcode->insn_size & 0x03) > 1
-+      && info->read_memory_func (addr + 1, buf + 1,
-+				 (opcode->insn_size & 0x03) - 1, info) != 0)
-+    opcode = &i51_opcodes[ARRAY_SIZE (i51_opcodes) - 1];
-+  addr++;
-+  next = buf + 1;
++  /* An instruction the section ends inside of is shown as its first
++     byte.  */
++  opc = i51_find_opcode (insn[0]);
++  if (opc != NULL && opc->size > 1
++      && info->read_memory_func (addr + 1, insn + 1, opc->size - 1, info) != 0)
++    opc = NULL;
 +
 +  info->insn_info_valid = 1;
-+  info->insn_type = dis_nonbranch;
 +  info->target = 0;
-+  
-+  op1[0] = 0;
-+  op2[0] = 0;
-+  op3[0] = 0;
-+  comment1[0] = 0;
-+  comment2[0] = 0;
-+
-+  if (opcode->name)
++  if (opc == NULL)
 +    {
-+      inslen = (opcode->insn_size) & 0x03;
-+      ok = 1;
-+      switch (opcode->args[0]) {
-+	case 'N':  /* none  */
-+	  break;
-+	case 'A':  /* A reg  */
-+	  sprintf (op1,"A");
-+	  break;
-+	case 'C':  /* AB reg  */
-+	  sprintf (op1,"AB");
-+	  break;
-+	case 'r':  /* C reg  */
-+	  sprintf (op1,"C");
-+	  break;
-+	case 'P':  /* DPTR  */
-+	  sprintf (op1,"DPTR");
-+	  break;
-+	case '@':  /* @A+DPTR  */
-+	  sprintf (op1,"@A+DPTR");
-+	  break;
-+	case 'T':  /* @DPTR  */
-+	  sprintf (op1,"@DPTR");
-+	  break;
-+	case 'D':  /* data  */
-+	case 'B':  /* bit  */
-+	  opdata = *next++;
-+	  addr++;
-+	  offset++;
-+	  sprintf (op1,"0x%02X",opdata);
-+	  break;
-+	case 'R':  /* R0..R7  */
-+	  sprintf (op1,"R%c",(insn&0x07)+'0');
-+	  break;
-+	case 'I':  /* @R0, @R1  */
-+	  sprintf (op1,"@R%c",(insn&0x01)+'0');
-+	  break;
-+	case 'J':  /* jump rel  */
-+	  opdata = *next++;
-+	  addr++;
-+	  /* Sign-extend the encoded displacement before deciding its sign:
-+	     testing bit 7 of (displacement + insn length) turns the largest
-+	     forward branches into backward ones.  */
-+	  disp = ((opdata ^ 0x80) & 0xFF) - 0x80;
-+	  rel_addr = disp + 2;
-+	  if (rel_addr < 0)
-+	    sprintf (op1,".-0x%02X",-rel_addr);
-+	  else
-+	    sprintf (op1,".+0x%02X",rel_addr);
-+	  sprintf (comment1, "0x%04lX",
-+		   (unsigned long) ((addr + disp) & 0xFFFF));
-+	  info->target = (addr + disp) & 0xFFFF;
-+	  break;
-+	case '1':  /* jump addr 11  */
-+	  opdata = *next++;
-+	  addr++;
-+	  code_target = (addr & 0xF800) + (((insn >> 5) & 0x07) << 8) + opdata;
-+	  op1_is_code_addr = 1;
-+	  sprintf (op1,"0x%04lX", (unsigned long) code_target);
-+	  break;
-+	case '6':  /* jump addr 16  */
-+	  opdata = bfd_getb16 (next);
-+	  next += 2;
-+	  addr += 2;
-+	  code_target = (bfd_vma) (unsigned) opdata;
-+	  op1_is_code_addr = 1;
-+	  sprintf (op1,"0x%04X",(unsigned) opdata);
-+	  break;
-+      }
-+      switch (opcode->args[1]) {
-+	case 'N':  /* none  */
-+	  break;
-+	case 'A':  /* A reg  */
-+	  sprintf (op2,"A");
-+	  break;
-+	case 'r':  /* C reg  */
-+	  sprintf (op2,"C");
-+	  break;
-+	case '@':  /* @A+DPTR  */
-+	  sprintf (op2,"@A+DPTR");
-+	  break;
-+	case 'X':  /* @A+PC  */
-+	  sprintf (op2,"@A+PC");
-+	  break;
-+	case '/':  /* /bit  */
-+	  opdata = *next++;
-+	  addr++;
-+	  offset++;
-+	  sprintf (op2,"/0x%02X",opdata);
-+	  break;
-+	case 'T':  /* @DPTR  */
-+	  sprintf (op2,"@DPTR");
-+	  break;
-+	case 'B':  /* bit  */
-+	case 'D':  /* data  */
-+	  opdata = *next++;
-+	  addr++;
-+	  offset++;
-+	  sprintf (op2,"0x%02X",opdata);
-+	  /* MOV direct,direct (0x85) is the one insn that encodes the
-+	     source byte first, so the operands come out swapped.  */
-+	  if (opcode->args[0] == 'D')
-+	    {
-+	      char tmp[16];
-+	      strcpy (tmp, op1);
-+	      strcpy (op1, op2);
-+	      strcpy (op2, tmp);
-+	    }
-+	  break;
-+	case 'R':  /* R0..R7  */
-+	  sprintf (op2,"R%c",(insn&0x07)+'0');
-+	  break;
-+	case 'I':  /* @R0, @R1  */
-+	  sprintf (op2,"@R%c",(insn&0x01)+'0');
-+	  break;
-+	case 'J':  /* jump rel  */
-+	  opdata = *next++;
-+	  addr++;
-+	  /* Sign-extend the encoded displacement before deciding its sign:
-+	     testing bit 7 of (displacement + insn length) turns the largest
-+	     forward branches into backward ones.  */
-+	  disp = ((opdata ^ 0x80) & 0xFF) - 0x80;
-+	  rel_addr = disp + 2+offset;
-+	  if (rel_addr < 0)
-+	    sprintf (op2,".-0x%02X",-rel_addr);
-+	  else
-+	    sprintf (op2,".+0x%02X",rel_addr);
-+	  sprintf (comment1, "0x%04lX",
-+		   (unsigned long) ((addr + disp) & 0xFFFF));
-+	  info->target = (addr + disp) & 0xFFFF;
-+	  break;
-+	case '#':  /* #data  */
-+	  if(opcode->args[0] == 'P') {
-+	    opdata = bfd_getb16 (next);
-+	    next += 2;
-+	    addr+=2;
-+	    sprintf (op2,"#0x%04X",(unsigned) opdata);
-+	  } else {
-+	    opdata = *next++;
-+	    addr++;
-+	    offset++;
-+	    sprintf (op2,"#0x%02X",opdata);
-+	    if ((opdata >= ' ') && (opdata < 0x7F)) {
-+	      sprintf (comment1, "#%u\t#'%c'", opdata, opdata);
-+	    } else {
-+	      sprintf (comment1, "#%u", opdata);
-+	    }
-+	  }
-+	  break;
-+      }
-+      switch (opcode->args[2]) {
-+	case 'N':  /* none  */
-+	  break;
-+	case 'J':  /* jump rel  */
-+	  opdata = *next++;
-+	  addr++;
-+	  /* Sign-extend the encoded displacement before deciding its sign:
-+	     testing bit 7 of (displacement + insn length) turns the largest
-+	     forward branches into backward ones.  */
-+	  disp = ((opdata ^ 0x80) & 0xFF) - 0x80;
-+	  rel_addr = disp + 2+offset;
-+	  if (rel_addr < 0)
-+	    sprintf (op3,".-0x%02X",-rel_addr);
-+	  else
-+	    sprintf (op3,".+0x%02X",rel_addr);
-+	  sprintf (comment1, "0x%04lX",
-+		   (unsigned long) ((addr + disp) & 0xFFFF));
-+	  info->target = (addr + disp) & 0xFFFF;
-+	  break;
-+      }
-+
-+      /* Branch information, for --visualize-jumps and the like.  */
-+      if (strchr (opcode->args, 'J') != NULL)
-+	info->insn_type = (strcmp (opcode->name, "sjmp") == 0
-+			   ? dis_branch : dis_condbranch);
-+      else if (op1_is_code_addr)
-+	{
-+	  info->target = code_target;
-+	  info->insn_type = opcode->name[1] == 'c' ? dis_jsr : dis_branch;
-+	}
-+    }
-+
-+  if (!ok)
-+    {
-+      /* Unknown opcode, or an instruction the section ends inside of.  */
 +      info->insn_type = dis_noninsn;
-+      sprintf (op1, "0x%02X", insn);
-+      sprintf (comment1, "????");
-+      comment2[0] = 0;
-+      op1_is_code_addr = 0;
++      info->fprintf_styled_func (info->stream, dis_style_assembler_directive,
++				 ".byte");
++      info->fprintf_styled_func (info->stream, dis_style_text, "\t");
++      info->fprintf_styled_func (info->stream, dis_style_immediate,
++				 "0x%02x", insn[0]);
++      return 1;
 +    }
 +
-+  (*prin) (stream, ok ? dis_style_mnemonic : dis_style_assembler_directive,
-+	   "%s", ok ? opcode->name : ".byte");
-+
-+  if (*op1)
++  /* MOV direct,direct stores its source first.  */
++  pos = 1;
++  for (i = 0; i < 3; i++)
 +    {
-+      (*prin) (stream, dis_style_text, "\t");
-+      /* An absolute code address goes through print_address_func, which
-+	 is what lets a consumer print the symbol it lands on.  Older
-+	 callers may leave the hook unset, so fall back to the string.  */
-+      if (op1_is_code_addr && info->print_address_func != NULL)
-+	(*info->print_address_func) (code_target, info);
-+      else
-+	(*prin) (stream, i51_operand_style (op1), "%s", op1);
++      field[i] = insn + pos;
++      pos += i51_field_size (opc, opc->args[i]);
 +    }
-+
-+  if (*op2)
++  if (opc->args[0] == 'D' && opc->args[1] == 'D')
 +    {
-+      (*prin) (stream, dis_style_text, ", ");
-+      (*prin) (stream, i51_operand_style (op2), "%s", op2);
++      field[1] = insn + 1;
++      field[0] = insn + 2;
 +    }
 +
-+  if (*op3)
++  info->insn_type = i51_insn_type (opc);
++  info->fprintf_styled_func (info->stream, dis_style_mnemonic, "%s",
++			     opc->name);
++  for (i = 0; i < 3 && opc->args[i] != 'N'; i++)
 +    {
-+      (*prin) (stream, dis_style_text, ", ");
-+      (*prin) (stream, i51_operand_style (op3), "%s", op3);
++      info->fprintf_styled_func (info->stream, dis_style_text,
++				 i == 0 ? "\t" : ", ");
++      i51_print_operand (opc, opc->args[i], insn, field[i], addr + opc->size,
++			 info);
 +    }
-+
-+  if (*comment1) {
-+    if (*op2)
-+      (*prin) (stream, dis_style_comment_start, "\t; %s", comment1);
-+    else
-+      (*prin) (stream, dis_style_comment_start, "\t\t; %s", comment1);
-+  }
-+
-+  if (*comment2)
-+    (*prin) (stream, dis_style_comment_start, " %s", comment2);
-+
-+  return inslen;
++  return opc->size;
 +}

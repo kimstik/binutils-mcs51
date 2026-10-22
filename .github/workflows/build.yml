@@ -160,8 +160,10 @@ jobs:
       #
       # The archive is reproducible: every file carries the commit's time, the
       # entries are in name order, and owner and gzip header carry nothing of
-      # the machine that made it.
+      # the machine that made it. TZ is fixed because zip stores local time.
       - name: Package
+        env:
+          TZ: UTC
         run: |
           set -eu
           pkg="i51-binutils-$PORT_VERSION-${{ matrix.name }}"

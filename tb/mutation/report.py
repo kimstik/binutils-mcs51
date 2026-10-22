@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Turn one or two mutation runs into the tables of TESTS-mutation.md.
 
-That document is not in this repository; it is kept alongside the review
-archives, at docs/reviews-round2/TESTS-mutation.md, one level above the
-repository root.
+That document is not in this repository: it is
+docs/reviews-round2/TESTS-mutation.md, one level above the repository root.
 
   report.py --after results.json [--before results-before.json]
 

@@ -15,9 +15,9 @@ does, in seven steps:
   kinds     what separates the three eight-bit absolute relocations: a
             direct address and an immediate each carry a type of their own
             and the range that kind has, while R_I51_8 - which records no
-            operand kind, and is what a datum, a pcode byte and every
-            older object carry - keeps the low byte of anything and says
-            nothing.
+            operand kind, and is what a datum, a pcode byte and any object
+            without the kinded types carry - keeps the low byte of anything
+            and says nothing.
   range     the two branch relocations with a range rule - the 8-bit
             displacement of R_I51_7_PCREL and the 2K page of R_I51_11 -
             linked one unit inside and one unit outside their limit, on
@@ -124,12 +124,11 @@ DATA_RELOCS = [
 DATA_TEXT = '3412' '1234' '22'
 
 # R_I51_8 records that one byte is relocated and nothing more.  A datum
-# has no operand kind to record, so it keeps that type - and with it the
-# rule it has always had: the low byte of whatever the value turned out to
-# be, and nothing said about the rest.  Every object built before
-# R_I51_8_DIR and R_I51_8_IMM existed carries type 6 for its eight-bit
-# operands too and is linked by that same rule, which is why it is pinned
-# here rather than tightened.
+# has no operand kind to record, so it keeps that type - and with it its
+# rule: the low byte of whatever the value is, and nothing said about the
+# rest.  An object that carries type 6 for its eight-bit operands, without
+# R_I51_8_DIR or R_I51_8_IMM, is linked by that same rule, which is why it
+# is pinned here rather than tightened.
 BYTE_PROBE = '\t.text\n\t.global _START\n_START:\n\t.byte\tDVAR\n'
 BYTE_RELOCS = [(0x00, 'R_I51_8', 'DVAR')]
 
@@ -322,7 +321,7 @@ FOLD_CASES = [
 # bytes of the linked .text; msg means the link has to say so instead.
 PCODE_LINK = [
     ('pcode-link',       0x0123, '012300', None),
-    # Both of these fail the link now: the field has thirteen bits and the top
+    # Both of these fail the link: the field has thirteen bits and the top
     # three are flags, so a target that does not fit has nowhere to go, and a
     # relocation the port cannot apply must not leave a byte meaning something
     # else behind it.  want None with a msg means ld has to refuse and say so.

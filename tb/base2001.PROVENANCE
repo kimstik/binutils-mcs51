@@ -220,18 +220,15 @@ reproduces under the transform: every base.7z member is 4 to 32 bytes shorter
 than the overlay's. base.7z's libcgi.a is a differently built archive, not a
 converted copy of this one. No project links it.
 
-lib/libk23.a and lib/libw23.a used to be listed here as not compared. They have
-been compared now, and they are not deltas: both reproduce base.7z's copies
+lib/libk23.a and lib/libw23.a are not deltas: both reproduce base.7z's copies
 byte-for-byte under the transform in section 3.
 
-lib/web51_80.obj, lib/web51_23.obj and lib/libw80.a used to be listed here too.
-base.7z shipped re-assembled copies of them, and a re-assembly loses what the
-port's assembler could not write: an external memory-space common came out as
-SHN_COMMON instead of the SHN_I51_* index naming its space. Counted over the
-symbol tables of this archive's copies, the three carry 0xff02 x1 + 0xff06 x6,
-0xff02 x1 + 0xff06 x8, and 0xff00 x11 + 0xff02 x2 + 0xff03 x2 + 0xff06 x21
-respectively. base.7z's copies now carry exactly the same census, index for
-index, which is what says the re-assembled copies are gone.
+lib/web51_80.obj, lib/web51_23.obj and lib/libw80.a are not deltas either.
+Counted over the symbol tables of this archive's copies, the three carry
+external memory-space commons at 0xff02 x1 + 0xff06 x6, 0xff02 x1 + 0xff06 x8,
+and 0xff00 x11 + 0xff02 x2 + 0xff03 x2 + 0xff06 x21 respectively, and base.7z's
+copies carry exactly the same census, index for index - none of them is a
+re-assembly that wrote a space common as SHN_COMMON.
 
 Paths base.7z ships that the overlay does NOT replace, because gnu13 has no
 counterpart and no project links them:
@@ -308,8 +305,7 @@ spelled _reti_ in the 2001 objects and _RETI_ in base.7z's - measured in both
 this session: this archive's web51_80.obj (317 symbols) and web51_23.obj (327)
 hold _reti_, base.7z's hold _RETI_, and the two symbol tables differ in nothing
 but case. Left alone, a frozen link has no _RETI_ to resolve against and stops
-on all ten projects. The exact wording of the linker's message was not re-run
-here, so it is no longer quoted.
+on all ten projects.
 
 Rewriting the reference is the script-side half of the same case conversion the
 objects went through; the uppercase alias names INTIE0.., which nothing in a
@@ -322,8 +318,7 @@ five INTIE0.. aliases and the STACK alias are absent, and it has one trailing
 blank line fewer - 258 LF-terminated lines against 265, 5431 bytes against
 5623. `*(reset_network)` is live in both, at line 82 of each, between
 *(reset_device) and *(reset_end) - no script in play omits the section.
-base.7z was repacked with that line restored (tb/Makefile's oracle comment
-records the repair), and tb/reference.md5 is pinned to the ten www8051.rom
+tb/reference.md5 is pinned to the ten www8051.rom
 files that archive ships: size and md5 agree on all ten, checked here.
 Deriving the overlay's script from base.7z's by the one-line
 _reti_ rewrite is therefore the smaller change: it keeps the aliases and the

@@ -6,15 +6,13 @@
             so agreement means both agree with the ISA rather than with each other.
   decode    feed the same golden bytes to our disassembler.  Each must come back
             as exactly one instruction that consumes exactly those bytes and
-            carries a mnemonic rather than the `.byte 0xNN ; ????' fallback.
+            carries a mnemonic rather than the `.byte 0xNN' fallback.
             print_insn_i51 never emits `(bad)', so a check for that string alone
             would be a condition this disassembler cannot violate; the byte span
             and the mnemonic are conditions it can.
   roundtrip take the instruction `decode' printed, feed it back to the assembler
-            and require the same bytes again.  Where the two ways of printing a
-            branch target disagree - the displacement in the operand against the
-            absolute address in the comment - that is caught first, because
-            re-assembly goes through the absolute one and would not see it.
+            and require the same bytes again.  A branch target is printed as
+            the absolute address, and both runs place the code at 0.
             gas and the disassembler share include/opcode/i51.h, so the round
             trip says nothing about the opcode bytes themselves - but `assemble'
             above has already pinned those against an unrelated assembler, which
@@ -171,54 +169,12 @@ class Tools:
         if raw != data.hex():
             return None, ('one instruction covering %s, want %s'
                           % (raw, data.hex()))
-        # `.byte 0x47 ; ????' is what print_insn_i51 prints for an opcode it
-        # does not recognise - and gas takes it back happily, so a round trip
+        # `.byte 0x47' is what print_insn_i51 prints for an opcode it does
+        # not recognise - and gas takes it back happily, so a round trip
         # alone would close over exactly the case that matters most.
-        if text.split()[0] == '.byte' or '(bad)' in text or '????' in text + comment:
+        if text.split()[0] == '.byte' or '(bad)' in text:
             return None, 'not decoded to an instruction: %s' % text
         return insn, None
-
-
-REL = re.compile(r'\.[-+]0x[0-9A-Fa-f]+')
-ADDR = re.compile(r'^0x[0-9A-F]{4}$')
-
-
-def mismatch(text, comment):
-    """The two ways a branch target is printed must agree.
-
-    A relative branch prints the displacement from the start of the
-    instruction and, in the comment, the absolute target.  The bytes are
-    disassembled at address 0 here, so the two are the same number - and
-    the displacement is the half that resyntax throws away, which would
-    otherwise let a wrong one through unnoticed."""
-    m = REL.search(text)
-    if not m:
-        return None
-    target = comment.split()[0] if comment else ''
-    if not ADDR.match(target):
-        return None
-    tok = m.group(0)                      # `.+0x04' / `.-0x7E'
-    disp = int(tok[2:], 16)
-    if tok[1] == '-':
-        disp = -disp
-    if (disp & 0xFFFF) != int(target, 16):
-        return 'prints `%s\' but says %s' % (m.group(0), target)
-    return None
-
-
-def resyntax(text, comment):
-    """Disassembly to something the assembler will take back.
-
-    Only relative branch operands need help: they print as a displacement
-    from the instruction, and the absolute target is in the comment. Nothing
-    else is rewritten - if the assembler will not take what objdump printed,
-    that is the disagreement this check is looking for."""
-    if REL.search(text):
-        target = comment.split()[0] if comment else ''
-        if not ADDR.match(target):
-            return None
-        text = REL.sub(target, text)
-    return text
 
 
 def report(what, total, bad):
@@ -285,16 +241,7 @@ def run_table(tools, args, stages, work):
                                % (n, src, want.hex(), why))
                     continue
             considered += 1
-            _, _, text, comment = insn
-            why = mismatch(text, comment)
-            if why:
-                bad.append('line %-4d %-28s %s' % (n, src, why))
-                continue
-            back = resyntax(text, comment)
-            if back is None:
-                bad.append('line %-4d %-28s no target in `%s ; %s\''
-                           % (n, src, text, comment))
-                continue
+            back = insn[2]
             got = tools.assemble(back, work)
             flat = ' '.join(back.split())
             if isinstance(got, str):

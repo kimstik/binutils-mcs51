@@ -11,9 +11,8 @@ name: frozen-2.11.2
 # reference.
 #
 # tb/frozen.expect requires three columns per project and romdiff.py refuses a
-# line with fewer instead of defaulting the missing one, so an expectation file
-# written before the ROM-size column fails the job loudly rather than gating on
-# half of itself.
+# line with fewer instead of defaulting the missing one, so an incomplete
+# expectation file fails the job rather than gating on part of itself.
 
 on:
   workflow_dispatch:

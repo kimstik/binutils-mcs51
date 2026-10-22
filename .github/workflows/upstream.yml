@@ -12,8 +12,7 @@ name: upstream-watch
 # result. While that issue is open it is rewritten rather than duplicated.
 #
 # Why ftp.gnu.org and not sourceware.org, and what makes a listing entry a
-# release: the docstring at the head of tb/upstream_watch.py, which also records
-# what both listings held when this was written.
+# release: the docstring at the head of tb/upstream_watch.py.
 #
 # WHAT IT MAY NOT DO. It never edits tb/Makefile, never rewrites mcs51/*.patch,
 # never runs `make refresh', never commits and never opens a pull request - the

@@ -74,7 +74,7 @@ TARGET        ?= i51-elf
 
 # Release builds are small: size-optimised, LTO, stripped. HOST empty means native.
 HOST          ?=
-OPTFLAGS      ?= -Os -flto -march=haswell
+OPTFLAGS      ?= -Os -flto
 AR_WRAP       ?= yes
 TOOLPREFIX    := $(if $(HOST),$(HOST)-,)
 
@@ -95,8 +95,7 @@ TOOLS := mcs51-as:gas/as-new \
 # $(MUTGATE); .github/workflows/gate.yml asks `ci-list' below for the names and
 # runs whatever it prints, one log group and one verdict per name. A stage added
 # here is therefore gated by CI and hunted by the mutation harness with no second
-# edit anywhere - which is the point: gate.yml used to spell the same list out
-# again as one hand-written step per stage, and that copy had drifted before.
+# edit anywhere.
 #
 # TOOLGATE is everything that judges the toolchain from its own inputs: no
 # project sources, no reference ROM.
@@ -111,9 +110,7 @@ TOOLS := mcs51-as:gas/as-new \
 #
 # GATE adds the two stages that use the ten projects: check, which compares
 # every www8051.rom against the reference base.7z ships, and oracle, which
-# compares it against the 2001 www8051.hex. gate.yml used to run oracle alone,
-# which meant the merge gate never once hashed a produced ROM against the
-# reference; check is a step of its own there now.
+# compares it against the 2001 www8051.hex.
 #
 # MUTGATE is what a mutant has to survive: TOOLGATE and check. It does not also
 # add oracle - oracle builds the same ten projects with the same tools and judges
@@ -129,9 +126,8 @@ MUTGATE  := $(TOOLGATE) check
 # assembler and requires `check' to report red, so it is only worth reading
 # beside the stage it judges. It is written out rather than derived by text
 # substitution on $(GATE), because a derivation fails silently - a $(subst) that
-# stops matching drops the canary, and a gate that has quietly stopped proving
-# `check' can fail is exactly the state this testbench was already in once. What
-# is asserted instead is the set: `ci-list' refuses to print a list that is not
+# stops matching drops the canary, and with it the proof that `check' can fail.
+# What is asserted instead is the set: `ci-list' refuses to print a list that is not
 # $(GATE) plus the canary, so a stage added above either reaches CI or reddens
 # it at the first step.
 CIGATE := $(TOOLGATE) check check-canary oracle
@@ -188,7 +184,6 @@ frozen:
 # deliver that: it forbids fuzzy context matching, not a hunk sliding onto
 # another line, and patch exits 0 on a slide.  The apply below reads its own
 # log and refuses an offset.
-# and the testbench says whether a step forward broke anything.
 build:
 	rm -rf $(WORK)/modern
 	mkdir -p $(WORK)/modern
@@ -322,28 +317,16 @@ check-frozen:
 
 # ------------------------------------------------------------------ hex oracle
 
-# The only input in this repository that no run of the current toolchain has ever
-# written: projekt/*/www8051.hex, shipped in base.7z next to the www8051.rom that
-# has been regenerated several times since. Each .hex decodes byte-for-byte to the
-# .rom that first commit shipped, so it records what the 2001 port emitted, and
-# nothing here can regenerate it.
+# projekt/*/www8051.hex, shipped in base.7z, is what the 2001 port emitted:
+# no run of the current toolchain writes it, and nothing here can regenerate
+# it. The recipe below extracts base.7z, builds it as it stands, repairs
+# nothing, and compares each produced ROM against that .hex.
 #
-# The recipe below extracts base.7z and builds it as it stands. It repairs
-# nothing, because the one repair that was needed is already inside the archive:
-#
-#   lib/www51.sc now carries `*(reset_network)` live. It once shipped with that
-#   line commented out, which orphaned the section holding `LCALL network_init`
-#   (lib/packet.asm) - the only call to it in nine of the ten projects - so the
-#   section landed past _etext and `objcopy -j .text` dropped it. Every ROM the
-#   testbench then certified was three bytes short and never initialised the
-#   RTL8019AS. base.7z was repacked with the line restored, which put eight of
-#   the ten projects back on the 2001 ROM's exact length, and tb/reference.md5
-#   was re-pinned on that archive.
-#
-# diag stays 3 bytes longer than its oracle even so: 2001 linked it with ld's
-# built-in script rather than www51.sc, so its reset_network was orphaned there
-# too, and diag calls network_init from its own main. hexoracle.py records that
-# delta as expected.
+# lib/www51.sc carries `*(reset_network)', which places the section holding
+# `LCALL network_init' (lib/packet.asm) inside .text. diag is 3 bytes longer
+# than its oracle: 2001 linked it with ld's built-in script rather than
+# www51.sc, which orphaned its reset_network, and diag calls network_init from
+# its own main. hexoracle.py records that delta as expected.
 oracle:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD) - run make build, or pass BUILD=<dir>"; exit 2; }
 	rm -rf $(WORK)/oracle $(WORK)/oracle-hex
@@ -465,9 +448,8 @@ reloc:
 # Five relocations index the section contents themselves instead of going
 # through _bfd_final_link_relocate (), so that one call is the only thing
 # between a crafted object and a read or write at an arbitrary distance from
-# the contents buffer.  Every other stage stayed green with the check
-# deleted.  The malformed objects are built here from good ones by rewriting
-# r_offset and nothing else.
+# the contents buffer, and no other stage exercises it.  The malformed objects
+# are built here from good ones by rewriting r_offset and nothing else.
 guard:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
 	python3 $(HERE)/sim/run-guard.py --build $(BUILD)
@@ -493,35 +475,28 @@ commons:
 # an input section of its own carrying one identifiable byte, and the run
 # asserts the whole .text image and the address of every RAM-space marker. A
 # dropped arm leaves its input an orphan: the section still exists and the
-# symbol still resolves, but the byte falls out of `objcopy -j .text'. That is
-# how `*(reset_network)' stayed commented out in www51.sc, with every gate stage
-# green, until base.7z was repacked with the line restored. The archive's copy
-# now carries it live and this stage is what keeps it there.
+# symbol still resolves, but the byte falls out of `objcopy -j .text', and no
+# other stage notices.
 script:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
 	python3 $(HERE)/sim/run-script.py --build $(BUILD) --base $(HERE)/base.7z
 
 # The disassembler's symbol filter, i51_symbol_is_valid: which symbols may
 # name an address. Every other objdump call above passes `-b binary', a flat
-# image with no symbol table, so the hook was never executed at all - and a
-# .o would not execute it either, because objdump matches sections itself
-# whenever the file carries relocations. Only on a linked executable does
-# the hook decide, so this stage links a probe and reads the name objdump
-# prints beside a code address.
+# image with no symbol table, so the hook does not run there - and a .o does
+# not run it either, because objdump matches sections itself whenever the
+# file carries relocations. Only on a linked executable does the hook decide,
+# so this stage links a probe and reads the name objdump prints beside a code
+# address.
 disasm:
 	@test -x "$(BUILD)/gas/as-new" || { echo "no toolchain in $(BUILD)"; exit 2; }
 	python3 $(HERE)/sim/run-disasm.py --build $(BUILD)
 
 # ------------------------------------------------------------------ doctruth
 
-# gas/doc/c-i51.texi was made normative and nothing checked it. Three of its
-# sentences were found false in one afternoon, and a human reading caught
-# every one of them: a pin with no gate, which is the disease a review round
-# was spent removing from the rest of this testbench.
-#
-# This stage is the part of that reading a machine can do. It compares the
-# lists the manual gives against the lists the source gives - md_pseudo_table
-# against the Directives section, i51_directop against the operand names,
+# gas/doc/c-i51.texi is normative. This stage compares the lists the manual
+# gives against the lists the source gives - md_pseudo_table
+# against the Directives section, i51_names against the operand names,
 # RELOC_NUMBERS against the relocation names, the I51_INS rows against the
 # instruction list - and it requires every diagnostic the manual quotes to be
 # an instance of a format string the port really carries, conversions and all.
@@ -529,10 +504,8 @@ disasm:
 # are the same failure.
 #
 # It does not read English, and no amount of green here says a documented
-# rule is the rule the code implements. The three false sentences that
-# prompted it were all of that shape and all three would still pass; what
-# judges those is bits, reloc and branch, which assemble something. The
-# header of doctruth.py states what it checks and what it cannot, at length,
+# rule is the rule the code implements; what judges that is bits, reloc and
+# branch, which assemble something. The header of doctruth.py states what it checks and what it cannot, at length,
 # because a check that appears to verify prose is worse than no check.
 #
 # No toolchain: the port has no source tree, so the files are reconstructed
@@ -542,10 +515,9 @@ doctruth:
 	python3 $(HERE)/doctruth.py --patch $(HERE)/../mcs51/additions.patch
 
 # The port's own DejaGnu suites, gas/testsuite/gas/i51 and ld/testsuite/ld-i51:
-# the regression tests binutils itself would run, among them one for each
-# defect the reviews found, and the tests of what an operand, a relocation or
-# the default linker script has to refuse - the class of test the stages above
-# had none of.  BUILD has to be a configured build tree, which `make build'
+# the regression tests binutils itself would run, including the tests of what
+# an operand, a relocation or the default linker script has to refuse, which
+# the stages above do not cover.  BUILD has to be a configured build tree, which `make build'
 # leaves.  Green means every test passed and at least one ran: runtest that
 # reports nothing is a broken setup, not a pass.
 dejagnu:
@@ -602,9 +574,8 @@ mutants:
 #
 # `mutants' above stops at the first stage that goes red, so a stage's kill
 # count is a fact about its POSITION in $(MUTGATE): a stage that runs last is
-# only ever recorded catching what every stage before it missed. The last
-# recorded run read sim 0 and commons 0 for exactly that reason, and no
-# argument about removing or merging a stage can rest on a number like that.
+# only ever recorded catching what every stage before it missed, so no
+# argument about removing or merging a stage can rest on that number.
 #
 # This target runs the whole list against every mutant - `run.py --all-stages'
 # - and reduces the matrix: per stage the kills it makes on its own and the
@@ -662,24 +633,19 @@ space := $(subst ,, )
 # BUILD-INFO beside them, strip, then check the result is a toolchain somebody
 # can actually assemble and link 8051 code with.
 #
-# The first three of those are all the recipe used to do, and every archive
-# published from it was wrong in three ways that nothing could have caught:
+#   - Licence. binutils is GPLv3 and its `make install' installs no COPYING of
+#     any kind, so the text is copied out of the tarball that was just built:
+#     the licence of the sources these binaries came from, not a copy kept in
+#     this repository and liable to drift. No COPYING* is fatal.
+#   - Provenance. BUILD-INFO.txt names the binutils release, the commit and the
+#     host, so an unpacked copy can be identified. Its date is the commit date
+#     in UTC, so two builds of one commit write the same file.
+#   - Strip. A missing or failing strip is fatal; DIST_STRIP overrides the
+#     program if a host needs it to.
 #
-#   - No licence. binutils is GPLv3 and its `make install' installs no COPYING
-#     of any kind, so the archive was a pile of GPL binaries with no licence
-#     text - not redistributable. The text is copied out of the tarball that was
-#     just built, so it is the licence of the sources these binaries came from
-#     rather than a copy kept in this repository and liable to drift.
-#   - No provenance. Nothing in the archive said which binutils, which commit or
-#     which host it was, so an unpacked copy was unidentifiable a week later.
-#   - `strip ... || true'. A missing cross-strip published unstripped binaries
-#     under a release note promising stripped ones, silently. It is fatal now;
-#     DIST_STRIP overrides the program if a host ever needs it to.
-#
-# And nothing looked at the result. Every gate stage runs the binaries out of
-# the build tree, so `install' could drop a tool or the linker script and the
-# whole gate would stay green while the archive shipped broken. dist_check.sh
-# is the only thing in the repository that judges the installed tree.
+# Every gate stage runs the binaries out of the build tree, so `install' could
+# drop a tool or the linker script with the whole gate green. dist_check.sh is
+# the only thing in the repository that judges the installed tree.
 #
 # DIST_RUN says whether the installed binaries can be executed here: `native'
 # when they are this machine's, `wine' for the mingw hosts, `none' for the
@@ -691,6 +657,9 @@ DIST_LABEL  ?= $(if $(HOST),$(HOST),$(shell uname -s 2>/dev/null)-$(shell uname 
 DIST_RUN    ?= $(if $(HOST),none,native)
 DIST_STRIP  ?= $(TOOLPREFIX)strip
 DIST_COMMIT ?= $(or $(shell git -C $(HERE)/.. rev-parse HEAD 2>/dev/null),unknown)
+# The commit's date in UTC, not the wall clock: BUILD-INFO.txt is the same file
+# however often one commit is built. SOURCE_DATE_EPOCH wins when it is set.
+DIST_DATE   ?= $(or $(if $(SOURCE_DATE_EPOCH),$(shell TZ=UTC0 date -u -d @$(SOURCE_DATE_EPOCH) '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)),$(shell TZ=UTC0 git -C $(HERE)/.. log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ 2>/dev/null),unknown)
 
 dist:
 	cd $(WORK)/modern/build && $(MAKE) MAKEINFO=true install-gas install-ld install-binutils
@@ -721,7 +690,7 @@ dist:
 		echo "target:            $(TARGET)"; \
 		echo "host:              $(DIST_LABEL)"; \
 		echo "port-commit:       $(DIST_COMMIT)"; \
-		echo "built:             $$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; \
+		echo "built:             $(DIST_DATE)"; \
 		echo "patches:           mcs51/additions.patch mcs51/modifications.patch"; \
 		echo "source:            https://github.com/kimstik/binutils-mcs51"; \
 		echo "licence:           GNU GPL v3 or later - see COPYING3"; \
@@ -760,8 +729,8 @@ release-vars:
 # The stage list a release is allowed to claim, straight out of $(GATE) plus the
 # canary, which is in no list above. release.yml runs `gate' and `check-canary'
 # and then requires this list to be exactly the sixteen names it names in the
-# release body: adding a stage without saying so in the release note fails the
-# publish instead of quietly changing what "sixteen stages" means.
+# release body, so a stage added without saying so in the release note fails
+# the publish.
 gate-list:
 	@echo $(GATE) check-canary
 
@@ -824,8 +793,8 @@ upstream:
 		$(if $(PRETEND),--pretend-version $(PRETEND),)
 
 # The pin, for upstream_watch.py. Asking make beats scraping this file with a
-# regex: `?=', a command-line override and any future computed value all read the
-# same. Nothing else uses it.
+# regex: `?=', a command-line override and a computed value all read the same.
+# Nothing else uses it.
 print-port:
 	@printf '%s\n' 'PORT_VERSION=$(PORT_VERSION)' 'PORT_URL=$(PORT_URL)' 'PORT_SHA256=$(PORT_SHA256)'
 

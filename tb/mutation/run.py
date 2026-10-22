@@ -7,16 +7,15 @@ any gate stage fail is killed; one that passes the whole gate is a hole in
 the suite - a fault the tests cannot see.
 
 The stages are the existing testbench targets, run through tb/Makefile, so
-whatever `make -C tb <stage>' means today is what a mutant has to survive.
+whatever `make -C tb <stage>' means is what a mutant has to survive.
 --stages is required and has no default: the one list of stages a mutant must
 survive is tb/Makefile's $(MUTGATE), and a default here would be a second copy
 of it that drifts.  A stage added to $(MUTGATE) then reaches this file for
-free, and a hand run states what it measured against instead of quietly
-measuring against less than the recorded runs did.
+free, and a hand run states what it measured against.
 
   run.py --tree WORK/modern/binutils-2.47 --build WORK/modern/build \
          --mutants mutants.json --out results.json \
-         --stages isa,roundtrip,branch,bits,reloc,sim,defaultlink,commons,script,disasm,check
+         --stages isa,roundtrip,branch,bits,reloc,guard,sim,defaultlink,commons,script,disasm,doctruth,dejagnu,check
 
 --all-stages runs every stage against every mutant instead of stopping at
 the first red, and records each stage's verdict and wall clock separately.
@@ -24,10 +23,8 @@ It is a mode and not the default because it costs the whole gate for every
 mutant, where the fail-first path costs only as far as the first red.  What
 it buys is the one question the fail-first numbers cannot answer: in stage
 order a stage can only ever be recorded killing what every stage before it
-missed, so its count measures its POSITION as much as its reach.  The last
-fail-first run read sim 0 and commons 0 - both run late, and something
-earlier always got there first.  Nothing about removing or merging a stage
-can be argued from a number like that.  mutation/coverage.py reduces the
+missed, so its count measures its POSITION as much as its reach, and
+nothing about removing or merging a stage can be argued from it.  mutation/coverage.py reduces the
 full matrix this mode writes; it refuses a fail-first file outright.
 
 Exit: 0 the run completed (kill rate in the report), 1 interrupted (the
