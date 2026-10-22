@@ -317,6 +317,19 @@ index fcf65041..3e7e30c6 100644
  
  #ifdef BFD64
  	&bpf_elf64_be_vec,
+diff --git a/binutils/NEWS b/binutils/NEWS
+index b8a762c7..56c2a717 100644
+--- a/binutils/NEWS
++++ b/binutils/NEWS
+@@ -2,6 +2,8 @@
+ 
+ Changes in 2.47:
+ 
++* Add support for the Intel MCS-51 (8051) microcontroller, target i51-elf.
++
+ * The s390 32-bit target (s390-*) is deprecated and planned for removal in a
+   future release, along with the elf32-s390 target format.  configure emits
+   an error for this target, which can be overridden using --enable-obsolete.
 diff --git a/binutils/readelf.c b/binutils/readelf.c
 index 1f7a90e7..11ed67ce 100644
 --- a/binutils/readelf.c
@@ -407,6 +420,19 @@ index b2bb505c..fcab63ec 100644
  	doc/c-ip2k.texi \
  	doc/c-kvx.texi \
  	doc/c-lm32.texi \
+diff --git a/gas/NEWS b/gas/NEWS
+index 165e2336..fdb603d9 100644
+--- a/gas/NEWS
++++ b/gas/NEWS
+@@ -2,6 +2,8 @@
+ 
+ Changes in 2.47:
+ 
++* Add support for the Intel MCS-51 (8051) microcontroller, target i51-elf.
++
+ * New command line option --reloc-section-sym=[all|internal|none]
+   controls whether relocations referencing local binding symbols are adjusted
+   to use section symbols.
 diff --git a/gas/configure.tgt b/gas/configure.tgt
 index 7a5645fd..07546d74 100644
 --- a/gas/configure.tgt
@@ -514,6 +540,21 @@ index d879f04a..ae282e3e 100644
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32ip2k.Po@am__quote@
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32iq10.Po@am__quote@
  @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eelf32iq2000.Po@am__quote@
+diff --git a/ld/NEWS b/ld/NEWS
+index 53394fee..9d78de46 100644
+--- a/ld/NEWS
++++ b/ld/NEWS
+@@ -2,6 +2,10 @@
+ 
+ Changes in 2.47:
+ 
++* Add support for the Intel MCS-51 (8051) microcontroller, target i51-elf,
++  with a default linker script that keeps each of its memory spaces at its
++  own addresses.
++
+ * Add a linker optimization level of zero.  Using "-O 0" on the linker command
+   line will stop it from combining the contents of mergeable sections.  This
+   can significantly speed up the link process at the cost of producing larger
 diff --git a/ld/configure.tgt b/ld/configure.tgt
 index 60b62e69..699e1838 100644
 --- a/ld/configure.tgt
@@ -539,6 +580,74 @@ index d7d0c517..133990ff 100644
  eelf32ip2k.c
  eelf32iq10.c
  eelf32iq2000.c
+diff --git a/ld/testsuite/ld-checks/checks.exp b/ld/testsuite/ld-checks/checks.exp
+index abfb01cc..6f9b55fb 100644
+--- a/ld/testsuite/ld-checks/checks.exp
++++ b/ld/testsuite/ld-checks/checks.exp
+@@ -28,7 +28,9 @@ proc section_check {} {
+     global subdir
+ 
+     # The usage of .lcomm in asm.s is incompatible with ia64 and ppc xcoff.
+-    if { [istarget ia64-*-*] || [is_xcoff_format] } {
++    # The MCS-51 default script loads none of its RAM spaces, and the
++    # linker refuses the initialized .data this object carries.
++    if { [istarget ia64-*-*] || [istarget i51-*-*] || [is_xcoff_format] } {
+ 	return
+     }
+     set test "check sections 1"
+diff --git a/ld/testsuite/ld-elf/comm-data4.d b/ld/testsuite/ld-elf/comm-data4.d
+index 024cfd8d..d1c03a47 100644
+--- a/ld/testsuite/ld-elf/comm-data4.d
++++ b/ld/testsuite/ld-elf/comm-data4.d
+@@ -1,5 +1,7 @@
+ #source: comm-data4.s
+ #ld: 
+ #readelf: -r
++#notarget: i51-*-*
++# The MCS-51 linker refuses initialized data in RAM nothing loads.
+ 
+ There are no relocations in this file.
+diff --git a/ld/testsuite/ld-linkonce/linkonce.exp b/ld/testsuite/ld-linkonce/linkonce.exp
+index 96c54d4a..517c5233 100644
+--- a/ld/testsuite/ld-linkonce/linkonce.exp
++++ b/ld/testsuite/ld-linkonce/linkonce.exp
+@@ -30,11 +30,18 @@ run_ld_link_tests [list \
+     [list "Build sym.a" \
+ 	"" "" \
+ 	"" {sym1.s sym2.s sym3.s ref2.s} {} "sym.a" ] \
+-    [list "pr26103" \
+-	"" "--start-group tmpdir/sym.a tmpdir/ref2.o --end-group" \
+-	"" {ref1.s} {} "pr26103" ] \
+ ]
+ 
++# The MCS-51 default script loads none of its RAM spaces, and the linker
++# refuses the initialized .data these objects carry.
++if { ![istarget i51-*-*] } {
++    run_ld_link_tests [list \
++	[list "pr26103" \
++	    "" "--start-group tmpdir/sym.a tmpdir/ref2.o --end-group" \
++	    "" {ref1.s} {} "pr26103" ] \
++    ]
++}
++
+ set rd_test_list [lsort [glob -nocomplain $srcdir/$subdir/*.d]]
+ for { set i 0 } { $i < [llength $rd_test_list] } { incr i } {
+     # We need to strip the ".d", but can leave the dirname.
+diff --git a/ld/testsuite/ld-scripts/sysroot-prefix.exp b/ld/testsuite/ld-scripts/sysroot-prefix.exp
+index acf59daf..41717f58 100644
+--- a/ld/testsuite/ld-scripts/sysroot-prefix.exp
++++ b/ld/testsuite/ld-scripts/sysroot-prefix.exp
+@@ -19,7 +19,10 @@
+ 
+ # Don't run on alpha-vms which requires linking with other libraries,
+ # or on targets that complain about relocations in read-only sections.
++# The MCS-51 default script loads none of its RAM spaces, and the linker
++# refuses the initialized .data these objects carry.
+ if { [istarget *-*-vms]
++     || [istarget i51-*-*]
+      || [istarget bfin-*-*]
+      || [istarget frv-*-*]
+      || [istarget lm32-*-*] } then {
 diff --git a/opcodes/Makefile.am b/opcodes/Makefile.am
 index a0fcf4d5..183b4d80 100644
 --- a/opcodes/Makefile.am
