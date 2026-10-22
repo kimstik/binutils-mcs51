@@ -1221,10 +1221,10 @@ index 00000000..dccd9af4
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..2433b547
+index 00000000..fa66112d
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2254 @@
+@@ -0,0 +1,2284 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1600,6 +1600,7 @@ index 00000000..2433b547
 +  bool bit;
 +};
 +static htab_t i51_names_used;
++static struct i51_name_use *i51_name_use (const char *);
 +
 +/* Where each memory-space common was declared, and in which space.  */
 +struct i51_common_decl
@@ -1876,13 +1877,17 @@ index 00000000..2433b547
 +i51_note_use (const char *name, bool bit)
 +{
 +  struct i51_name_use *use;
++  char *upper, *p;
 +
-+  if (str_hash_find (i51_names_used, name) != NULL)
++  if (i51_name_use (name) != NULL)
 +    return;
++  upper = xstrdup (name);
++  for (p = upper; *p != 0; p++)
++    *p = TOUPPER (*p);
 +  use = XNEW (struct i51_name_use);
 +  use->file = as_where (&use->line);
 +  use->bit = bit;
-+  str_hash_insert (i51_names_used, xstrdup (name), use, 0);
++  str_hash_insert (i51_names_used, upper, use, 0);
 +}
 +
 +/* The value of a built-in byte or bit name.  ARn is register n of the
@@ -1906,6 +1911,24 @@ index 00000000..2433b547
 +  i51_note_use (n->name, false);
 +}
 +
++/* Where NAME was first used as a built-in name or as NAME.N, or NULL.
++   The uses are recorded in upper case, as the built-in names are spelled
++   whether or not symbol names are folded.  */
++
++static struct i51_name_use *
++i51_name_use (const char *name)
++{
++  char *upper = xstrdup (name);
++  struct i51_name_use *use;
++  char *p;
++
++  for (p = upper; *p != 0; p++)
++    *p = TOUPPER (*p);
++  use = str_hash_find (i51_names_used, upper);
++  free (upper);
++  return use;
++}
++
 +/* tc_frob_symbol: a symbol may not be defined under a built-in name the
 +   file has already used as such.  */
 +
@@ -1924,7 +1947,7 @@ index 00000000..2433b547
 +  if ((!S_IS_DEFINED (sym) && !S_IS_EXTERNAL (sym) && !S_IS_WEAK (sym))
 +      || symbol_section_p (sym))
 +    return;
-+  use = str_hash_find (i51_names_used, S_GET_NAME (sym));
++  use = i51_name_use (S_GET_NAME (sym));
 +  if (use == NULL)
 +    return;
 +  if (use->bit)
@@ -2142,7 +2165,7 @@ index 00000000..2433b547
 +
 +      memset (&arg, 0, sizeof (arg));
 +      full = xstrdup (name);
-+      i51_note_use (i51_canonicalize_symbol_name (full), true);
++      i51_note_use (full, true);
 +      free (full);
 +      n = i51_lookup_name (name, baselen);
 +      if (n != NULL && !i51_user_symbol (name, baselen))
@@ -2621,6 +2644,12 @@ index 00000000..2433b547
 +{
 +  char *saved = input_line_pointer;
 +
++  if (seg_info (now_seg)->bss)
++    {
++      as_bad (_("an instruction in %s, which has no contents"),
++	      segment_name (now_seg));
++      return;
++    }
 +  i51_assemble (str);
 +  input_line_pointer = saved;
 +}
@@ -3006,8 +3035,9 @@ index 00000000..2433b547
 +  if (i51_space_segs[space] != NULL)
 +    return i51_space_segs[space];
 +
++  /* subseg_new () makes the section current; the caller decides that.  */
 +  fresh = bfd_get_section_by_name (stdoutput, name) == NULL;
-+  i51_space_segs[space] = subseg_new (name, 0);
++  i51_space_segs[space] = subseg_get (name, 0);
 +  if (fresh)
 +    {
 +      flagword keep = i51_spaces[space].keep;
@@ -4691,6 +4721,32 @@ index 00000000..3810c5bf
 +g:	nop
 +	sjmp	w
 +	sjmp	g
+diff --git a/gas/testsuite/gas/i51/bss-insn.d b/gas/testsuite/gas/i51/bss-insn.d
+new file mode 100644
+index 00000000..129fb0aa
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bss-insn.d
+@@ -0,0 +1,3 @@
++#name: i51 instruction in a section without contents
++#as:
++#error_output: bss-insn.l
+diff --git a/gas/testsuite/gas/i51/bss-insn.l b/gas/testsuite/gas/i51/bss-insn.l
+new file mode 100644
+index 00000000..6b8b0857
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bss-insn.l
+@@ -0,0 +1,2 @@
++.*: Assembler messages:
++.*:3: Error: an instruction in \.xbss, which has no contents
+diff --git a/gas/testsuite/gas/i51/bss-insn.s b/gas/testsuite/gas/i51/bss-insn.s
+new file mode 100644
+index 00000000..6e6d44fa
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bss-insn.s
+@@ -0,0 +1,3 @@
++; An instruction needs a section with contents.
++	.xbss
++	nop
 diff --git a/gas/testsuite/gas/i51/builtin-global.d b/gas/testsuite/gas/i51/builtin-global.d
 new file mode 100644
 index 00000000..c3785a39
@@ -4718,6 +4774,36 @@ index 00000000..8cce3636
 +	.text
 +	setb	ea
 +	.global	ea
+diff --git a/gas/testsuite/gas/i51/case-bad.d b/gas/testsuite/gas/i51/case-bad.d
+new file mode 100644
+index 00000000..a6d0073c
+--- /dev/null
++++ b/gas/testsuite/gas/i51/case-bad.d
+@@ -0,0 +1,3 @@
++#name: i51 -mcase-sensitive built-in names used, then defined
++#as: -mcase-sensitive
++#error_output: case-bad.l
+diff --git a/gas/testsuite/gas/i51/case-bad.l b/gas/testsuite/gas/i51/case-bad.l
+new file mode 100644
+index 00000000..3aa4c9d6
+--- /dev/null
++++ b/gas/testsuite/gas/i51/case-bad.l
+@@ -0,0 +1,3 @@
++.*: Assembler messages:
++.*:3: Error: `acc' is used here as the built-in name and defined later as a symbol; declare it with \.local first
++.*:5: Error: `tcon\.4' is used here as a bit of the byte before the dot and defined later as a symbol; define it before its first use
+diff --git a/gas/testsuite/gas/i51/case-bad.s b/gas/testsuite/gas/i51/case-bad.s
+new file mode 100644
+index 00000000..491cb5be
+--- /dev/null
++++ b/gas/testsuite/gas/i51/case-bad.s
+@@ -0,0 +1,6 @@
++; -mcase-sensitive keeps the rule on built-in names used, then defined.
++	.text
++	mov	a,acc
++	.equ	acc,0x30
++	setb	tcon.4
++tcon.4:	nop
 diff --git a/gas/testsuite/gas/i51/case.d b/gas/testsuite/gas/i51/case.d
 new file mode 100644
 index 00000000..24cd2b1e
@@ -5199,6 +5285,33 @@ index 00000000..666bd33c
 +	jz	l
 +m:	acall	l
 +	ret
+diff --git a/gas/testsuite/gas/i51/lcomm-code.d b/gas/testsuite/gas/i51/lcomm-code.d
+new file mode 100644
+index 00000000..cd05e853
+--- /dev/null
++++ b/gas/testsuite/gas/i51/lcomm-code.d
+@@ -0,0 +1,8 @@
++#name: i51 .local common between instructions
++#as:
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 74019000 00f0 +.*
+diff --git a/gas/testsuite/gas/i51/lcomm-code.s b/gas/testsuite/gas/i51/lcomm-code.s
+new file mode 100644
+index 00000000..b4971169
+--- /dev/null
++++ b/gas/testsuite/gas/i51/lcomm-code.s
+@@ -0,0 +1,7 @@
++; A .local common of a space leaves the current section alone.
++	.text
++	mov	a,#1
++	.local	buf
++	.xcomm	buf,4
++	mov	dptr,#buf
++	movx	@dptr,a
 diff --git a/gas/testsuite/gas/i51/lcomm-space.d b/gas/testsuite/gas/i51/lcomm-space.d
 new file mode 100644
 index 00000000..d767f416
