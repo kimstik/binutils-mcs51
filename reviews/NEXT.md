@@ -11,7 +11,12 @@ r9-quality.md / r9-tests.md (open, list below).
 - [x] gas: LOW1,2,5,6,7,8,11,12,13,15,16 + gas tests: bf7eb5c.
 - [x] harness (gen.py scopes, run.py, Makefile counts), last DejaGnu tests, docs: e3c2b4e.
 - [x] clean-room build from tarball + patches at e3c2b4e: gate green, no warnings in port files.
-- [ ] next: round 10 review (quality + tests lanes, as r9), fix, repeat until clean.
+- [x] round 10 started; r10-quality.md in. C1 (.local space common lost the
+      code after it) and M1 (-mcase-sensitive use-then-define) fixed: fbc931d.
+- [ ] r10-quality LOW 1-9 (see r10-quality.md), r10-tests.md when it lands,
+      then round 11 if anything above LOW remains.
+Commits: author and committer kimstik <kimstik@github.com>, no attribution
+trailers (owner's request); the clone's user.name/user.email are set.
 
 ## Decision by the owner
 Symbol names: fold to upper case by default (compatibility), plus an option
