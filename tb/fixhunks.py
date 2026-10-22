@@ -28,7 +28,8 @@ import hashlib
 import re
 import sys
 
-HUNK_PREFIX = "@@ -0,0 +1,"
+# git leaves the count out of a one-line file's hunk: "@@ -0,0 +1 @@".
+HUNK_RE = re.compile(rb"^@@ -0,0 \+1(?:,\d+)? @@")
 INDEX_RE = re.compile(rb"^index (0{7,40})\.\.([0-9a-f]{7,40})$")
 PLUSPLUS_RE = re.compile(rb"^\+\+\+ (?:b/)?(.+)$")
 
@@ -65,7 +66,7 @@ def walk(lines):
         if not line.startswith(b"@@ "):
             i += 1
             continue
-        if not line.startswith(HUNK_PREFIX.encode()):
+        if not HUNK_RE.match(line):
             raise NotAllAdditions(
                 "%d: not an all-additions hunk: %s"
                 % (i + 1, line.decode("utf-8", "replace")))
@@ -119,7 +120,7 @@ def process(path, check):
         for i, j, _name in walk(lines):
             line = lines[i]
             n = len(hunk_body(lines, i, j))
-            want = b"@@ -0,0 +1,%d @@" % n
+            want = b"@@ -0,0 +1 @@" if n == 1 else b"@@ -0,0 +1,%d @@" % n
             if line != want:
                 stale.append((i + 1, line.decode(), want.decode()))
                 if not check:

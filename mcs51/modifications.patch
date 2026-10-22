@@ -331,7 +331,7 @@ index b8a762c7..56c2a717 100644
    future release, along with the elf32-s390 target format.  configure emits
    an error for this target, which can be overridden using --enable-obsolete.
 diff --git a/binutils/readelf.c b/binutils/readelf.c
-index 1f7a90e7..aec1c314 100644
+index 1f7a90e7..fcba001b 100644
 --- a/binutils/readelf.c
 +++ b/binutils/readelf.c
 @@ -117,6 +117,7 @@
@@ -342,14 +342,14 @@ index 1f7a90e7..aec1c314 100644
  #include "elf/i370.h"
  #include "elf/i860.h"
  #include "elf/i960.h"
-@@ -1282,6 +1283,7 @@ guess_is_rela (unsigned int e_machine)
-     case EM_ARC_COMPACT2:
-     case EM_ARC_COMPACT3:
-     case EM_ARC_COMPACT3_64:
+@@ -1272,6 +1273,7 @@ guess_is_rela (unsigned int e_machine)
+ 
+       /* Targets that use RELA relocations.  */
+     case EM_68K:
 +    case EM_8051:
-     case EM_AVR:
-     case EM_AVR_OLD:
-     case EM_BLACKFIN:
+     case EM_860:
+     case EM_AARCH64:
+     case EM_ADAPTEVA_EPIPHANY:
 @@ -2383,6 +2385,9 @@ dump_relocations (Filedata *          filedata,
  	case EM_AVR_OLD:
  	  rtype = elf_avr_reloc_type (type);
@@ -759,21 +759,22 @@ index 734f9329..259ce5ff 100644
  
  # Test objdump -s
 diff --git a/binutils/testsuite/binutils-all/readelf.exp b/binutils/testsuite/binutils-all/readelf.exp
-index 6c5e63fb..52f6ce53 100644
+index 6c5e63fb..2ab6b1f9 100644
 --- a/binutils/testsuite/binutils-all/readelf.exp
 +++ b/binutils/testsuite/binutils-all/readelf.exp
-@@ -366,7 +366,10 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+@@ -366,7 +366,11 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
      readelf_test -h $tempfile readelf.h
      readelf_test -S $tempfile readelf.s
      setup_xfail "mips-*-*irix*"
 +    # The i51 assembler folds symbol names to upper case.
 +    setup_xfail "i51-*-*"
      readelf_test -s $tempfile readelf.ss
++    # Likewise.
 +    setup_xfail "i51-*-*"
      readelf_test -r $tempfile readelf.r
  
      readelf_thin_archive_test
-@@ -384,6 +387,9 @@ if {![binutils_assemble $srcdir/$subdir/mangled.s tmpdir/mangled.o]} then {
+@@ -384,6 +388,9 @@ if {![binutils_assemble $srcdir/$subdir/mangled.s tmpdir/mangled.o]} then {
      }
  
      # Run the test.
@@ -783,7 +784,7 @@ index 6c5e63fb..52f6ce53 100644
      readelf_test {--syms --demangle --wide} $tempfile readelf.demangled
  }
  
-@@ -713,9 +719,9 @@ proc readelf_relr_test {} {
+@@ -713,9 +720,9 @@ proc readelf_relr_test {} {
      pass "$testname"
  }
  
@@ -2156,18 +2157,18 @@ index 53394fee..9d78de46 100644
    line will stop it from combining the contents of mergeable sections.  This
    can significantly speed up the link process at the cost of producing larger
 diff --git a/ld/configure.tgt b/ld/configure.tgt
-index 60b62e69..699e1838 100644
+index 60b62e69..276b96e0 100644
 --- a/ld/configure.tgt
 +++ b/ld/configure.tgt
-@@ -320,6 +320,8 @@ h8300-*-linux*)
- 			targ_emul=h8300helf_linux;
- 			targ_extra_emuls="h8300self_linux h8300sxelf_linux h8300elf_linux"
+@@ -428,6 +428,8 @@ i[3-7]86-*-chaos)	targ_emul=elf_i386_chaos
+ ia16-*-elf*)		targ_emul=elf_i386
+ 			targ_extra_emuls=i386msdos
  			;;
 +i51-*-*)		targ_emul=elf32i51
 +			;;
- hppa*64*-*-linux-*)	targ_emul=hppa64linux
+ ia64-*-elf*)		targ_emul=elf64_ia64
  			;;
- hppa*64*-hpux*)		targ_emul=elf64hppa
+ ia64-*-freebsd* | ia64-*-kfreebsd*-gnu)
 diff --git a/ld/po/BLD-POTFILES.in b/ld/po/BLD-POTFILES.in
 index d7d0c517..133990ff 100644
 --- a/ld/po/BLD-POTFILES.in
