@@ -1171,7 +1171,7 @@ index 00000000..db3ce5af
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..fb938eb4
+index 00000000..dc9d57b0
 --- /dev/null
 +++ b/gas/config/tc-i51.c
 @@ -0,0 +1,2300 @@
@@ -2269,7 +2269,7 @@ index 00000000..fb938eb4
 +      opc = i51_find_row (i51_aliases[i].real, ops, nops);
 +  if (opc == NULL)
 +    {
-+      /* HIGH () or LOW () where the row wants a branch target.  */
++      /* HIGH () or LOW () where the row wants a code or bit address.  */
 +      for (i = 0; i < nops; i++)
 +	if (ops[i].exp.X_op == O_i51_high || ops[i].exp.X_op == O_i51_low)
 +	  {
@@ -2280,8 +2280,8 @@ index 00000000..fb938eb4
 +	    ops[i].cls = 'D';
 +	    if (alt != NULL)
 +	      {
-+		as_bad (_("HIGH() and LOW() are not allowed on a code "
-+			  "address"));
++		as_bad (_("HIGH() and LOW() name a byte, and are not allowed "
++			  "on a code or bit address"));
 +		return;
 +	      }
 +	  }
