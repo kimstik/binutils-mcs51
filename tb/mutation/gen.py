@@ -61,16 +61,28 @@ FILES = {
     'ldsc': 'ld/scripttempl/elf32i51.sc',
 }
 
-# Functions worth mutating: the ones that encode, relocate or decode.
+# Functions worth mutating: the ones that parse operands, encode, relocate,
+# place or decode.  The operand parser and the memory-space code are here
+# because that is where the defects of the sixth review were.
 SCOPES = {
     'gas': ['md_apply_fix', 'fixup8', 'fixup11', 'fixup16', 'check_range',
             'i51_fold_bit_suffix', 'i51_build_ins', 'md_pcrel_from_section',
-            'tc_gen_reloc', 'i51_bit', 'md_undefined_symbol',
-            'i51_arg_kind', 'i51_check_direct'],
+            'tc_gen_reloc', 'i51_bit', 'i51_arg_kind', 'i51_check_direct',
+            'i51_bit_address', 'i51_parse_operand', 'i51_row_fits',
+            'i51_find_row', 'i51_assemble', 'i51_parse_name',
+            'i51_apply_operator', 'i51_operator_args', 'i51_strip_operator',
+            'i51_cons_fix_new', 'i51_frob_symbol', 'i51_using',
+            'i51_space_section', 'i51_alloc_local', 'i51_common_parse',
+            'pcode_operand', 'pcode_byte', 'pcode_word', 'pcode_flags',
+            'i51_pcode'],
     'bfd': ['i51_final_link_relocate', 'elf32_i51_relocate_section',
             'i51_info_to_howto_rela', 'elf32_i51_section_from_bfd_section',
-            'elf32_i51_add_symbol_hook', 'bfd_elf32_bfd_reloc_type_lookup'],
-    'dis': ['print_insn_i51', 'i51dis_op16', 'i51dis_opcode'],
+            'elf32_i51_add_symbol_hook', 'bfd_elf32_bfd_reloc_type_lookup',
+            'i51_section_space', 'i51_check_space', 'elf32_i51_final_link',
+            'elf32_i51_check_common_space', 'i51_common_by_shndx',
+            'i51_common_by_section', 'elf32_i51_symbol_processing',
+            'i51_elf_section_flags'],
+    'dis': ['print_insn_i51'],
 }
 
 

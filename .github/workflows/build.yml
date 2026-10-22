@@ -25,6 +25,10 @@ on:
       - 'tb/**'
       - '.github/workflows/build.yml'
 
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
@@ -33,7 +37,7 @@ jobs:
         include:
           - name: linux-x86_64
             os: ubuntu-24.04
-            flags: -Os -flto -march=haswell
+            flags: -Os -flto
             arwrap: yes
             check: native
             distrun: native
@@ -55,7 +59,7 @@ jobs:
           - name: windows-x86_64
             os: ubuntu-24.04
             host: x86_64-w64-mingw32
-            flags: -Os -flto -march=haswell
+            flags: -Os -flto
             arwrap: yes
             check: wine
             distrun: wine
@@ -83,7 +87,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y p7zip-full texinfo zip
+          sudo apt-get install -y p7zip-full texinfo zip dejagnu
+          if [ "${{ matrix.check }}" = native ]; then sudo apt-get install -y sdcc-ucsim; fi
           if [ -n "${{ matrix.host }}" ]; then sudo apt-get install -y mingw-w64; fi
           if [ "${{ matrix.check }}" = wine ]; then
             if [ "${{ matrix.host }}" = i686-w64-mingw32 ]; then
@@ -101,15 +106,27 @@ jobs:
           HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
           HOMEBREW_NO_INSTALL_UPGRADE: 1
         run: |
-          brew install --quiet coreutils p7zip
+          brew install --quiet coreutils p7zip deja-gnu
           echo "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
 
       - name: Build
         run: make -C tb build HOST=${{ matrix.host }} OPTFLAGS="${{ matrix.flags }}" AR_WRAP="${{ matrix.arwrap }}"
 
+      # On Linux these binaries are the ones the archive below ships, so they
+      # go through the whole gate rather than a part of it: what is released
+      # is what was gated, not a second build of the same commit.
+      - name: The gate, on the binaries this job ships
+        if: matrix.check == 'native' && runner.os == 'Linux'
+        run: make -C tb gate BUILD=$GITHUB_WORKSPACE/work/modern/build
+
+      # macOS has no ucsim package to run the `sim' stage with, so it runs the
+      # stages that need none.
       - name: Run the testbench
-        if: matrix.check == 'native'
-        run: make -C tb check BUILD=$GITHUB_WORKSPACE/work/modern/build
+        if: matrix.check == 'native' && runner.os != 'Linux'
+        run: |
+          for s in check isa dejagnu; do
+            make -C tb "$s" BUILD=$GITHUB_WORKSPACE/work/modern/build || exit 1
+          done
 
       # Runs whatever the testbench reported: it checks that a broken toolchain
       # makes the testbench go red, which is only worth knowing when the testbench
@@ -117,10 +134,6 @@ jobs:
       - name: Testbench canary
         if: always() && matrix.check == 'native'
         run: make -C tb check-canary
-
-      - name: Instruction gate
-        if: matrix.check == 'native'
-        run: make -C tb isa BUILD=$GITHUB_WORKSPACE/work/modern/build
 
       - name: Smoke test under wine
         if: matrix.check == 'wine'

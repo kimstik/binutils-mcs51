@@ -120,7 +120,7 @@ TOOLS := mcs51-as:gas/as-new \
 # them against a fixed 2001 image, so against a mutated toolchain it can only
 # repeat what check already says, at twice the cost.
 TOOLGATE := isa roundtrip branch bits reloc guard sim defaultlink commons script disasm \
-            doctruth
+            doctruth dejagnu
 GATE     := $(TOOLGATE) check oracle
 MUTGATE  := $(TOOLGATE) check
 
@@ -541,6 +541,31 @@ disasm:
 doctruth:
 	python3 $(HERE)/doctruth.py --patch $(HERE)/../mcs51/additions.patch
 
+# The port's own DejaGnu suites, gas/testsuite/gas/i51 and ld/testsuite/ld-i51:
+# the regression tests binutils itself would run, among them one for each
+# defect the reviews found, and the tests of what an operand, a relocation or
+# the default linker script has to refuse - the class of test the stages above
+# had none of.  BUILD has to be a configured build tree, which `make build'
+# leaves.  Green means every test passed and at least one ran: runtest that
+# reports nothing is a broken setup, not a pass.
+dejagnu:
+	@test -f "$(BUILD)/gas/Makefile" || { echo "no build tree in $(BUILD)"; exit 2; }
+	@command -v runtest > /dev/null || { echo "dejagnu: runtest is not installed"; exit 2; }
+	@mkdir -p $(WORK)
+	@rc=0; \
+	for t in gas ld; do \
+		rm -f $(BUILD)/$$t/$$t.sum $(BUILD)/$$t/testsuite/$$t.sum; \
+		$(MAKE) -C $(BUILD)/$$t check RUNTESTFLAGS=i51.exp \
+			> $(WORK)/dejagnu-$$t.log 2>&1; \
+		sum=$$(ls $(BUILD)/$$t/$$t.sum $(BUILD)/$$t/testsuite/$$t.sum 2> /dev/null | head -1); \
+		if [ -z "$$sum" ]; then echo "== $$t: no $$t.sum"; rc=1; continue; fi; \
+		pass=$$(grep -c '^PASS:' "$$sum"); \
+		bad=$$(grep -E '^(FAIL|XPASS|ERROR|UNRESOLVED|UNTESTED):' "$$sum"); \
+		echo "== $$t: $$pass passed"; \
+		if [ -n "$$bad" ] || [ "$$pass" -eq 0 ]; then echo "$$bad"; rc=1; fi; \
+	done; \
+	exit $$rc
+
 # ---------------------------------------------------------------- gate
 
 # Everything the merge gate runs. Each stage prints its own verdict; the first
@@ -734,9 +759,9 @@ release-vars:
 
 # The stage list a release is allowed to claim, straight out of $(GATE) plus the
 # canary, which is in no list above. release.yml runs `gate' and `check-canary'
-# and then requires this list to be exactly the fifteen names it names in the
+# and then requires this list to be exactly the sixteen names it names in the
 # release body: adding a stage without saying so in the release note fails the
-# publish instead of quietly changing what "fifteen stages" means.
+# publish instead of quietly changing what "sixteen stages" means.
 gate-list:
 	@echo $(GATE) check-canary
 

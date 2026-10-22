@@ -32,7 +32,7 @@ name: gate
 # also where a stage is added; that is the only place those notes live.
 #
 # The build is not a stage and stays a step of its own, before the loop: if it
-# fails there is no toolchain, and fifteen stages each reporting `no toolchain'
+# fails there is no toolchain, and sixteen stages each reporting `no toolchain'
 # is noise. The artifact upload is not a stage either and keeps its own
 # `if: always()'.
 
@@ -40,6 +40,10 @@ on:
   workflow_dispatch:
   push:
   pull_request:
+
+# Nothing here writes to the repository.
+permissions:
+  contents: read
 
 jobs:
   # The job id is the check name a branch protection rule references, so it
@@ -53,7 +57,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y p7zip-full sdcc-ucsim
+          sudo apt-get install -y p7zip-full sdcc-ucsim dejagnu
 
       - name: Build the port
         run: make -C tb build

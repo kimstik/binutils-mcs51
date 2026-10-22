@@ -25,6 +25,10 @@ on:
 env:
   PROJECTS: diag ds1620 ds1822 lcd led1 led2 led3 serial welcome wjava
 
+# Nothing here writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
