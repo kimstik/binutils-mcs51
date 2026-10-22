@@ -90,13 +90,16 @@ DEF_TEXT_IMAGE = "0102030405060708090a0b0c22"
 DEF_ETEXT = 0x0d
 
 # Every RAM space.  One byte per arm, so each address below follows from the
-# script's own size arithmetic and nothing else.
+# script's own size arithmetic and nothing else.  The default script loads no
+# RAM space, so its linker refuses initialized bytes there: these arms are
+# checked through their symbols, and their bytes are zero (see _emit).
+# Register bank 0 is always reserved, so the register area starts at 0x08.
 DEF_RAM = [
     A("*(.regbank)",          ".regbank",           "sec", 0x11, "A_REGBANK",  0x00),
-    A("*(.rdata)",            ".rdata",             "dir", 0x12, "A_RDATA",    0x01),
-    A("*(.rdata.*)",          ".rdata.p",           "sec", 0x13, "A_RDATAP",   0x02),
-    A("*(.rbss)",             ".rbss",              "dir", None, "A_RBSS",     0x03),
-    A("*(.rbss.*)",           ".rbss.p",            "sec", None, "A_RBSSP",    0x04),
+    A("*(.rdata)",            ".rdata",             "dir", 0x12, "A_RDATA",    0x08),
+    A("*(.rdata.*)",          ".rdata.p",           "sec", 0x13, "A_RDATAP",   0x09),
+    A("*(.rbss)",             ".rbss",              "dir", None, "A_RBSS",     0x0a),
+    A("*(.rbss.*)",           ".rbss.p",            "sec", None, "A_RBSSP",    0x0b),
     A("*(.bdata)",            ".bdata",             "dir", 0x14, "A_BDATA",    0x20),
     A("*(.bdata.*)",          ".bdata.p",           "sec", 0x15, "A_BDATAP",   0x21),
     A("*(.bbss)",             ".bbss",              "dir", None, "A_BBSS",     0x22),
@@ -127,9 +130,16 @@ DEF_RAM = [
     A("*(.eeprom.*)",         ".eeprom.p",          "sec", 0x20, "A_EEPROMP",  0x01),
 ]
 
+# The RAM spaces start undefined and the default script loads none of them,
+# so the linker refuses an initialized byte there: the arms that carry bytes
+# carry zeros.  EEPROM is programmed with its contents and keeps its marker.
+for _arm in DEF_RAM:
+    if isinstance(_arm["marker"], int) and not _arm["sec"].startswith(".eeprom"):
+        _arm["marker"] = 0
+
 # Section addresses the script computes, checked alongside the symbols.
 DEF_SEC_ADDR = {
-    ".text": 0x00, ".regbank": 0x00, ".rdata": 0x01, ".rbss": 0x03,
+    ".text": 0x00, ".regbank": 0x00, ".rdata": 0x08, ".rbss": 0x0a,
     ".bdata": 0x20, ".bbss": 0x22, ".bit": 0x20, ".bitbss": 0x22,
     ".data": 0x25, ".bss": 0x28, ".idata": 0x2b, ".ibss": 0x2d,
     ".xdata": 0x00, ".xbss": 0x02, ".edata": 0x00, ".ebss": 0x02,
@@ -172,6 +182,13 @@ DEF_DEBUG = [
     (".debug_pubtypes", [(".debug_pubtypes",  0x5c)]),
     (".debug_ranges",   [(".debug_ranges",    0x5d)]),
     (".debug_macro",    [(".debug_macro",     0x5e)]),
+    (".debug_addr",     [(".debug_addr",      0x62)]),
+    (".debug_line_str", [(".debug_line_str",  0x63)]),
+    (".debug_loclists", [(".debug_loclists",  0x64)]),
+    (".debug_names",    [(".debug_names",     0x65)]),
+    (".debug_rnglists", [(".debug_rnglists",  0x66)]),
+    (".debug_str_offsets", [(".debug_str_offsets", 0x67)]),
+    (".debug_sup",      [(".debug_sup",       0x68)]),
 ]
 
 # /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }

@@ -4,7 +4,9 @@
 # script produces.
 #
 # The probe touches one section of every address space the port emits:
-# code in .text, initialized bytes in .xdata and .eeprom, a byte in the
+# code in .text, reserved bytes in .xdata, an initialized byte in .eeprom
+# (the RAM spaces are never loaded, so initialized data there is refused
+# and has its own check at the end), a byte in the
 # bit-addressable .bdata area (reached through a B2B relocation, which
 # only resolves against true on-chip addresses), a named bit in
 # .bitdata, and a call through __gsinit_startup left undefined on
@@ -50,9 +52,9 @@ _START: lcall   __gsinit_startup ; undefined on purpose -> RET stub
 
         .xdata
         .global XVAR
-XVAR:   .byte   0x55
+XVAR:   .space  1
         .global XVAR2
-XVAR2:  .byte   0xAA
+XVAR2:  .space  1
 
         .eeprom
         .global EVAR

@@ -48,10 +48,10 @@ index 00000000..ab3d9f53
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..57a9fd38
+index 00000000..69d64c45
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1021 @@
+@@ -0,0 +1,1086 @@
 +/* MCS-51 specific support for 32-bit ELF
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -776,6 +776,70 @@ index 00000000..57a9fd38
 +  return 1;
 +}
 +
++/* Refuse initialized data in a memory space that nothing loads.  The RAM
++   of an MCS-51 starts undefined, and the default linker script emits the
++   RAM spaces as non-loaded (INFO) sections: bytes a program put there
++   would vanish from the image, and the variable would start with
++   whatever the RAM held.  A zero byte is a reservation and is accepted,
++   and so is anything in a section a linker script does load, for a
++   program that copies it into place itself.  */
++
++static bool
++elf32_i51_final_link (bfd *abfd, struct bfd_link_info *info)
++{
++  bfd *ibfd;
++  asection *sec;
++  bool ok = true;
++
++  if (!bfd_link_relocatable (info))
++    for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link.next)
++      for (sec = ibfd->sections; sec != NULL; sec = sec->next)
++	{
++	  enum i51_space space = i51_section_space (sec);
++	  bool init;
++
++	  if ((space != I51_SPACE_DIRECT && space != I51_SPACE_INDIRECT
++	       && space != I51_SPACE_BIT && space != I51_SPACE_XDATA
++	       && space != I51_SPACE_EDATA)
++	      || (sec->flags & SEC_HAS_CONTENTS) == 0
++	      || sec->size == 0
++	      || discarded_section (sec)
++	      || sec->output_section == NULL
++	      || ((sec->output_section->flags & (SEC_ALLOC | SEC_LOAD))
++		  == (SEC_ALLOC | SEC_LOAD)))
++	    continue;
++
++	  init = sec->reloc_count != 0;
++	  if (!init)
++	    {
++	      bfd_byte *contents;
++	      bfd_size_type i;
++
++	      if (!bfd_malloc_and_get_section (ibfd, sec, &contents))
++		return false;
++	      for (i = 0; i < sec->size && !init; i++)
++		init = contents[i] != 0;
++	      free (contents);
++	    }
++	  if (init)
++	    {
++	      _bfd_error_handler
++		/* xgettext:c-format */
++		(_("%pB(%pA): initialized data in %s, which nothing loads:"
++		   " reserve the space with .space and set it from code"),
++		 ibfd, sec, _(i51_space_names[space]));
++	      ok = false;
++	    }
++	}
++
++  if (!ok)
++    {
++      bfd_set_error (bfd_error_bad_value);
++      return false;
++    }
++  return _bfd_elf_final_link (abfd, info);
++}
++
 +/* The memory-space commons.  A common of one of these spaces carries the
 +   space's reserved section index in st_shndx, and the linker collects it
 +   into a section of the space's own name, which is the name a linker
@@ -1063,6 +1127,7 @@ index 00000000..57a9fd38
 +
 +#define elf_info_to_howto	             i51_info_to_howto_rela
 +#define elf_info_to_howto_rel	             NULL
++#define bfd_elf32_bfd_final_link	     elf32_i51_final_link
 +#define elf_backend_relocate_section         elf32_i51_relocate_section
 +#define elf_backend_can_gc_sections          1
 +#define elf_backend_rela_normal		     1
@@ -3627,10 +3692,10 @@ index 00000000..1e2eaa7e
 +#define tc_init_after_args() i51_init_after_args ()
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..ceb00c55
+index 00000000..73e3bc26
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,786 @@
+@@ -0,0 +1,807 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -3983,7 +4048,7 @@ index 00000000..ceb00c55
 +@item Register area, internal RAM @code{0x00} to @code{0x1F}
 +@code{.rdata}, @code{.rbss} and @code{.rcomm}.  This is where the four
 +register banks live; the @code{.regbank} space below reserves the ones in
-+use.
++use, and bank 0 always.
 +
 +@item Bit-addressable bytes, internal RAM @code{0x20} to @code{0x2F}
 +@code{.bdata}, @code{.bbss} and @code{.bcomm}.  Bytes here have bit
@@ -4043,6 +4108,27 @@ index 00000000..ceb00c55
 +A plain @code{.comm} names no space and is never compared this way.  Within
 +one file, a name declared a common of one space and then of another is an
 +error.
++
++@cindex initialized data in RAM, MCS-51
++@cindex stack, MCS-51
++The RAM of an MCS-51 starts undefined, and the linker script this port
++installs loads nothing into it: the RAM spaces are emitted at their true
++addresses but are not part of the program image.  Bytes a program writes
++into a RAM section would therefore vanish, and the linker refuses them; a
++zero byte is a reservation and is accepted.  A variable that needs an
++initial value is reserved with @code{.space} and set from code.  The script
++also always reserves register bank 0, which is in use from reset, keeps
++@code{__STACK_SIZE} bytes of internal RAM free above the data for the stack
++(16 by default; @code{STACK} is the first of them), and checks the internal
++RAM against @code{__IRAM_SIZE} (@code{0x100}; give @code{0x80} for a part
++with 128 bytes) and the EEPROM against @code{__EEPROM_SIZE}.  Each of the
++three can be set with @option{--defsym}.
++
++A linker script that places several spaces at the same load address, as one
++that gives each its own @code{MEMORY} region at origin 0 does, needs
++@option{--no-check-sections}, and its image has to be extracted one space at
++a time, with @samp{objcopy -j .text} and @samp{objcopy -j .eeprom}: a copy of
++the whole file writes the spaces over one another.
 +
 +@cindex address spaces of relocations, MCS-51
 +The linker also refuses an operand that names the wrong space: a jump or
@@ -5383,10 +5469,10 @@ index 00000000..808ad3c2
 +MACHINE=
 diff --git a/ld/scripttempl/elf32i51.sc b/ld/scripttempl/elf32i51.sc
 new file mode 100644
-index 00000000..012b76af
+index 00000000..20ff8183
 --- /dev/null
 +++ b/ld/scripttempl/elf32i51.sc
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,259 @@
 +# Copyright (C) 2014-2025 Free Software Foundation, Inc.
 +#
 +# Copying and distribution of this file, with or without modification,
@@ -5482,6 +5568,10 @@ index 00000000..012b76af
 +       assignment keeps its address statement even when empty.  */
 +    __REGBANK_START = .;
 +    *(.regbank)
++    /* Bank 0 is the one in use from reset, whether or not a file says
++       .using, so its eight registers are always reserved; .using in a
++       file reserves up to the highest bank it selects.  */
++    . = MAX (., 0x08);
 +  }
 +  .rdata (ADDR (.regbank) + SIZEOF (.regbank)) (INFO) :
 +  {
@@ -5561,9 +5651,15 @@ index 00000000..012b76af
 +    __IDATA_END = .;
 +  }
 +
-+  /* First free internal RAM byte: bottom of the upward-growing stack. */
++  /* First free internal RAM byte: bottom of the upward-growing stack.
++     __STACK_SIZE bytes of internal RAM are kept free for it, and
++     __IRAM_SIZE is the size of the internal RAM: 0x100 on an 8052, 0x80
++     on an 8051 - give the part's size with --defsym.  */
 +  PROVIDE (STACK = __IDATA_END);
 +  PROVIDE (__STACK = STACK);
++  PROVIDE (__STACK_SIZE = 0x10);
++  PROVIDE (__IRAM_SIZE = 0x100);
++  PROVIDE (__EEPROM_SIZE = 0x10000);
 +
 +  /* --------------------------- external RAM (xdata), 0x0000-0xFFFF */
 +  .xdata 0x0000 (INFO) :
@@ -5603,7 +5699,11 @@ index 00000000..012b76af
 +  }
 +
 +  /* Space limits.  Code size is bounded by the rom region above.  */
-+  ASSERT (__IDATA_END <= 0x100, "internal RAM overflow (past 0xFF)")
++  ASSERT (__DATA_END <= 0x80,
++          "directly addressed RAM overflow (.data and .bss past 0x7F)")
++  ASSERT (__IDATA_END <= __IRAM_SIZE, "internal RAM overflow")
++  ASSERT (STACK + __STACK_SIZE <= __IRAM_SIZE,
++          "no room for __STACK_SIZE bytes of stack in internal RAM")
 +  ASSERT (SIZEOF (.bdata) + SIZEOF (.bbss) == 0 || __BDATA_END <= 0x30,
 +          "bit-addressable data overflow (past 0x2F)")
 +  ASSERT (SIZEOF (.bit) + SIZEOF (.bitbss) == 0
@@ -5611,6 +5711,7 @@ index 00000000..012b76af
 +          "bit space overflow (past bit 0x7F)")
 +  ASSERT (__XDATA_END <= 0x10000, "xdata overflow (past 0xFFFF)")
 +  ASSERT (__EDATA_END <= 0x10000, "edata overflow (past 0xFFFF)")
++  ASSERT (__EEPROM_END <= __EEPROM_SIZE, "EEPROM overflow (past __EEPROM_SIZE)")
 +
 +  /* Stabs debugging sections */
 +  .stab          0 : { *(.stab) }
@@ -5621,27 +5722,11 @@ index 00000000..012b76af
 +  .stab.indexstr 0 : { *(.stab.indexstr) }
 +  .comment       0 : { *(.comment) }
 +
-+  /* DWARF debug sections */
-+  .debug          0 : { *(.debug) }
-+  .line           0 : { *(.line) }
-+  .debug_srcinfo  0 : { *(.debug_srcinfo) }
-+  .debug_sfnames  0 : { *(.debug_sfnames) }
-+  .debug_aranges  0 : { *(.debug_aranges) }
-+  .debug_pubnames 0 : { *(.debug_pubnames) }
-+  .debug_info     0 : { *(.debug_info .gnu.linkonce.wi.*) }
-+  .debug_abbrev   0 : { *(.debug_abbrev) }
-+  .debug_line     0 : { *(.debug_line .debug_line.* .debug_line_end ) }
-+  .debug_frame    0 : { *(.debug_frame) }
-+  .debug_str      0 : { *(.debug_str) }
-+  .debug_loc      0 : { *(.debug_loc) }
-+  .debug_macinfo  0 : { *(.debug_macinfo) }
-+  .debug_weaknames 0 : { *(.debug_weaknames) }
-+  .debug_funcnames 0 : { *(.debug_funcnames) }
-+  .debug_typenames 0 : { *(.debug_typenames) }
-+  .debug_varnames  0 : { *(.debug_varnames) }
-+  .debug_pubtypes 0 : { *(.debug_pubtypes) }
-+  .debug_ranges   0 : { *(.debug_ranges) }
-+  .debug_macro    0 : { *(.debug_macro) }
++EOF
++
++source_sh $srcdir/scripttempl/DWARF.sc
++
++cat <<EOF
 +
 +  /* Discard standard sections not used in embedded systems */
 +  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }
@@ -5689,6 +5774,34 @@ index 00000000..9629d1ae
 +	.text
 +	.global	_START
 +_START:	setb	b2b(w,3)
+diff --git a/ld/testsuite/ld-i51/bank0.d b/ld/testsuite/ld-i51/bank0.d
+new file mode 100644
+index 00000000..3695bfd9
+--- /dev/null
++++ b/ld/testsuite/ld-i51/bank0.d
+@@ -0,0 +1,8 @@
++#name: i51 register bank 0 is reserved
++#source: bank0.s
++#ld:
++#nm: -n
++
++#...
++0+8 . R
++#pass
+diff --git a/ld/testsuite/ld-i51/bank0.s b/ld/testsuite/ld-i51/bank0.s
+new file mode 100644
+index 00000000..e92a3d93
+--- /dev/null
++++ b/ld/testsuite/ld-i51/bank0.s
+@@ -0,0 +1,8 @@
++; Register bank 0 is in use from reset: register-area data goes above it
++; even in a file that never says .using.
++	.text
++	.global	_START
++_START:	mov	a,r
++	.rdata
++	.global	r
++r:	.space	1
 diff --git a/ld/testsuite/ld-i51/commdef.d b/ld/testsuite/ld-i51/commdef.d
 new file mode 100644
 index 00000000..17bde064
@@ -5721,6 +5834,28 @@ index 00000000..57a42e6e
 +	.idata
 +	.global	buf
 +buf:	.space	4
+diff --git a/ld/testsuite/ld-i51/eeprom.d b/ld/testsuite/ld-i51/eeprom.d
+new file mode 100644
+index 00000000..e7fbb723
+--- /dev/null
++++ b/ld/testsuite/ld-i51/eeprom.d
+@@ -0,0 +1,4 @@
++#name: i51 EEPROM overflow
++#source: eeprom.s
++#ld: --defsym __EEPROM_SIZE=0x10
++#error: .*EEPROM overflow.*
+diff --git a/ld/testsuite/ld-i51/eeprom.s b/ld/testsuite/ld-i51/eeprom.s
+new file mode 100644
+index 00000000..46e05780
+--- /dev/null
++++ b/ld/testsuite/ld-i51/eeprom.s
+@@ -0,0 +1,6 @@
++; EEPROM is bounded by __EEPROM_SIZE.
++	.text
++	.global	_START
++_START:	ret
++	.eeprom
++	.space	0x11
 diff --git a/ld/testsuite/ld-i51/emit.d b/ld/testsuite/ld-i51/emit.d
 new file mode 100644
 index 00000000..6b713653
@@ -5794,6 +5929,31 @@ index 00000000..9af7ebd2
 +foreach test [lsort [glob -nocomplain $srcdir/$subdir/*.d]] {
 +    run_dump_test [file rootname $test]
 +}
+diff --git a/ld/testsuite/ld-i51/init.d b/ld/testsuite/ld-i51/init.d
+new file mode 100644
+index 00000000..7e30c6c3
+--- /dev/null
++++ b/ld/testsuite/ld-i51/init.d
+@@ -0,0 +1,4 @@
++#name: i51 initialized data in RAM is refused
++#source: init.s
++#ld:
++#error: .*init.o\(.data\): initialized data in internal RAM, which nothing loads.*
+diff --git a/ld/testsuite/ld-i51/init.s b/ld/testsuite/ld-i51/init.s
+new file mode 100644
+index 00000000..d03d0305
+--- /dev/null
++++ b/ld/testsuite/ld-i51/init.s
+@@ -0,0 +1,9 @@
++; RAM starts undefined and the default script loads none of it: an
++; initial value there would vanish without a word.  Zero bytes are a
++; reservation.
++	.text
++	.global	_START
++_START:	mov	a,v
++	.data
++z:	.byte	0
++v:	.byte	5
 diff --git a/ld/testsuite/ld-i51/merge.d b/ld/testsuite/ld-i51/merge.d
 new file mode 100644
 index 00000000..82074217
@@ -5944,6 +6104,28 @@ index 00000000..d223a681
 +_START:	mov	a,v2
 +	.bss
 +v2:	.space	1
+diff --git a/ld/testsuite/ld-i51/ramfull.d b/ld/testsuite/ld-i51/ramfull.d
+new file mode 100644
+index 00000000..ce54ee07
+--- /dev/null
++++ b/ld/testsuite/ld-i51/ramfull.d
+@@ -0,0 +1,4 @@
++#name: i51 directly addressed RAM overflow
++#source: ramfull.s
++#ld:
++#error: .*directly addressed RAM overflow.*
+diff --git a/ld/testsuite/ld-i51/ramfull.s b/ld/testsuite/ld-i51/ramfull.s
+new file mode 100644
+index 00000000..c1358d34
+--- /dev/null
++++ b/ld/testsuite/ld-i51/ramfull.s
+@@ -0,0 +1,6 @@
++; Directly addressed RAM ends at 0x7F.
++	.text
++	.global	_START
++_START:	ret
++	.bss
++	.space	0x79
 diff --git a/ld/testsuite/ld-i51/space.d b/ld/testsuite/ld-i51/space.d
 new file mode 100644
 index 00000000..e054c0e7
@@ -5990,6 +6172,43 @@ index 00000000..236863bb
 +bv:	.byte	0
 +	.data
 +dv:	.byte	0
+diff --git a/ld/testsuite/ld-i51/stack-ok.d b/ld/testsuite/ld-i51/stack-ok.d
+new file mode 100644
+index 00000000..d23a56ba
+--- /dev/null
++++ b/ld/testsuite/ld-i51/stack-ok.d
+@@ -0,0 +1,8 @@
++#name: i51 stack size given on the command line
++#source: stack.s
++#ld: --defsym __STACK_SIZE=4
++#nm: -n
++
++#...
++0+f8 . STACK
++#pass
+diff --git a/ld/testsuite/ld-i51/stack.d b/ld/testsuite/ld-i51/stack.d
+new file mode 100644
+index 00000000..bd44f6e6
+--- /dev/null
++++ b/ld/testsuite/ld-i51/stack.d
+@@ -0,0 +1,4 @@
++#name: i51 no room for the stack
++#source: stack.s
++#ld:
++#error: .*no room for __STACK_SIZE bytes of stack in internal RAM.*
+diff --git a/ld/testsuite/ld-i51/stack.s b/ld/testsuite/ld-i51/stack.s
+new file mode 100644
+index 00000000..35351144
+--- /dev/null
++++ b/ld/testsuite/ld-i51/stack.s
+@@ -0,0 +1,7 @@
++; The default script keeps __STACK_SIZE bytes of internal RAM for the
++; stack.
++	.text
++	.global	_START
++_START:	ret
++	.ibss
++	.space	0xd8		; 0x20..0xf7
 diff --git a/ld/testsuite/ld-i51/weak.d b/ld/testsuite/ld-i51/weak.d
 new file mode 100644
 index 00000000..ffdc64a5

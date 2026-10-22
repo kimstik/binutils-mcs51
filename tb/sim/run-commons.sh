@@ -242,7 +242,9 @@ expect_size "partial link" "$W/psecs.txt" .bss    3
 # fabrication that lands on the real section marks it SEC_IS_COMMON, and
 # the linker then treats a section full of data as a size-only
 # placeholder - the bytes are dropped, the link succeeds, nothing is
-# said.
+# said.  The bytes are zero: the linker refuses initialized data in a
+# RAM space nothing loads, and a section that was taken for a common
+# shows as one with no contents, whatever its bytes were.
 cat > "$W/mixed.s" <<'EOF'
 ; real data and an external common in one space, in one object
 
@@ -252,13 +254,13 @@ _START: ret
 
         .section .rbss,"aw",@progbits
         .global RREAL
-RREAL:  .byte 0x11,0x22,0x33,0x44
+RREAL:  .byte 0,0,0,0
         .rcomm RCVAR,4,1        ; external -> fabricated .rbss common
 
         .section .bitbss,"aw",@progbits
         .global BITREAL
 BITREAL:
-        .byte 0x5A
+        .byte 0
         .bitcomm BITVAR,1,1     ; external -> fabricated .bitbss common
 EOF
 
@@ -288,10 +290,11 @@ expect_mixed() {  # SECTION SIZE HEAD-BYTES COMMON-SYMBOL COMMON-ADDRESS
     [ -n "$v" ] || { fail "mixed: symbol $4 not in the image"; return; }
     [ $((0x$v)) -eq $(($5)) ] || fail "mixed: $4 = 0x$v, expected $5"
 }
-# Four real bytes at the start of the space, the four-byte common after.
-expect_mixed .rbss   8 11223344 RCVAR  4
+# Four real bytes at the start of the space - above register bank 0, which
+# the default script always reserves - the four-byte common after.
+expect_mixed .rbss   8 00000000 RCVAR  0xc
 # One real byte in the bit space, the one-bit common after it.
-expect_mixed .bitbss 2 5a       BITVAR 1
+expect_mixed .bitbss 2 00       BITVAR 1
 
 # The same two things split over two objects.  Nothing collides inside
 # one object here, so this passes either way; it pins the other half of
@@ -307,7 +310,7 @@ _START: ret
 
         .section .rbss,"aw",@progbits
         .global AREAL
-AREAL:  .byte 0xAA,0xBB
+AREAL:  .byte 0,0
 EOF
 cat > "$W/com.s" <<'EOF'
 ; the common of that space, in a second object
@@ -337,15 +340,15 @@ if ! bytes=$(sechex "$W/split.elf" .rbss); then
     fail "split: .rbss has no contents in the image"
 else
     case "$bytes" in
-        aabb*) ;;
-        *)     fail "split: .rbss holds '$bytes', expected it to start with 'aabb'" ;;
+        0000*) ;;
+        *)     fail "split: .rbss holds '$bytes', expected it to start with '0000'" ;;
     esac
 fi
 v=$(symval "$W/split.elf" BCVAR)
 if [ -z "$v" ]; then
     fail "split: symbol BCVAR not in the image"
-elif [ $((0x$v)) -ne 2 ]; then
-    fail "split: BCVAR = 0x$v, expected 2"
+elif [ $((0x$v)) -ne 10 ]; then
+    fail "split: BCVAR = 0x$v, expected 0xa (bank 0, then two real bytes)"
 fi
 
 # ---- a real section and the directive that names the same space ----
@@ -389,20 +392,15 @@ expect_bytes() {  # WHAT FILE SECTION HEAD-BYTES
 
 expect_bytes "spaces object" "$W/spaces.o" .rbss 11223344
 
-if ! "$LD" -o "$W/spaces.elf" "$W/spaces.o" 2> "$W/spaces.err"; then
-    echo "run-commons: spaces link FAILED" >&2
-    cat "$W/spaces.err" >&2
-    exit 1
+# The bytes reach the linker too, which refuses them: initialized data in
+# a RAM space the default script does not load.  A section that had lost
+# its contents would link clean instead.
+if "$LD" -o "$W/spaces.elf" "$W/spaces.o" 2> "$W/spaces.err"; then
+    fail "spaces: linked clean - the bytes in .rbss did not reach the linker"
+elif ! grep -q 'spaces.o(.rbss): initialized data' "$W/spaces.err"; then
+    fail "spaces: link refused, but not for the initialized .rbss bytes"
+    cat "$W/spaces.err"
 fi
-[ -s "$W/spaces.err" ] && { echo "== ld stderr (spaces, non-fatal):"; cat "$W/spaces.err"; }
-
-sz=$(secfield "$W/spaces.elf" .rbss 5)
-if [ -z "$sz" ]; then
-    fail "spaces: .rbss not in the image"
-elif [ $((0x$sz)) -ne 4 ]; then
-    fail "spaces: .rbss is 0x$sz bytes, expected 4"
-fi
-expect_bytes "spaces image" "$W/spaces.elf" .rbss 11223344
 
 # Bytes written after the switch land in the same section.  A section
 # marked contentless refuses them instead, so this half of it is loud.

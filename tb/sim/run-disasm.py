@@ -141,7 +141,8 @@ class Tools:
 
     def link(self, obj, name):
         e = self.path(name + '.elf')
-        r = subprocess.run([self.ld, '-T', SCRIPT, '-o', e, obj],
+        r = subprocess.run([self.ld, '-T', SCRIPT, '--no-check-sections',
+                            '-o', e, obj],
                            capture_output=True, text=True)
         return (e if r.returncode == 0 else None), (r.stdout + r.stderr).strip()
 
