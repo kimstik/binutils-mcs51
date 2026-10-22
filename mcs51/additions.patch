@@ -48,10 +48,10 @@ index 00000000..ab3d9f53
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..594cc14e
+index 00000000..57a9fd38
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1011 @@
+@@ -0,0 +1,1021 @@
 +/* MCS-51 specific support for 32-bit ELF
 +   Copyright (C) 2001 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -290,14 +290,15 @@ index 00000000..594cc14e
 +	 0xff,			/* dst_mask */
 +	 false),		/* pcrel_offset */
 +
-+  /* A code address: the target of an LJMP or LCALL.  */
++  /* A code address: the target of an LJMP or LCALL, 0..0xFFFF, which
++     i51_final_link_relocate () checks.  */
 +  HOWTO (R_I51_16_CODE,		/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size in bytes */
 +	 16,			/* bitsize */
 +	 false,			/* pc_relative */
 +	 0,			/* bitpos */
-+	 complain_overflow_unsigned, /* complain_on_overflow */
++	 complain_overflow_dont, /* complain_on_overflow */
 +	 bfd_elf_generic_reloc,	/* special_function */
 +	 "R_I51_16_CODE",	/* name */
 +	 false,			/* partial_inplace */
@@ -503,7 +504,7 @@ index 00000000..594cc14e
 +	    return false;
 +	  /* xgettext:c-format */
 +	  info->callbacks->einfo
-+	    (_("%X%H: %s against `%s': RAM at %#v is not directly "
++	    (_("%X%H: %s against `%s': RAM at 0x%v is not directly "
 +	       "addressable, 0x80 and above is the special function "
 +	       "register page\n"),
 +	     input_bfd, input_section, rel->r_offset, howto->name, name,
@@ -604,6 +605,15 @@ index 00000000..594cc14e
 +
 +    case R_I51_16:
 +      if (srel < -32768 || srel > 65535)
++	return bfd_reloc_overflow;
++      bfd_putb16 (srel, contents);
++      return bfd_reloc_ok;
++
++    case R_I51_16_CODE:
++      /* Checked here rather than by the howto: bfd_check_overflow ()
++	 first cuts the value to the 16 bits of an address of this
++	 architecture, which leaves nothing to overflow.  */
++      if (srel < 0 || srel > 0xffff)
 +	return bfd_reloc_overflow;
 +      bfd_putb16 (srel, contents);
 +      return bfd_reloc_ok;
@@ -720,7 +730,7 @@ index 00000000..594cc14e
 +	  else
 +	    /* xgettext:c-format */
 +	    info->callbacks->einfo
-+	      (_("%X%H: %s against `%s': %#v is not bit addressable\n"),
++	      (_("%X%H: %s against `%s': 0x%v is not bit addressable\n"),
 +	       input_bfd, input_section, rel->r_offset, howto->name, name,
 +	       relocation + rel->r_addend);
 +	  break;
@@ -1065,10 +1075,10 @@ index 00000000..594cc14e
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..7f1f1358
+index 00000000..55d8cc8b
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2342 @@
+@@ -0,0 +1,2352 @@
 +/* tc-i51.c -- Assembler code for the MCS-51
 +
 +   Copyright (C) 2001 Free Software Foundation, Inc.
@@ -3076,6 +3086,18 @@ index 00000000..7f1f1358
 +   s_comm_internal (): an optional byte alignment, then a local common
 +   allocated here or a common of the space's fake common section.  */
 +
++/* Skip the rest of a statement s_comm_internal () is reading.  It ends
++   the statement itself, so ignore_rest_of_line () here would take the
++   next line with it.  */
++
++static symbolS *
++i51_common_error (void)
++{
++  while (!is_end_of_stmt (*input_line_pointer))
++    ++input_line_pointer;
++  return NULL;
++}
++
 +static symbolS *
 +i51_common_parse (int space, symbolS *symbolP, addressT size)
 +{
@@ -3092,8 +3114,7 @@ index 00000000..7f1f1358
 +      if ((alignment & (alignment - 1)) != 0)
 +	{
 +	  as_bad (_("common alignment not a power of 2"));
-+	  ignore_rest_of_line ();
-+	  return NULL;
++	  return i51_common_error ();
 +	}
 +      for (align = 0; alignment > ((addressT) 1 << align); align++)
 +	;
@@ -3106,8 +3127,7 @@ index 00000000..7f1f1358
 +    {
 +      as_bad (_("`%s' is already a common of another memory space"),
 +	      S_GET_NAME (symbolP));
-+      ignore_rest_of_line ();
-+      return NULL;
++      return i51_common_error ();
 +    }
 +
 +  if (symbol_get_obj (symbolP)->local)
@@ -4529,6 +4549,67 @@ index 00000000..3810c5bf
 +g:	nop
 +	sjmp	w
 +	sjmp	g
+diff --git a/gas/testsuite/gas/i51/comm-bad.d b/gas/testsuite/gas/i51/comm-bad.d
+new file mode 100644
+index 00000000..f069f3d0
+--- /dev/null
++++ b/gas/testsuite/gas/i51/comm-bad.d
+@@ -0,0 +1,3 @@
++#name: i51 memory-space common errors
++#as:
++#error_output: comm-bad.l
+diff --git a/gas/testsuite/gas/i51/comm-bad.l b/gas/testsuite/gas/i51/comm-bad.l
+new file mode 100644
+index 00000000..ea1776fe
+--- /dev/null
++++ b/gas/testsuite/gas/i51/comm-bad.l
+@@ -0,0 +1,5 @@
++.*: Assembler messages:
++.*:3: Warning: size of "buf" is already 4; not changing to 8
++.*:3: Error: `BUF' is already a common of another memory space
++.*:4: Error: expected symbol name
++.*:5: Error: common alignment not a power of 2
+diff --git a/gas/testsuite/gas/i51/comm-bad.s b/gas/testsuite/gas/i51/comm-bad.s
+new file mode 100644
+index 00000000..1f056ba3
+--- /dev/null
++++ b/gas/testsuite/gas/i51/comm-bad.s
+@@ -0,0 +1,5 @@
++; One name is a common of one space only.
++	.xcomm	buf, 4
++	.icomm	buf, 8
++	.xcomm	, 4
++	.icomm	buf2, 4, 3
+diff --git a/gas/testsuite/gas/i51/comm.d b/gas/testsuite/gas/i51/comm.d
+new file mode 100644
+index 00000000..e1c1b588
+--- /dev/null
++++ b/gas/testsuite/gas/i51/comm.d
+@@ -0,0 +1,11 @@
++#name: i51 memory-space commons
++#as:
++#readelf: -s --wide
++
++Symbol table '.symtab' contains .* entries:
++#...
++ +[0-9]+: 0+ +3 OBJECT  LOCAL  DEFAULT +[0-9]+ LBUF
++#...
++ +[0-9]+: [0-9a-f]+ +4 OBJECT  GLOBAL DEFAULT PRC\[0xff04\] XBUF
++ +[0-9]+: 0+2 +2 OBJECT  GLOBAL DEFAULT PRC\[0xff03\] IBUF
++ +[0-9]+: [0-9a-f]+ +5 OBJECT  GLOBAL DEFAULT  COM PLAIN
+diff --git a/gas/testsuite/gas/i51/comm.s b/gas/testsuite/gas/i51/comm.s
+new file mode 100644
+index 00000000..5dadebf2
+--- /dev/null
++++ b/gas/testsuite/gas/i51/comm.s
+@@ -0,0 +1,7 @@
++; A common of a memory space carries the space's section index; .local
++; before it allocates the symbol here instead.
++	.xcomm	xbuf, 4
++	.icomm	ibuf, 2, 2
++	.local	lbuf
++	.xcomm	lbuf, 3
++	.comm	plain, 5
 diff --git a/gas/testsuite/gas/i51/high-low.d b/gas/testsuite/gas/i51/high-low.d
 new file mode 100644
 index 00000000..7e1a5e78
@@ -4628,6 +4709,34 @@ index 00000000..75c9a2b7
 +	jmp	@a+dptr
 +	jmp	0x1234
 +	call	0x4321
+diff --git a/gas/testsuite/gas/i51/long.d b/gas/testsuite/gas/i51/long.d
+new file mode 100644
+index 00000000..6b99bb2c
+--- /dev/null
++++ b/gas/testsuite/gas/i51/long.d
+@@ -0,0 +1,13 @@
++#name: i51 .long
++#as:
++#objdump: -sr -j .data
++
++.*: +file format elf32-i51
++
++RELOCATION RECORDS FOR \[.data\]:
++OFFSET +TYPE +VALUE
++0+ R_I51_32 +SYM
++
++
++Contents of section .data:
++ 0000 00000000 12345678 +.*
+diff --git a/gas/testsuite/gas/i51/long.s b/gas/testsuite/gas/i51/long.s
+new file mode 100644
+index 00000000..1bb7a7c5
+--- /dev/null
++++ b/gas/testsuite/gas/i51/long.s
+@@ -0,0 +1,3 @@
++; A symbol in a four-byte datum carries R_I51_32.
++	.data
++	.long	sym, 0x12345678
 diff --git a/gas/testsuite/gas/i51/names-bad.d b/gas/testsuite/gas/i51/names-bad.d
 new file mode 100644
 index 00000000..5a4d335b
@@ -4740,6 +4849,72 @@ index 00000000..2d11e348
 +	ljmp	0x20.3
 +	setb	high(0x1234)
 +	mov	c,#1
+diff --git a/gas/testsuite/gas/i51/pcode-bad.d b/gas/testsuite/gas/i51/pcode-bad.d
+new file mode 100644
+index 00000000..f1ca11f5
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode-bad.d
+@@ -0,0 +1,3 @@
++#name: i51 .pcode errors
++#as:
++#error_output: pcode-bad.l
+diff --git a/gas/testsuite/gas/i51/pcode-bad.l b/gas/testsuite/gas/i51/pcode-bad.l
+new file mode 100644
+index 00000000..efe5b815
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode-bad.l
+@@ -0,0 +1,5 @@
++.*: Assembler messages:
++.*:3: Error: the pcode address is separated from its first operand by white space, not a comma
++.*:4: Error: expected comma after pcode operand
++.*:6: Error: pcode exec address out of 13-bit range: 0x2000
++.*:7: Error: pcode exec address underflow: 0xff
+diff --git a/gas/testsuite/gas/i51/pcode-bad.s b/gas/testsuite/gas/i51/pcode-bad.s
+new file mode 100644
+index 00000000..e4f2eb5e
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode-bad.s
+@@ -0,0 +1,7 @@
++; Errors in a .pcode line stay on that line.
++	.text
++	.pcode	0x200,1
++	.pcode	0x200 1 2
++	nop
++	.pcode	0x2000
++	.pcode	0xff
+diff --git a/gas/testsuite/gas/i51/pcode.d b/gas/testsuite/gas/i51/pcode.d
+new file mode 100644
+index 00000000..7fe07bb8
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode.d
+@@ -0,0 +1,15 @@
++#name: i51 .pcode operands
++#as:
++#objdump: -sr -j .text
++
++.*: +file format elf32-i51
++
++RELOCATION RECORDS FOR \[.text\]:
++OFFSET +TYPE +VALUE
++0+a R_I51_8 +SYM-0x0+1
++0+d R_I51_L +SYM
++0+e R_I51_H +SYM
++
++
++Contents of section .text:
++ 0000 41235d05 02341281 237d0001 020000 +.*
+diff --git a/gas/testsuite/gas/i51/pcode.s b/gas/testsuite/gas/i51/pcode.s
+new file mode 100644
+index 00000000..a414c697
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode.s
+@@ -0,0 +1,6 @@
++; .pcode entries.  Keywords are matched without regard to case; a symbol
++; operand of @BYTE is stored decremented through the relocation's addend,
++; and one of #SWAP low byte first, as a constant operand is.
++	.text
++	.pcode	0x123 #byte 5, @byte 3, #swap 0x1234
++	.pcode	0x123 @BYTE sym, #word 0x0102, #SWAP sym
 diff --git a/gas/testsuite/gas/i51/range-fwd.d b/gas/testsuite/gas/i51/range-fwd.d
 new file mode 100644
 index 00000000..c5068e9c
@@ -5472,6 +5647,389 @@ index 00000000..012b76af
 +  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }
 +}
 +EOF
+diff --git a/ld/testsuite/ld-i51/abs-branch.d b/ld/testsuite/ld-i51/abs-branch.d
+new file mode 100644
+index 00000000..6e21da53
+--- /dev/null
++++ b/ld/testsuite/ld-i51/abs-branch.d
+@@ -0,0 +1,4 @@
++#name: i51 branch to an absolute address
++#source: abs-branch.s
++#ld: -Ttext=0x100
++#error: .*\(.text\+0x3\): relocation truncated to fit: R_I51_7_PCREL against .*
+diff --git a/ld/testsuite/ld-i51/abs-branch.s b/ld/testsuite/ld-i51/abs-branch.s
+new file mode 100644
+index 00000000..310968c8
+--- /dev/null
++++ b/ld/testsuite/ld-i51/abs-branch.s
+@@ -0,0 +1,6 @@
++; A branch to an absolute address is measured from where the branch is
++; linked: from 0x100, 0x110 is in reach and 0 is not.
++	.text
++	.global	_START
++_START:	sjmp	0x110
++	sjmp	0
+diff --git a/ld/testsuite/ld-i51/b2b0.d b/ld/testsuite/ld-i51/b2b0.d
+new file mode 100644
+index 00000000..f6c492d3
+--- /dev/null
++++ b/ld/testsuite/ld-i51/b2b0.d
+@@ -0,0 +1,4 @@
++#name: i51 B2B of a byte at 0
++#source: b2b0.s
++#ld: --defsym W=0
++#error: .*R_I51_8_B2B against `W': 0x0 is not bit addressable.*
+diff --git a/ld/testsuite/ld-i51/b2b0.s b/ld/testsuite/ld-i51/b2b0.s
+new file mode 100644
+index 00000000..9629d1ae
+--- /dev/null
++++ b/ld/testsuite/ld-i51/b2b0.s
+@@ -0,0 +1,4 @@
++; B2B () of a byte at 0 is no bit address, and the linker says so.
++	.text
++	.global	_START
++_START:	setb	b2b(w,3)
+diff --git a/ld/testsuite/ld-i51/commdef.d b/ld/testsuite/ld-i51/commdef.d
+new file mode 100644
+index 00000000..17bde064
+--- /dev/null
++++ b/ld/testsuite/ld-i51/commdef.d
+@@ -0,0 +1,5 @@
++#name: i51 common and definition in different spaces
++#source: commdef1.s
++#source: commdef2.s
++#ld:
++#error: .*symbol `BUF' is in indirectly addressed internal RAM \(.idata\) here and in external RAM \(.xbss\).*
+diff --git a/ld/testsuite/ld-i51/commdef1.s b/ld/testsuite/ld-i51/commdef1.s
+new file mode 100644
+index 00000000..a8561cc6
+--- /dev/null
++++ b/ld/testsuite/ld-i51/commdef1.s
+@@ -0,0 +1,6 @@
++; A common of external RAM cannot be satisfied by a definition in
++; internal RAM.
++	.text
++	.global	_START
++_START:	mov	dptr,#buf
++	.xcomm	buf, 4
+diff --git a/ld/testsuite/ld-i51/commdef2.s b/ld/testsuite/ld-i51/commdef2.s
+new file mode 100644
+index 00000000..57a42e6e
+--- /dev/null
++++ b/ld/testsuite/ld-i51/commdef2.s
+@@ -0,0 +1,3 @@
++	.idata
++	.global	buf
++buf:	.space	4
+diff --git a/ld/testsuite/ld-i51/emit.d b/ld/testsuite/ld-i51/emit.d
+new file mode 100644
+index 00000000..6b713653
+--- /dev/null
++++ b/ld/testsuite/ld-i51/emit.d
+@@ -0,0 +1,19 @@
++#name: i51 --emit-relocs addends
++#source: emit.s
++#ld: --emit-relocs
++#objdump: -drz
++
++.*: +file format elf32-i51
++
++
++Disassembly of section .text:
++
++0+ <_START>:
++ +0:	02 00 04 +	ljmp	4 <L2>
++	+1: R_I51_16_CODE	.text\+0x4
++ +3:	00 +	nop
++
++0+4 <L2>:
++ +4:	02 00 04 +	ljmp	4 <L2>
++	+5: R_I51_16_CODE	.text\+0x4
++#pass
+diff --git a/ld/testsuite/ld-i51/emit.s b/ld/testsuite/ld-i51/emit.s
+new file mode 100644
+index 00000000..42099dac
+--- /dev/null
++++ b/ld/testsuite/ld-i51/emit.s
+@@ -0,0 +1,8 @@
++; --emit-relocs keeps relocations against section symbols right: their
++; addends move with the input section.
++	.text
++	.global	_START
++_START:	ljmp	l2
++	.section .text.b,"ax",@progbits
++	nop
++l2:	ljmp	l2
+diff --git a/ld/testsuite/ld-i51/i51.exp b/ld/testsuite/ld-i51/i51.exp
+new file mode 100644
+index 00000000..9af7ebd2
+--- /dev/null
++++ b/ld/testsuite/ld-i51/i51.exp
+@@ -0,0 +1,28 @@
++# Copyright (C) 2026 Free Software Foundation, Inc.
++#
++# This file is part of the GNU Binutils.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 3 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
++# MA 02110-1301, USA.
++
++# MCS-51 (i51) linker tests.
++
++if {![istarget i51-*-*]} {
++    return
++}
++
++foreach test [lsort [glob -nocomplain $srcdir/$subdir/*.d]] {
++    run_dump_test [file rootname $test]
++}
+diff --git a/ld/testsuite/ld-i51/merge.d b/ld/testsuite/ld-i51/merge.d
+new file mode 100644
+index 00000000..82074217
+--- /dev/null
++++ b/ld/testsuite/ld-i51/merge.d
+@@ -0,0 +1,12 @@
++#name: i51 merged strings
++#source: merge1.s
++#source: merge2.s
++#ld:
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 90001090 00161200 0990001c 90001622  .*
++ 0010 48454c4c 4f00574f 524c4400 58595a00  HELLO.WORLD.XYZ.
++ 0020 22 +.*
+diff --git a/ld/testsuite/ld-i51/merge1.s b/ld/testsuite/ld-i51/merge1.s
+new file mode 100644
+index 00000000..8e5cc2f9
+--- /dev/null
++++ b/ld/testsuite/ld-i51/merge1.s
+@@ -0,0 +1,10 @@
++; References into a merged string section have to follow the strings to
++; where the merge put them.
++	.text
++	.global	_START
++_START:	mov	dptr,#s1
++	mov	dptr,#s2
++	lcall	f
++	.section .rodata.str1.1,"aMS",@progbits,1
++s1:	.asciz	"HELLO"
++s2:	.asciz	"WORLD"
+diff --git a/ld/testsuite/ld-i51/merge2.s b/ld/testsuite/ld-i51/merge2.s
+new file mode 100644
+index 00000000..757a79f9
+--- /dev/null
++++ b/ld/testsuite/ld-i51/merge2.s
+@@ -0,0 +1,8 @@
++	.text
++	.global	f
++f:	mov	dptr,#s3
++	mov	dptr,#s4
++	ret
++	.section .rodata.str1.1,"aMS",@progbits,1
++s3:	.asciz	"XYZ"
++s4:	.asciz	"WORLD"
+diff --git a/ld/testsuite/ld-i51/overflow.d b/ld/testsuite/ld-i51/overflow.d
+new file mode 100644
+index 00000000..5c994b45
+--- /dev/null
++++ b/ld/testsuite/ld-i51/overflow.d
+@@ -0,0 +1,4 @@
++#name: i51 relocation overflow
++#source: overflow.s
++#ld: --defsym BS=0xff --defsym FAR=0x10 --defsym HI=0x12345 --defsym NEG=-40000 --defsym BIG=0x1234 --defsym PC=0x2345
++#error_output: overflow.l
+diff --git a/ld/testsuite/ld-i51/overflow.l b/ld/testsuite/ld-i51/overflow.l
+new file mode 100644
+index 00000000..36ef5f23
+--- /dev/null
++++ b/ld/testsuite/ld-i51/overflow.l
+@@ -0,0 +1,7 @@
++.*: in function `_START':
++.*: relocation truncated to fit: R_I51_8_BIT against symbol `BS'.*
++.*: relocation truncated to fit: R_I51_16_CODE against symbol `FAR'.*
++.*: relocation truncated to fit: R_I51_H against symbol `HI'.*
++.*: relocation truncated to fit: R_I51_16 against symbol `NEG'.*
++.*: relocation truncated to fit: R_I51_8 against symbol `BIG'.*
++.*: relocation truncated to fit: R_I51_13_PCODE against symbol `PC'.*
+diff --git a/ld/testsuite/ld-i51/overflow.s b/ld/testsuite/ld-i51/overflow.s
+new file mode 100644
+index 00000000..5d309a37
+--- /dev/null
++++ b/ld/testsuite/ld-i51/overflow.s
+@@ -0,0 +1,9 @@
++; Values that do not fit their field.
++	.text
++	.global	_START
++_START:	clr	bs+1		; bit 0x100
++	ljmp	far+0x10000	; past the code space
++	mov	a,#high(hi)	; high byte of a 17-bit value
++	mov	dptr,#neg	; below -32768
++	.byte	big		; not a byte
++	.pcode	pc
+diff --git a/ld/testsuite/ld-i51/page.d b/ld/testsuite/ld-i51/page.d
+new file mode 100644
+index 00000000..46a7aacf
+--- /dev/null
++++ b/ld/testsuite/ld-i51/page.d
+@@ -0,0 +1,4 @@
++#name: i51 acall/ajmp page
++#source: page.s
++#ld: --defsym TGT1=0x10000 --defsym TGT2=0x10005
++#error_output: page.l
+diff --git a/ld/testsuite/ld-i51/page.l b/ld/testsuite/ld-i51/page.l
+new file mode 100644
+index 00000000..21f85c84
+--- /dev/null
++++ b/ld/testsuite/ld-i51/page.l
+@@ -0,0 +1,3 @@
++.*: in function `_START':
++.*: relocation truncated to fit: R_I51_11 against symbol `TGT1'.*
++.*: relocation truncated to fit: R_I51_11 against symbol `TGT2'.*
+diff --git a/ld/testsuite/ld-i51/page.s b/ld/testsuite/ld-i51/page.s
+new file mode 100644
+index 00000000..49acee47
+--- /dev/null
++++ b/ld/testsuite/ld-i51/page.s
+@@ -0,0 +1,6 @@
++; acall and ajmp reach the 2K page of the following instruction, in a
++; 64K code space: bit 16 of the target is not a page bit.
++	.text
++	.global	_START
++_START:	acall	tgt1
++	ajmp	tgt2
+diff --git a/ld/testsuite/ld-i51/ram80.d b/ld/testsuite/ld-i51/ram80.d
+new file mode 100644
+index 00000000..5071f565
+--- /dev/null
++++ b/ld/testsuite/ld-i51/ram80.d
+@@ -0,0 +1,5 @@
++#name: i51 direct address of RAM past 0x7F
++#source: ram80a.s
++#source: ram80b.s
++#ld:
++#error: .*R_I51_8_DIR against `.bss': RAM at 0x90 is not directly addressable.*
+diff --git a/ld/testsuite/ld-i51/ram80a.s b/ld/testsuite/ld-i51/ram80a.s
+new file mode 100644
+index 00000000..8a7b69fd
+--- /dev/null
++++ b/ld/testsuite/ld-i51/ram80a.s
+@@ -0,0 +1,5 @@
++; Direct-addressed RAM past 0x7F across two files: the second file's
++; variable lands in the SFR page.
++	.bss
++	.global	v1
++v1:	.space	0x70
+diff --git a/ld/testsuite/ld-i51/ram80b.s b/ld/testsuite/ld-i51/ram80b.s
+new file mode 100644
+index 00000000..d223a681
+--- /dev/null
++++ b/ld/testsuite/ld-i51/ram80b.s
+@@ -0,0 +1,5 @@
++	.text
++	.global	_START
++_START:	mov	a,v2
++	.bss
++v2:	.space	1
+diff --git a/ld/testsuite/ld-i51/space.d b/ld/testsuite/ld-i51/space.d
+new file mode 100644
+index 00000000..e054c0e7
+--- /dev/null
++++ b/ld/testsuite/ld-i51/space.d
+@@ -0,0 +1,4 @@
++#name: i51 operands in the wrong memory space
++#source: space.s
++#ld:
++#error_output: space.l
+diff --git a/ld/testsuite/ld-i51/space.l b/ld/testsuite/ld-i51/space.l
+new file mode 100644
+index 00000000..cef2ca26
+--- /dev/null
++++ b/ld/testsuite/ld-i51/space.l
+@@ -0,0 +1,7 @@
++.*: in function `_START':
++.*: R_I51_16_CODE against `.xdata': a branch target cannot name external RAM
++.*: R_I51_8_DIR against `.xdata': a direct address cannot name external RAM
++.*: R_I51_8_BIT against `.bdata': a bit address cannot name internal RAM
++.*: R_I51_8_DIR against `_START': a direct address cannot name code memory
++.*: R_I51_7_PCREL against `.data': a branch target cannot name internal RAM
++.*: R_I51_11 against `.xdata': a branch target cannot name external RAM
+diff --git a/ld/testsuite/ld-i51/space.s b/ld/testsuite/ld-i51/space.s
+new file mode 100644
+index 00000000..236863bb
+--- /dev/null
++++ b/ld/testsuite/ld-i51/space.s
+@@ -0,0 +1,17 @@
++; Operands that name the wrong memory space.
++	.text
++	.global	_START
++_START:	ljmp	xv		; a code address in external RAM
++	mov	a,xv		; a direct address in external RAM
++	setb	bv		; a bit address naming a byte
++	mov	a,_START	; a direct address naming code
++	sjmp	dv		; a branch into internal RAM
++	acall	xv		; ditto, eleven bits
++	mov	dptr,#xv	; a number: fine
++	mov	a,#low(xv)	; fine
++	.xdata
++xv:	.byte	0
++	.bdata
++bv:	.byte	0
++	.data
++dv:	.byte	0
+diff --git a/ld/testsuite/ld-i51/weak.d b/ld/testsuite/ld-i51/weak.d
+new file mode 100644
+index 00000000..ffdc64a5
+--- /dev/null
++++ b/ld/testsuite/ld-i51/weak.d
+@@ -0,0 +1,10 @@
++#name: i51 weak symbol overridden
++#source: weak1.s
++#source: weak2.s
++#ld:
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 80040200 06220022 22 +.*
+diff --git a/ld/testsuite/ld-i51/weak1.s b/ld/testsuite/ld-i51/weak1.s
+new file mode 100644
+index 00000000..3907eb31
+--- /dev/null
++++ b/ld/testsuite/ld-i51/weak1.s
+@@ -0,0 +1,8 @@
++; A branch to a weak symbol of the same section follows a strong
++; definition in another file, as an ljmp to it does.
++	.text
++	.global	_START
++_START:	sjmp	w
++	ljmp	w
++	.weak	w
++w:	ret
+diff --git a/ld/testsuite/ld-i51/weak2.s b/ld/testsuite/ld-i51/weak2.s
+new file mode 100644
+index 00000000..690501bb
+--- /dev/null
++++ b/ld/testsuite/ld-i51/weak2.s
+@@ -0,0 +1,4 @@
++	.text
++	.global	w
++w:	nop
++	ret
 diff --git a/opcodes/i51-dis.c b/opcodes/i51-dis.c
 new file mode 100644
 index 00000000..c035f4ab
