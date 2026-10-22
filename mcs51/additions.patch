@@ -1196,10 +1196,10 @@ index 00000000..06acca07
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..5a911ebb
+index 00000000..2ce13257
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2210 @@
+@@ -0,0 +1,2220 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1245,13 +1245,15 @@ index 00000000..5a911ebb
 +
 +enum options
 +{
-+  OPTION_MMCU = OPTION_MD_BASE
++  OPTION_MMCU = OPTION_MD_BASE,
++  OPTION_CASE_SENSITIVE
 +};
 +
 +const char md_shortopts[] = "";
 +const struct option md_longopts[] =
 +{
 +  { "mmcu", required_argument, NULL, OPTION_MMCU },
++  { "mcase-sensitive", no_argument, NULL, OPTION_CASE_SENSITIVE },
 +  { NULL, no_argument, NULL, 0 }
 +};
 +const size_t md_longopts_size = sizeof (md_longopts);
@@ -1275,6 +1277,9 @@ index 00000000..5a911ebb
 +};
 +
 +static unsigned int i51_mcu = I51_MCU_ALL;
++
++/* Whether symbol names are folded to upper case.  */
++static bool i51_fold_case = true;
 +
 +/* The memory-space sections of the directives, in the order of
 +   I51_SPACE_SECTIONS.  I51_BSS is the ordinary .bss of a plain .comm.  */
@@ -1713,7 +1718,8 @@ index 00000000..5a911ebb
 +  fprintf (stream, _("\
 +MCS-51 options:\n\
 +  -mmcu=NAME              the part whose special function registers are\n\
-+                          known: 8051, 8052 or at89s8252 (the default)\n"));
++                          known: 8051, 8052 or at89s8252 (the default)\n\
++  -mcase-sensitive        do not fold symbol names to upper case\n"));
 +}
 +
 +int
@@ -1721,6 +1727,11 @@ index 00000000..5a911ebb
 +{
 +  size_t i;
 +
++  if (c == OPTION_CASE_SENSITIVE)
++    {
++      i51_fold_case = false;
++      return 1;
++    }
 +  if (c != OPTION_MMCU)
 +    return 0;
 +  for (i = 0; i < ARRAY_SIZE (i51_mcus); i++)
@@ -1734,18 +1745,17 @@ index 00000000..5a911ebb
 +}
 +
 +/* tc_canonicalize_symbol_name: symbol names are folded to upper case,
-+   as in every MCS-51 assembler.  A section name keeps its case, and so
-+   do the section symbols and the .startof. and .sizeof. symbols, which
-+   carry one.  */
++   as in every MCS-51 assembler, unless -mcase-sensitive says otherwise.
++   A name that starts with a dot keeps its case: the names of sections,
++   of their symbols and of the .startof. and .sizeof. symbols are among
++   them.  */
 +
 +char *
 +i51_canonicalize_symbol_name (char *name)
 +{
 +  char *p;
 +
-+  if (startswith (name, ".startof.") || startswith (name, ".sizeof.")
-+      || (name[0] == '.' && stdoutput != NULL
-+	  && bfd_get_section_by_name (stdoutput, name) != NULL))
++  if (!i51_fold_case || name[0] == '.')
 +    return name;
 +  for (p = name; *p != 0; p++)
 +    *p = TOUPPER (*p);
@@ -3516,10 +3526,10 @@ index 00000000..89e993a7
 +#define tc_canonicalize_symbol_name(NAME) i51_canonicalize_symbol_name (NAME)
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..926e287e
+index 00000000..6056b904
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,891 @@
+@@ -0,0 +1,899 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -3564,6 +3574,11 @@ index 00000000..926e287e
 +(@pxref{i51-Regs}): @samp{8051}, @samp{8052}, which adds the timer 2
 +names, or @samp{at89s8252}, which adds those of the Atmel AT89S8252 as
 +well.  The default is @samp{at89s8252}.
++
++@cindex @option{-mcase-sensitive} command-line option, MCS-51
++@item -mcase-sensitive
++Keep symbol names as they are written instead of folding them to upper
++case (@pxref{i51-Case}).
 +@end table
 +
 +There is no @option{-EB} or @option{-EL}: section contents are always big
@@ -3622,10 +3637,13 @@ index 00000000..926e287e
 +
 +@cindex symbol names, MCS-51
 +@cindex MCS-51 symbol names
-+Symbol names are case insensitive too.  @command{@value{AS}} implements
-+that by folding every symbol name to upper case as the symbol is created,
-+so @code{buf}, @code{Buf} and @code{BUF} all name one symbol, and the name
-+that reaches the object file is @code{BUF}.  Names defined with
++Symbol names are case insensitive too, unless @option{-mcase-sensitive}
++is given.  @command{@value{AS}} implements that by folding every symbol
++name to upper case as the symbol is created, so @code{buf}, @code{Buf} and
++@code{BUF} all name one symbol, and the name that reaches the object file
++is @code{BUF}.  A name that starts with a dot keeps its case: section
++names, and the symbols made from them such as @code{.startof..text}, are
++case sensitive.  Names defined with
 +@option{--defsym} are folded in the same way.  A consequence is that a
 +symbol which has to match a name written outside the assembler (in a linker
 +script, or in an object produced by another tool) has to be spelled in
@@ -4577,6 +4595,36 @@ index 00000000..3810c5bf
 +g:	nop
 +	sjmp	w
 +	sjmp	g
+diff --git a/gas/testsuite/gas/i51/case.d b/gas/testsuite/gas/i51/case.d
+new file mode 100644
+index 00000000..24cd2b1e
+--- /dev/null
++++ b/gas/testsuite/gas/i51/case.d
+@@ -0,0 +1,12 @@
++#name: i51 -mcase-sensitive
++#as: -mcase-sensitive
++#objdump: -dr
++
++#...
++0+ <foo>:
++#...
++0+1 <Foo>:
++ +1:	00 +	nop
++ +2:	02 00 00 +	ljmp	0 <foo>
++	+3: R_I51_16_CODE	.text\+0x1
++ +5:	e5 e0 +	mov	A, 0xe0
+diff --git a/gas/testsuite/gas/i51/case.s b/gas/testsuite/gas/i51/case.s
+new file mode 100644
+index 00000000..707b7edd
+--- /dev/null
++++ b/gas/testsuite/gas/i51/case.s
+@@ -0,0 +1,6 @@
++; With -mcase-sensitive, names differing in case are different symbols.
++	.text
++foo:	nop
++Foo:	nop
++	ljmp	Foo
++	mov	a,acc
 diff --git a/gas/testsuite/gas/i51/comm-bad.d b/gas/testsuite/gas/i51/comm-bad.d
 new file mode 100644
 index 00000000..f069f3d0

@@ -857,16 +857,17 @@ index b2bb505c..fcab63ec 100644
  	doc/c-kvx.texi \
  	doc/c-lm32.texi \
 diff --git a/gas/NEWS b/gas/NEWS
-index 165e2336..012bacfb 100644
+index 165e2336..b6b5f108 100644
 --- a/gas/NEWS
 +++ b/gas/NEWS
-@@ -2,6 +2,10 @@
+@@ -2,6 +2,11 @@
  
  Changes in 2.47:
  
 +* Add support for the Intel MCS-51 (8051) microcontroller, target i51-elf.
 +  The -mmcu option selects the special function register names of the
-+  8051, the 8052 or the AT89S8252.
++  8051, the 8052 or the AT89S8252, and -mcase-sensitive keeps symbol names
++  from being folded to upper case.
 +
  * New command line option --reloc-section-sym=[all|internal|none]
    controls whether relocations referencing local binding symbols are adjusted
@@ -1490,46 +1491,6 @@ index 8968d170..fc5ec205 100644
  
  .*: .*
  
-diff --git a/gas/testsuite/gas/elf/group0b.d b/gas/testsuite/gas/elf/group0b.d
-index c979f920..3d93b3a7 100644
---- a/gas/testsuite/gas/elf/group0b.d
-+++ b/gas/testsuite/gas/elf/group0b.d
-@@ -1,6 +1,8 @@
- #readelf: -g
- #name: group section (using readelf -g)
- #source: group0.s
-+# The i51 assembler folds symbol names to upper case.
-+#xfail: i51-*-*
- 
- #...
- COMDAT group section \[    1\] `\.group' \[.foo_group\] contains . sections:
-diff --git a/gas/testsuite/gas/elf/group0c.d b/gas/testsuite/gas/elf/group0c.d
-index ffb129a6..176ea33c 100644
---- a/gas/testsuite/gas/elf/group0c.d
-+++ b/gas/testsuite/gas/elf/group0c.d
-@@ -1,7 +1,8 @@
- #readelf: -sW
- #name: group section name
- #source: group0.s
--#xfail: *-*-solaris*
-+# The i51 assembler folds symbol names to upper case.
-+#xfail: *-*-solaris* i51-*-*
- 
- #...
- .*NOTYPE[ 	]+LOCAL[ 	]+DEFAULT[ 	]+[0-9]+[ 	]+\.foo_group
-diff --git a/gas/testsuite/gas/elf/group1b.d b/gas/testsuite/gas/elf/group1b.d
-index 8043f203..6abb8311 100644
---- a/gas/testsuite/gas/elf/group1b.d
-+++ b/gas/testsuite/gas/elf/group1b.d
-@@ -1,6 +1,8 @@
- #readelf: -g
- #name: group section with multiple sections of same name (using readelf -g)
- #source: group1.s
-+# The i51 assembler folds symbol names to upper case.
-+#xfail: i51-*-*
- 
- #...
- COMDAT group section \[    1\] `\.group' \[.foo_group\] contains . sections:
 diff --git a/gas/testsuite/gas/elf/group3.d b/gas/testsuite/gas/elf/group3.d
 index cd92f545..4adc7bd8 100644
 --- a/gas/testsuite/gas/elf/group3.d
@@ -1640,32 +1601,6 @@ index 1daa20bd..12c8c730 100644
  
  #...
  0+ .* u
-diff --git a/gas/testsuite/gas/elf/section12a.d b/gas/testsuite/gas/elf/section12a.d
-index 08ecbd21..f3cecd02 100644
---- a/gas/testsuite/gas/elf/section12a.d
-+++ b/gas/testsuite/gas/elf/section12a.d
-@@ -4,6 +4,8 @@
- #name: mbind sections 12
- # A number of targets do not support SHF_GNU_MBIND
- #notarget: ![supports_gnu_osabi]
-+# The i51 assembler folds symbol names to upper case.
-+#xfail: i51-*-*
- 
- #...
-   \[[ 0-9]+\] \.mbind\.data[ 	]+PROGBITS[ 	]+0+0 0+[0-9a-f]+ 0+1 00 WAD  0   0  1
-diff --git a/gas/testsuite/gas/elf/section16a.d b/gas/testsuite/gas/elf/section16a.d
-index e5a1a85d..ec2d00b3 100644
---- a/gas/testsuite/gas/elf/section16a.d
-+++ b/gas/testsuite/gas/elf/section16a.d
-@@ -4,6 +4,8 @@
- #name: mbind sections 16
- # A number of targets do not support SHF_GNU_MBIND
- #notarget: ![supports_gnu_osabi]
-+# The i51 assembler folds symbol names to upper case.
-+#xfail: i51-*-*
- 
- #...
-   \[[ 0-9]+\] \.mbind\.data[ 	]+PROGBITS[ 	]+0+0 0+[0-9a-f]+ 0+1 00 WAD  0   0  1
 diff --git a/gas/testsuite/gas/elf/section20.d b/gas/testsuite/gas/elf/section20.d
 index cd7ab5e0..7ec2911f 100644
 --- a/gas/testsuite/gas/elf/section20.d
@@ -2760,19 +2695,6 @@ index 09cdb1f2..05ee6e61 100644
  
  COMDAT group section \[[ 0-9]+\] `.group' \[foo\] contains . sections:
     \[Index\]    Name
-diff --git a/ld/testsuite/ld-elf/merge5.d b/ld/testsuite/ld-elf/merge5.d
-index 38c67546..21741193 100644
---- a/ld/testsuite/ld-elf/merge5.d
-+++ b/ld/testsuite/ld-elf/merge5.d
-@@ -4,6 +4,8 @@
- #source: merge5.b.s
- #ld: -T merge.ld -O 2 -O - -O 99 -O default -O fast -O 0
- #nm: -s
-+#xfail: i51-*-*
-+# i51 folds symbol names to upper case, so the lower-case names here never match.
- 
- 0+1100 R .merge1
- 0+1104 R .merge2
 diff --git a/ld/testsuite/ld-elf/nobits-1.d b/ld/testsuite/ld-elf/nobits-1.d
 index b869475d..cb47263a 100644
 --- a/ld/testsuite/ld-elf/nobits-1.d
