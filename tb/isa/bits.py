@@ -140,8 +140,8 @@ def dcase(name, src, want, msg=None, section='.text'):
 DIR_CASES = [
     dcase('bit-0',    '.bitdata\nBIT0:\t.bit 0', '00', section='.bitdata'),
     dcase('bit-1',    '.bitdata\nBIT1:\t.bit 1', '01', section='.bitdata'),
-    dcase('bit-2',    '.bitdata\nBIT2:\t.bit 2', None, 'not in range 0..1',
+    dcase('bit-2',    '.bitdata\nBIT2:\t.bit 2', None, 'a bit value is a constant 0 or 1',
           section='.bitdata'),
-    dcase('bit-neg',  '.bitdata\nBITN:\t.bit -1', None, 'not in range 0..1',
+    dcase('bit-neg',  '.bitdata\nBITN:\t.bit -1', None, 'a bit value is a constant 0 or 1',
           section='.bitdata'),
 ]

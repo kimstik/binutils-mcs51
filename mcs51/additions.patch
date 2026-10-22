@@ -1221,10 +1221,10 @@ index 00000000..dccd9af4
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..2ce13257
+index 00000000..2433b547
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2220 @@
+@@ -0,0 +1,2254 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1901,6 +1901,8 @@ index 00000000..2ce13257
 +      else
 +	exp->X_add_number += i51_regbank * 8;
 +    }
++  if (n->kind == 'B')
++    i51_operator_class = 'B';
 +  i51_note_use (n->name, false);
 +}
 +
@@ -1919,7 +1921,8 @@ index 00000000..2ce13257
 +	      "be defined"));
 +  i51_check_common (sym);
 +
-+  if (!S_IS_DEFINED (sym) || symbol_section_p (sym))
++  if ((!S_IS_DEFINED (sym) && !S_IS_EXTERNAL (sym) && !S_IS_WEAK (sym))
++      || symbol_section_p (sym))
 +    return;
 +  use = str_hash_find (i51_names_used, S_GET_NAME (sym));
 +  if (use == NULL)
@@ -2135,8 +2138,12 @@ index 00000000..2ce13257
 +      size_t baselen = dot - name;
 +      expressionS arg;
 +      offsetT bit = strtol (dot + 1, NULL, 10);
++      char *full;
 +
 +      memset (&arg, 0, sizeof (arg));
++      full = xstrdup (name);
++      i51_note_use (i51_canonicalize_symbol_name (full), true);
++      free (full);
 +      n = i51_lookup_name (name, baselen);
 +      if (n != NULL && !i51_user_symbol (name, baselen))
 +	{
@@ -2152,10 +2159,7 @@ index 00000000..2ce13257
 +      else
 +	{
 +	  char *base = xmemdup0 (name, baselen);
-+	  char *full = xstrdup (name);
 +
-+	  i51_note_use (i51_canonicalize_symbol_name (full), true);
-+	  free (full);
 +	  arg.X_op = O_symbol;
 +	  arg.X_add_symbol = symbol_find_or_make (base);
 +	  free (base);
@@ -2256,22 +2260,20 @@ index 00000000..2ce13257
 +  SKIP_WHITESPACE ();
 +  p = input_line_pointer;
 +
-+  /* An indirect operand is a fixed name, which white space may divide:
-+     `@ R0', `@A + DPTR'.  */
++  /* An indirect operand is a fixed name: `@R0', `@A+DPTR'.  */
 +  if (*p == '@')
 +    {
 +      char name[I51_NAME_MAX + 1];
 +      size_t len = 0;
-+      bool fits = true;
++      bool fits = true, ended = false;
 +
 +      for (end = p; *end != ',' && !is_end_of_stmt (*end); end++)
-+	if (!is_whitespace (*end))
-+	  {
-+	    if (len == I51_NAME_MAX)
-+	      fits = false;
-+	    else
-+	      name[len++] = *end;
-+	  }
++	if (is_whitespace (*end))
++	  ended = len > 0;
++	else if (ended || len == I51_NAME_MAX)
++	  fits = false;
++	else
++	  name[len++] = *end;
 +      n = fits ? i51_lookup_name (name, len) : NULL;
 +      if (n == NULL)
 +	{
@@ -2723,11 +2725,6 @@ index 00000000..2ce13257
 +  offsetT value = *valuep;
 +  long bit;
 +
-+  /* i51_check_range () states the rule of an operand field, which the
-+     width test in write.c cannot.  */
-+  fixp->fx_no_overflow = (fixp->fx_r_type != BFD_RELOC_8
-+			  && fixp->fx_r_type != BFD_RELOC_16
-+			  && fixp->fx_r_type != BFD_RELOC_32);
 +
 +  /* Final here: a fixup with no symbol left on it, other than an
 +     ACALL/AJMP target, whose page is only known once the code is placed;
@@ -2741,6 +2738,15 @@ index 00000000..2ce13257
 +	   && S_GET_SEGMENT (fixp->fx_addsy) == seg
 +	   && S_IS_DEFINED (fixp->fx_addsy) && !S_IS_WEAK (fixp->fx_addsy))
 +    fixp->fx_done = 1;
++
++  /* i51_check_range () states the rule of an operand field, which the
++     width test in write.c cannot.  A datum is left to that test when its
++     value is known here, and to the linker when it is not: its addend
++     alone is not the value.  */
++  fixp->fx_no_overflow = (!fixp->fx_done
++			  || (fixp->fx_r_type != BFD_RELOC_8
++			      && fixp->fx_r_type != BFD_RELOC_16
++			      && fixp->fx_r_type != BFD_RELOC_32));
 +
 +  if (fixp->fx_subsy != NULL)
 +    as_bad_subtract (fixp);
@@ -2921,11 +2927,10 @@ index 00000000..2ce13257
 +  do
 +    {
 +      expression (&exp);
-+      if (exp.X_op == O_constant
-+	  && (exp.X_add_number < 0 || exp.X_add_number > 1))
++      if (exp.X_op != O_constant
++	  || exp.X_add_number < 0 || exp.X_add_number > 1)
 +	{
-+	  as_bad (_("bit value is not in range 0..1 %ld"),
-+		  (long) exp.X_add_number);
++	  as_bad (_("a bit value is a constant 0 or 1"));
 +	  ignore_rest_of_line ();
 +	  return;
 +	}
@@ -3037,6 +3042,14 @@ index 00000000..2ce13257
 +  int is_local = symbol_get_obj (symbolP)->local;
 +  addressT align = 0;
 +
++  if (strcmp (S_GET_NAME (symbolP), "__RB__") == 0)
++    {
++      as_bad (_("`__RB__' is the register-bank common of .using and cannot "
++		"be defined"));
++      i51_rb_reported = true;
++      ignore_rest_of_line ();
++      return NULL;
++    }
 +  if (S_IS_COMMON (symbolP) && S_GET_SEGMENT (symbolP) != com)
 +    {
 +      as_bad (_("`%s' is already a common of another memory space"),
@@ -3046,12 +3059,10 @@ index 00000000..2ce13257
 +    }
 +  if (space == I51_BSS)
 +    {
-+      /* With no alignment given, bfd would align to the size, up to 16:
-+	 a byte is aligned to a byte here.  */
-+      bool aligned = *input_line_pointer == ',';
-+
++      /* With no alignment, bfd would align to the size, up to 16: a byte
++	 is aligned to a byte here.  */
 +      symbolP = elf_common_parse (0, symbolP, size);
-+      if (symbolP != NULL && !aligned && !is_local)
++      if (symbolP != NULL && !is_local && S_GET_ALIGN (symbolP) == 0)
 +	S_SET_ALIGN (symbolP, 1);
 +      return symbolP;
 +    }
@@ -3157,6 +3168,9 @@ index 00000000..2ce13257
 +    if (TOUPPER ((unsigned char) input_line_pointer[i]) != kw[i])
 +      return false;
 +  if (is_part_of_name (kw[len - 1]) && is_part_of_name (input_line_pointer[len]))
++    return false;
++  /* A bare keyword is a symbol of the program when one has its name.  */
++  if (ISALPHA (kw[0]) && i51_user_symbol (input_line_pointer, len))
 +    return false;
 +  input_line_pointer += len;
 +  return true;
@@ -3330,7 +3344,8 @@ index 00000000..2ce13257
 +  bool word = mode == PCODE_DIRECTWORD || mode == PCODE_DIRECTSWAP;
 +  unsigned int flags = 0;
 +
-+  if (constant && (word ? stored < -65535 || stored > 65535
++  if (constant && (mode == PCODE_DIRECTSWAP ? stored < -32768 || stored > 65535
++		   : word ? stored < -65535 || stored > 65535
 +		   : stored < -255 || stored > 255))
 +    as_bad (_("pcode operand out of range: %ld"), (long) v);
 +  if (!swapable && (mode == PCODE_DIRECTSWAP || mode == PCODE_INDIRECTSWAP))
@@ -3369,6 +3384,21 @@ index 00000000..2ce13257
 +  return flags;
 +}
 +
++/* Whether the text from START to END is the name of HIGH, LOW or B2B.  */
++
++static bool
++i51_operator_name (const char *start, const char *end)
++{
++  static const char *const names[] = { "HIGH", "LOW", "B2B" };
++  size_t i;
++
++  for (i = 0; i < ARRAY_SIZE (names); i++)
++    if ((size_t) (end - start) == strlen (names[i])
++	&& strncasecmp (start, names[i], end - start) == 0)
++      return true;
++  return false;
++}
++
 +static void
 +i51_pcode (int ignore ATTRIBUTE_UNUSED)
 +{
@@ -3380,7 +3410,8 @@ index 00000000..2ce13257
 +  int errors = had_errors ();
 +
 +  /* The address is one term - a number, a name, or an expression in
-+     parentheses - so the sign or the `#' or `@' of an operand ends it:
++     parentheses - so the sign, parenthesis, `#' or `@' of an operand ends
++     it:
 +     `.pcode 0x200 -1' has an operand.  */
 +  SKIP_WHITESPACE ();
 +  end = input_line_pointer;
@@ -3388,7 +3419,10 @@ index 00000000..2ce13257
 +  while (!is_end_of_stmt (*end)
 +	 && (depth > 0
 +	     || (!is_whitespace (*end) && *end != '#' && *end != '@'
-+		 && ((*end != '+' && *end != '-') || end == input_line_pointer))))
++		 && ((*end != '+' && *end != '-' && *end != '(')
++		     || end == input_line_pointer
++		     || (*end == '(' && i51_operator_name (input_line_pointer,
++						       end))))))
 +    {
 +      if (*end == '(')
 +	depth++;
@@ -3551,10 +3585,10 @@ index 00000000..89e993a7
 +#define tc_canonicalize_symbol_name(NAME) i51_canonicalize_symbol_name (NAME)
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..656df5eb
+index 00000000..45a11864
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,902 @@
+@@ -0,0 +1,904 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -4124,7 +4158,7 @@ index 00000000..656df5eb
 +@cindex @code{bit} directive, MCS-51
 +@item .bit @var{expressions}
 +Assemble one byte for each of the comma-separated @var{expressions}, each
-+of which must be 0 or 1: in the bit space one byte of section contents
++of which must be the constant 0 or 1: in the bit space one byte of section contents
 +describes one bit.  The default linker script loads nothing into the bit
 +space, so it refuses a @code{.bit 1} there (@pxref{i51 Memory Spaces}).
 +@code{HIGH ()} and @code{LOW ()} of a value not known here are not
@@ -4233,9 +4267,11 @@ index 00000000..656df5eb
 +
 +@noindent
 +The entry is two bytes of execution address and flags, one byte of the
-+remaining flags, and then the operand bytes.  A byte that would be zero is
-+left out and the flags record its absence, so an entry is only as long as
-+it needs to be:
++remaining flags, and then the operand bytes.  A byte of a constant operand
++that is zero is left out and the flags record its absence, so an entry is
++only as long as it needs to be; @code{@@BYTE 1} is stored as a zero byte,
++since it is the operand that is not zero.  A keyword without @samp{#} or
++@samp{@@} is the symbol of that name where the program has one.
 +
 +@smallexample
 +        .pcode  pc2x PKT_DEST, arpgwreq, #BYTE sizeofarpgwreq
@@ -4457,6 +4493,35 @@ index 00000000..656df5eb
 +@smallexample
 +        .quad   sym        @r{Error: cannot relocate 8 bytes of data}
 +@end smallexample
+diff --git a/gas/testsuite/gas/i51/bit-bad.d b/gas/testsuite/gas/i51/bit-bad.d
+new file mode 100644
+index 00000000..5fdd49a5
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bit-bad.d
+@@ -0,0 +1,3 @@
++#name: i51 .bit values
++#as:
++#error_output: bit-bad.l
+diff --git a/gas/testsuite/gas/i51/bit-bad.l b/gas/testsuite/gas/i51/bit-bad.l
+new file mode 100644
+index 00000000..6d939254
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bit-bad.l
+@@ -0,0 +1,3 @@
++.*: Assembler messages:
++.*:3: Error: a bit value is a constant 0 or 1
++.*:4: Error: a bit value is a constant 0 or 1
+diff --git a/gas/testsuite/gas/i51/bit-bad.s b/gas/testsuite/gas/i51/bit-bad.s
+new file mode 100644
+index 00000000..8a5a0377
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bit-bad.s
+@@ -0,0 +1,5 @@
++; A bit value is a constant 0 or 1.
++	.bitdata
++	.bit	k
++	.bit	2
++	.equ	k, 1
 diff --git a/gas/testsuite/gas/i51/bitnames.d b/gas/testsuite/gas/i51/bitnames.d
 new file mode 100644
 index 00000000..e3b4c1d0
@@ -4523,22 +4588,23 @@ index 00000000..ee095256
 +#error_output: bitsuffix-bad.l
 diff --git a/gas/testsuite/gas/i51/bitsuffix-bad.l b/gas/testsuite/gas/i51/bitsuffix-bad.l
 new file mode 100644
-index 00000000..01c20124
+index 00000000..c95af3f8
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/bitsuffix-bad.l
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,7 @@
 +.*: Assembler messages:
 +.*:3: Error: junk at end of line, first unrecognized character is `\.'
 +.*:4: Error: bit number 8 is not 0\.\.7
 +.*:5: Error: 0x30 is not bit addressable
 +.*:6: Error: bit number 10 is not 0\.\.7
 +.*:7: Error: a bit address is not a number
++.*:8: Error: a bit address is not a number
 diff --git a/gas/testsuite/gas/i51/bitsuffix-bad.s b/gas/testsuite/gas/i51/bitsuffix-bad.s
 new file mode 100644
-index 00000000..acedf4cc
+index 00000000..ee681d7b
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/bitsuffix-bad.s
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,8 @@
 +; The number before a bit number stands alone, and the bit is 0..7.
 +	.text
 +	setb	1+0x20.1
@@ -4546,6 +4612,7 @@ index 00000000..acedf4cc
 +	setb	0x30.1
 +	setb	0x20.10
 +	mov	a,#0x20.3
++	mov	a,#p1.1
 diff --git a/gas/testsuite/gas/i51/branch-abs.d b/gas/testsuite/gas/i51/branch-abs.d
 new file mode 100644
 index 00000000..36cd244a
@@ -4623,6 +4690,33 @@ index 00000000..3810c5bf
 +g:	nop
 +	sjmp	w
 +	sjmp	g
+diff --git a/gas/testsuite/gas/i51/builtin-global.d b/gas/testsuite/gas/i51/builtin-global.d
+new file mode 100644
+index 00000000..c3785a39
+--- /dev/null
++++ b/gas/testsuite/gas/i51/builtin-global.d
+@@ -0,0 +1,3 @@
++#name: i51 built-in name made global after its use
++#as:
++#error_output: builtin-global.l
+diff --git a/gas/testsuite/gas/i51/builtin-global.l b/gas/testsuite/gas/i51/builtin-global.l
+new file mode 100644
+index 00000000..313b6cc1
+--- /dev/null
++++ b/gas/testsuite/gas/i51/builtin-global.l
+@@ -0,0 +1,2 @@
++.*: Assembler messages:
++.*:3: Error: `EA' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
+diff --git a/gas/testsuite/gas/i51/builtin-global.s b/gas/testsuite/gas/i51/builtin-global.s
+new file mode 100644
+index 00000000..8cce3636
+--- /dev/null
++++ b/gas/testsuite/gas/i51/builtin-global.s
+@@ -0,0 +1,4 @@
++; A built-in name used as such cannot become a global symbol afterwards.
++	.text
++	setb	ea
++	.global	ea
 diff --git a/gas/testsuite/gas/i51/case.d b/gas/testsuite/gas/i51/case.d
 new file mode 100644
 index 00000000..24cd2b1e
@@ -4722,10 +4816,10 @@ index 00000000..f316d5e0
 +	.tls_common b2, 8
 diff --git a/gas/testsuite/gas/i51/comm.d b/gas/testsuite/gas/i51/comm.d
 new file mode 100644
-index 00000000..f0639bfc
+index 00000000..a36da68a
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/comm.d
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,13 @@
 +#name: i51 memory-space commons
 +#as:
 +#readelf: -s --wide
@@ -4737,12 +4831,14 @@ index 00000000..f0639bfc
 + +[0-9]+: [0-9a-f]+ +4 OBJECT  GLOBAL DEFAULT PRC\[0xff04\] XBUF
 + +[0-9]+: 0+2 +2 OBJECT  GLOBAL DEFAULT PRC\[0xff03\] IBUF
 + +[0-9]+: 0+1 +5 OBJECT  GLOBAL DEFAULT  COM PLAIN
++ +[0-9]+: 0+4 +4 OBJECT  GLOBAL DEFAULT  COM CA
++ +[0-9]+: 0+1 +4 OBJECT  GLOBAL DEFAULT  COM CB
 diff --git a/gas/testsuite/gas/i51/comm.s b/gas/testsuite/gas/i51/comm.s
 new file mode 100644
-index 00000000..5dadebf2
+index 00000000..e23eefe4
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/comm.s
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,9 @@
 +; A common of a memory space carries the space's section index; .local
 +; before it allocates the symbol here instead.
 +	.xcomm	xbuf, 4
@@ -4750,6 +4846,8 @@ index 00000000..5dadebf2
 +	.local	lbuf
 +	.xcomm	lbuf, 3
 +	.comm	plain, 5
++	.comm	ca,4,4
++	.comm	cb,4,"bss"
 diff --git a/gas/testsuite/gas/i51/crash-sub.d b/gas/testsuite/gas/i51/crash-sub.d
 new file mode 100644
 index 00000000..358c270d
@@ -4791,19 +4889,20 @@ index 00000000..891f1edc
 +#error_output: direct-bad.l
 diff --git a/gas/testsuite/gas/i51/direct-bad.l b/gas/testsuite/gas/i51/direct-bad.l
 new file mode 100644
-index 00000000..cfae152a
+index 00000000..d343502c
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/direct-bad.l
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,4 @@
 +.*: Assembler messages:
 +.*:8: Error: `BUF' is at 0x90, which a direct address cannot reach: 0x80 and above is the special function register page, and RAM there is reachable only through @R0/@R1
 +.*:11: Error: `B80' is at 0x80, which a direct address cannot reach: 0x80 and above is the special function register page, and RAM there is reachable only through @R0/@R1
++.*:16: Error: `FOO' is at 0x90, which a direct address cannot reach: 0x80 and above is the special function register page, and RAM there is reachable only through @R0/@R1
 diff --git a/gas/testsuite/gas/i51/direct-bad.s b/gas/testsuite/gas/i51/direct-bad.s
 new file mode 100644
-index 00000000..5221b048
+index 00000000..9a59c6d4
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/direct-bad.s
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,16 @@
 +; A direct operand cannot reach RAM the assembler placed at 0x80 or above.
 +	.idata
 +	.ds.b	0x7f
@@ -4815,6 +4914,35 @@ index 00000000..5221b048
 +	mov	r0,#buf
 +	mov	a,b7f
 +	mov	a,b80
++	.section .data.foo,"aw"
++	.ds.b	0x90
++foo:	.ds.b	1
++	.text
++	mov	a,foo
+diff --git a/gas/testsuite/gas/i51/direct-x.d b/gas/testsuite/gas/i51/direct-x.d
+new file mode 100644
+index 00000000..80bdbe9a
+--- /dev/null
++++ b/gas/testsuite/gas/i51/direct-x.d
+@@ -0,0 +1,6 @@
++#name: i51 direct operand naming external RAM
++#as:
++#objdump: -r
++
++#...
++0+1 R_I51_8_DIR +.xdata\+0x0*90
+diff --git a/gas/testsuite/gas/i51/direct-x.s b/gas/testsuite/gas/i51/direct-x.s
+new file mode 100644
+index 00000000..611fb2ee
+--- /dev/null
++++ b/gas/testsuite/gas/i51/direct-x.s
+@@ -0,0 +1,6 @@
++; Symbols outside internal RAM are left to the linker.
++	.xdata
++	.ds.b	0x90
++xb:	.byte	0
++	.text
++	mov	a,xb
 diff --git a/gas/testsuite/gas/i51/dotted-bad.d b/gas/testsuite/gas/i51/dotted-bad.d
 new file mode 100644
 index 00000000..60a5b054
@@ -4826,20 +4954,21 @@ index 00000000..60a5b054
 +#error_output: dotted-bad.l
 diff --git a/gas/testsuite/gas/i51/dotted-bad.l b/gas/testsuite/gas/i51/dotted-bad.l
 new file mode 100644
-index 00000000..aae82e27
+index 00000000..066240f0
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/dotted-bad.l
-@@ -0,0 +1,4 @@
+@@ -0,0 +1,5 @@
 +.*: Assembler messages:
 +.*:3: Error: invalid instruction operands
 +.*:3: Error: `LOOP\.1' is used here as a bit of the byte before the dot and defined later as a symbol; define it before its first use
 +.*:4: Error: `WW\.3' is used here as a bit of the byte before the dot and defined later as a symbol; define it before its first use
++.*:8: Error: `TCON\.4' is used here as a bit of the byte before the dot and defined later as a symbol; define it before its first use
 diff --git a/gas/testsuite/gas/i51/dotted-bad.s b/gas/testsuite/gas/i51/dotted-bad.s
 new file mode 100644
-index 00000000..b51db913
+index 00000000..23e8f01e
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/dotted-bad.s
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,9 @@
 +; A name used as bit N of NAME cannot be defined afterwards.
 +	.text
 +	ljmp	loop.1
@@ -4847,6 +4976,8 @@ index 00000000..b51db913
 +loop.1:	nop
 +	.equ	ww.3, 0x50
 +	.equ	ww, 0x20
++	setb	tcon.4
++tcon.4:	nop
 diff --git a/gas/testsuite/gas/i51/eflags.d b/gas/testsuite/gas/i51/eflags.d
 new file mode 100644
 index 00000000..e8d333de
@@ -4903,10 +5034,10 @@ index 00000000..0f4c7a2d
 +	.equ	fwd, 0xabcd
 diff --git a/gas/testsuite/gas/i51/i51.exp b/gas/testsuite/gas/i51/i51.exp
 new file mode 100644
-index 00000000..df80d4e1
+index 00000000..dd7ea9d0
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/i51.exp
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,34 @@
 +# Copyright (C) 2026 Free Software Foundation, Inc.
 +
 +# This program is free software; you can redistribute it and/or modify
@@ -4932,6 +5063,43 @@ index 00000000..df80d4e1
 +run_dump_tests [lsort [glob -nocomplain $srcdir/$subdir/*.d]]
 +
 +run_list_test "listing" "-as"
++
++# .using does not carry from one input file into the next.
++set test "i51 .using is per file"
++set got [remote_exec host "$AS" "-o tmpdir/using.o $srcdir/$subdir/using-a.s $srcdir/$subdir/using-b.s"]
++if { [regexp {using-b.s:3: Error: missing .using} [lindex $got 1]] } {
++    pass $test
++} else {
++    fail $test
++}
+diff --git a/gas/testsuite/gas/i51/indirect-bad.d b/gas/testsuite/gas/i51/indirect-bad.d
+new file mode 100644
+index 00000000..c1cb226d
+--- /dev/null
++++ b/gas/testsuite/gas/i51/indirect-bad.d
+@@ -0,0 +1,3 @@
++#name: i51 indirect operand names
++#as:
++#error_output: indirect-bad.l
+diff --git a/gas/testsuite/gas/i51/indirect-bad.l b/gas/testsuite/gas/i51/indirect-bad.l
+new file mode 100644
+index 00000000..9f383276
+--- /dev/null
++++ b/gas/testsuite/gas/i51/indirect-bad.l
+@@ -0,0 +1,3 @@
++.*: Assembler messages:
++.*:3: Error: invalid indirect operand `@r 0'
++.*:4: Error: invalid indirect operand `@a\+dptrx'
+diff --git a/gas/testsuite/gas/i51/indirect-bad.s b/gas/testsuite/gas/i51/indirect-bad.s
+new file mode 100644
+index 00000000..c614cf7e
+--- /dev/null
++++ b/gas/testsuite/gas/i51/indirect-bad.s
+@@ -0,0 +1,4 @@
++; Indirect operands are fixed names.
++	.text
++	mov	a,@r 0
++	jmp	@a+dptrx
 diff --git a/gas/testsuite/gas/i51/indirect-space.d b/gas/testsuite/gas/i51/indirect-space.d
 new file mode 100644
 index 00000000..2f648299
@@ -5408,6 +5576,27 @@ index 00000000..e4f2eb5e
 +	nop
 +	.pcode	0x2000
 +	.pcode	0xff
+diff --git a/gas/testsuite/gas/i51/pcode-ext.d b/gas/testsuite/gas/i51/pcode-ext.d
+new file mode 100644
+index 00000000..d1636d9a
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode-ext.d
+@@ -0,0 +1,6 @@
++#name: i51 .pcode byte of an external symbol
++#as:
++#objdump: -r
++
++#...
++0+3 R_I51_8 +K-0x0*100
+diff --git a/gas/testsuite/gas/i51/pcode-ext.s b/gas/testsuite/gas/i51/pcode-ext.s
+new file mode 100644
+index 00000000..16826d92
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode-ext.s
+@@ -0,0 +1,3 @@
++; A pcode byte of an external symbol is checked by the linker.
++	.text
++	.pcode	0x200 @k-256
 diff --git a/gas/testsuite/gas/i51/pcode.d b/gas/testsuite/gas/i51/pcode.d
 new file mode 100644
 index 00000000..7fe07bb8
@@ -5452,22 +5641,28 @@ index 00000000..825a90e0
 +#error_output: pcode2-bad.l
 diff --git a/gas/testsuite/gas/i51/pcode2-bad.l b/gas/testsuite/gas/i51/pcode2-bad.l
 new file mode 100644
-index 00000000..9fe56921
+index 00000000..6ab8e1ee
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/pcode2-bad.l
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,12 @@
 +.*: Assembler messages:
 +.*:3: Error: this pcode operand cannot be swapped
 +.*:4: Error: pcode operand out of range: \-65536
 +.*:5: Error: pcode operand out of range: 256
 +.*:6: Error: pcode operand out of range: 257
 +.*:7: Error: found '1', expected: '\)'
++.*:8: Error: pcode operand out of range: \-40000
++.*:9: Error: pcode operand out of range: 65536
++.*:10: Error: pcode operand out of range: \-256
++.*:11: Error: junk in pcode address: `\)1'
++.*:12: Error: bad expression
++.*:12: Error: expected comma after pcode operand
 diff --git a/gas/testsuite/gas/i51/pcode2-bad.s b/gas/testsuite/gas/i51/pcode2-bad.s
 new file mode 100644
-index 00000000..99ea1f4d
+index 00000000..32d00924
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/pcode2-bad.s
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,12 @@
 +; Operands .pcode cannot hold.
 +	.text
 +	.pcode	0x200 1,#SWAP 0x1234,2
@@ -5475,12 +5670,17 @@ index 00000000..99ea1f4d
 +	.pcode	0x200 #BYTE 256
 +	.pcode	0x200 @BYTE 257
 +	.pcode	(0x200 1
++	.pcode	0x200 #SWAP -40000
++	.pcode	0x200 WORD 65536
++	.pcode	0x200 BYTE -256
++	.pcode	0x200) 1
++	.pcode	(0x100)*2 1
 diff --git a/gas/testsuite/gas/i51/pcode2.d b/gas/testsuite/gas/i51/pcode2.d
 new file mode 100644
-index 00000000..1eb60e30
+index 00000000..f3b254ca
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/pcode2.d
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,10 @@
 +#name: i51 .pcode address and signed operands
 +#as:
 +#objdump: -s -j .text
@@ -5489,13 +5689,14 @@ index 00000000..1eb60e30
 +
 +Contents of section .text:
 + 0000 0200c0ff ff0201c0 fffe8200 40ff8200  .*
-+ 0010 000200c0 12340200 4001 +.*
++ 0010 000200c0 12340200 40010200 40010200  .*
++ 0020 c0123302 0000 +.*
 diff --git a/gas/testsuite/gas/i51/pcode2.s b/gas/testsuite/gas/i51/pcode2.s
 new file mode 100644
-index 00000000..f8853ed9
+index 00000000..845a034c
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/pcode2.s
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,13 @@
 +; The address of .pcode is one term; the operand after it may have a sign.
 +	.text
 +	.equ	shl8x, 0x1234
@@ -5505,6 +5706,10 @@ index 00000000..f8853ed9
 +	.pcode	0x200 @BYTE 0
 +	.pcode	0x200 shl8x
 +	.pcode	0x200 #WORD -65535
++	.equ	word, 0x1234
++	.pcode	0x200 (1)
++	.pcode	0x200 word-1
++	.pcode	0x200 SHL8 0
 diff --git a/gas/testsuite/gas/i51/range-fwd.d b/gas/testsuite/gas/i51/range-fwd.d
 new file mode 100644
 index 00000000..c5068e9c
@@ -5682,6 +5887,31 @@ index 00000000..dbd48557
 +; __RB__ is the assembler's, whatever directive gives it.
 +	.using	1
 +	.xcomm	__RB__, 40
+diff --git a/gas/testsuite/gas/i51/rb-bad3.d b/gas/testsuite/gas/i51/rb-bad3.d
+new file mode 100644
+index 00000000..4b411b87
+--- /dev/null
++++ b/gas/testsuite/gas/i51/rb-bad3.d
+@@ -0,0 +1,3 @@
++#name: i51 __RB__ as .comm
++#as:
++#error_output: rb-bad3.l
+diff --git a/gas/testsuite/gas/i51/rb-bad3.l b/gas/testsuite/gas/i51/rb-bad3.l
+new file mode 100644
+index 00000000..0f0d1705
+--- /dev/null
++++ b/gas/testsuite/gas/i51/rb-bad3.l
+@@ -0,0 +1,2 @@
++.*: Assembler messages:
++.*:2: Error: `__RB__' is the register\-bank common of \.using and cannot be defined
+diff --git a/gas/testsuite/gas/i51/rb-bad3.s b/gas/testsuite/gas/i51/rb-bad3.s
+new file mode 100644
+index 00000000..43f511b2
+--- /dev/null
++++ b/gas/testsuite/gas/i51/rb-bad3.s
+@@ -0,0 +1,2 @@
++; __RB__ is the assembler's.
++	.comm	__RB__, 4
 diff --git a/gas/testsuite/gas/i51/rbsize.d b/gas/testsuite/gas/i51/rbsize.d
 new file mode 100644
 index 00000000..159c1eb3
@@ -5890,6 +6120,25 @@ index 00000000..77a2112f
 +	.text
 +	nop
 +	.byte	0x02, 0x12
+diff --git a/gas/testsuite/gas/i51/using-a.s b/gas/testsuite/gas/i51/using-a.s
+new file mode 100644
+index 00000000..76b53a8d
+--- /dev/null
++++ b/gas/testsuite/gas/i51/using-a.s
+@@ -0,0 +1,4 @@
++; .using holds within its file.
++	.text
++	.using	1
++	mov	a,ar1
+diff --git a/gas/testsuite/gas/i51/using-b.s b/gas/testsuite/gas/i51/using-b.s
+new file mode 100644
+index 00000000..9736d909
+--- /dev/null
++++ b/gas/testsuite/gas/i51/using-b.s
+@@ -0,0 +1,3 @@
++; A file starts with no .using of its own.
++	.text
++	mov	a,ar1
 diff --git a/gas/testsuite/gas/i51/using-bad.d b/gas/testsuite/gas/i51/using-bad.d
 new file mode 100644
 index 00000000..2bfa17cc
