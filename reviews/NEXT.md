@@ -13,8 +13,14 @@ r9-quality.md / r9-tests.md (open, list below).
 - [x] clean-room build from tarball + patches at e3c2b4e: gate green, no warnings in port files.
 - [x] round 10 started; r10-quality.md in. C1 (.local space common lost the
       code after it) and M1 (-mcase-sensitive use-then-define) fixed: fbc931d.
-- [ ] r10-quality LOW 1-9 (see r10-quality.md), r10-tests.md when it lands,
-      then round 11 if anything above LOW remains.
+- [x] r10-quality P2: space common vs definitions of its own space, vectors
+      as code (a320f83); later symbol of a built-in name, pcode keyword use,
+      @BYTE overflow (59c71f3); .pcode doc (8efc2d0).
+- [=] accepted: `.equ __RB__` refused without a line number (gas has no
+      assignment hook that tells a definition from a reference; overriding
+      .equ/.set is not worth it); `.pcode 0x200@1` accepted (the scrubber
+      drops the blank; the address rule is "one term").
+- [ ] r10-tests.md when it lands; then round 11 if anything above LOW remains.
 Commits: author and committer kimstik <kimstik@github.com>, no attribution
 trailers (owner's request); the clone's user.name/user.email are set.
 
