@@ -26,7 +26,7 @@ A tag matching `v*`, or a hand dispatch of `.github/workflows/release.yml`,
 publishes one stripped archive per host, both patches, and a `SHA256SUMS` over
 all of it. A push to main publishes nothing.
 
-Nothing is published from a tree that has not passed the gate: its fifteen
+Nothing is published from a tree that has not passed the gate: its sixteen
 stages and the testbench canary run in the release run itself, and the
 publishing job cannot start while any of them is red. The release note carries the binutils release, that tarball's
 sha256 and the commit built from, all of them checked before the release is
@@ -103,9 +103,9 @@ Two layers:
   set against third-party tables; a simulator run; linker-script coverage;
   and, on demand, mutation testing.
 
-`make -C tb gate BUILD=<build tree>` runs the fifteen gate stages (`isa
+`make -C tb gate BUILD=<build tree>` runs the sixteen gate stages (`isa
 roundtrip branch bits reloc guard sim defaultlink commons script disasm
-doctruth dejagnu check oracle`) and stops at the first failure. `BUILD` has
+doctruth dejagnu check libsrc oracle`) and stops at the first failure. `BUILD` has
 to point at a configured build tree - after `make -C tb build` that is
 `work/modern/build` - because the default is the frozen 2001 build.
 `make -C tb check-canary` checks that `check` still fails on a broken

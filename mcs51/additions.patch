@@ -1140,10 +1140,10 @@ index 00000000..aae13d16
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..3e043f94
+index 00000000..bcd7eda4
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2028 @@
+@@ -0,0 +1,2029 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1291,8 +1291,9 @@ index 00000000..3e043f94
 +  { NULL, NULL, 0, 0 }
 +};
 +
-+/* The longest mnemonic, with its terminator.  */
++/* The longest mnemonic and the longest built-in name.  */
 +#define I51_MNEMONIC_MAX 6
++#define I51_NAME_MAX 7
 +
 +/* The names the assembler knows without being told.  KIND is the
 +   operand letter a name stands for: a register or addressing mode, `D'
@@ -1733,10 +1734,10 @@ index 00000000..3e043f94
 +static const struct i51_name *
 +i51_lookup_name (const char *name, size_t len)
 +{
-+  char upper[16];
++  char upper[I51_NAME_MAX + 1];
 +  size_t i;
 +
-+  if (len >= sizeof (upper))
++  if (len > I51_NAME_MAX)
 +    return NULL;
 +  for (i = 0; i < len; i++)
 +    upper[i] = TOUPPER ((unsigned char) name[i]);
@@ -2354,9 +2355,9 @@ index 00000000..3e043f94
 +  const struct i51_opcode *opc;
 +  const char *alias;
 +  char name[I51_MNEMONIC_MAX + 1];
-+  size_t len;
++  size_t len, i;
 +  int nops = 0;
-+  int i;
++  int op;
 +
 +  memset (ops, 0, sizeof (ops));
 +  str = skip_space (str);
@@ -2372,7 +2373,7 @@ index 00000000..3e043f94
 +      as_bad (_("unknown opcode `%.*s'"), (int) len, str);
 +      return;
 +    }
-+  for (i = 0; i < (int) len; i++)
++  for (i = 0; i < len; i++)
 +    name[i] = TOLOWER ((unsigned char) str[i]);
 +  name[len] = 0;
 +
@@ -2411,10 +2412,10 @@ index 00000000..3e043f94
 +	  return;
 +	}
 +      /* HIGH () or LOW () where the row wants a code or bit address.  */
-+      for (i = 0; i < nops; i++)
-+	if (ops[i].exp.X_op == O_i51_high || ops[i].exp.X_op == O_i51_low)
++      for (op = 0; op < nops; op++)
++	if (ops[op].exp.X_op == O_i51_high || ops[op].exp.X_op == O_i51_low)
 +	  {
-+	    ops[i].cls = 'E';
++	    ops[op].cls = 'E';
 +	    if (i51_find_row (name, ops, nops) != NULL
 +		|| (alias != NULL && i51_find_row (alias, ops, nops) != NULL))
 +	      {
@@ -2422,7 +2423,7 @@ index 00000000..3e043f94
 +			  "on a code or bit address"));
 +		return;
 +	      }
-+	    ops[i].cls = 'D';
++	    ops[op].cls = 'D';
 +	  }
 +      as_bad (_("invalid instruction operands"));
 +      return;
@@ -3281,10 +3282,10 @@ index 00000000..7b82e6a0
 +#define tc_init_after_args() i51_init_after_args ()
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..0fc91e71
+index 00000000..2569b26b
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,875 @@
+@@ -0,0 +1,876 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -3728,6 +3729,7 @@ index 00000000..0fc91e71
 +size the way ordinary commons are, nor can a common of one space be
 +satisfied by a definition in another, and the link is refused instead:
 +
++@c doctruth: diagnostic
 +@smallexample
 +a.o: symbol `BUF' is in external RAM (.xbss) here
 +     and in indirectly addressed internal RAM (.ibss) in b.o

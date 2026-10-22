@@ -10,7 +10,7 @@ name: release
 #
 # WHY A RE-RUN OF THE PUBLISH JOB CANNOT GET ROUND THE GATE
 #
-# The sixteen stages run in this same workflow run, in the `gate' job below, and
+# The seventeen stages run in this same workflow run, in the `gate' job below, and
 # `publish' declares `needs: [gate, build]'. Actions will not start a job whose
 # needs did not succeed: while `gate' is red, `publish' is skipped, and the only
 # re-run that can reach it - "re-run failed jobs" - re-runs `gate' first. There
@@ -20,7 +20,7 @@ name: release
 # That is the structural half. The publish job then re-derives, for itself, the
 # facts the release note states, and refuses if any of them cannot be filled in:
 #
-#   * tb/Makefile's own gate list has to be exactly the sixteen names this
+#   * tb/Makefile's own gate list has to be exactly the seventeen names this
 #     workflow publishes. A stage deleted from $(GATE) to make the gate cheap
 #     is caught here. Both of the checks below read that same list, so between
 #     them they establish one fact, not two: what $(GATE) says it will run.
@@ -60,7 +60,7 @@ jobs:
   # rather than keeping its own copy, because it wants a verdict per stage
   # where this job only wants a verdict overall.
   gate:
-    name: sixteen stages
+    name: seventeen stages
     runs-on: ubuntu-24.04
     outputs:
       stages: ${{ steps.stages.outputs.list }}
@@ -176,20 +176,20 @@ jobs:
         run: |
           set -u
           rc=0
-          # The sixteen this release note names, pinned. When a stage is added
+          # The seventeen this release note names, pinned. When a stage is added
           # to $(GATE), this line and the wording of the body change together -
           # until they do, no release is cut claiming a number that moved.
-          want='isa roundtrip branch bits reloc guard sim defaultlink commons script disasm doctruth dejagnu check oracle check-canary'
+          want='isa roundtrip branch bits reloc guard sim defaultlink commons script disasm doctruth dejagnu check libsrc oracle check-canary'
           if [ "$GATE_STAGES" != "$want" ]; then
             echo "::error::tb/Makefile's gate list is '$GATE_STAGES', this workflow publishes '$want'"
             rc=1
           fi
           if [ "$STAGES_RAN" != "$want" ]; then
-            echo "::error::the gate job reported '$STAGES_RAN', not the sixteen stages"
+            echo "::error::the gate job reported '$STAGES_RAN', not the seventeen stages"
             rc=1
           fi
-          if [ "$COUNT_RAN" != 16 ]; then
-            echo "::error::the gate job reported '$COUNT_RAN' stages, the release body says sixteen"
+          if [ "$COUNT_RAN" != 17 ]; then
+            echo "::error::the gate job reported '$COUNT_RAN' stages, the release body says seventeen"
             rc=1
           fi
           if ! printf '%s' "$PORT_VERSION" | grep -Eq '^[0-9]+(\.[0-9]+)+$'; then
@@ -241,7 +241,7 @@ jobs:
             printf '| upstream tarball | `%s` |\n' "$PORT_TARBALL"
             printf '| its sha256 | `%s` |\n' "$PORT_SHA256"
             printf '| built from commit | `%s` |\n' "$GITHUB_SHA"
-            printf '| gate | 16 of 16 stages passed |\n'
+            printf '| gate | 17 of 17 stages passed |\n'
             printf '| run | %s |\n' "$run_url"
             printf '%s\n' \
               '' \
@@ -249,7 +249,7 @@ jobs:
               'and every build in this run checked the tarball it downloaded against it, so' \
               'a binutils release re-rolled under the same name would have failed the run.' \
               '' \
-              '## The sixteen stages'
+              '## The seventeen stages'
             printf '\n`%s`\n' "$GATE_STAGES"
             printf '%s\n' \
               '' \

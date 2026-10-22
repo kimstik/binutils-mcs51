@@ -331,7 +331,7 @@ index b8a762c7..56c2a717 100644
    future release, along with the elf32-s390 target format.  configure emits
    an error for this target, which can be overridden using --enable-obsolete.
 diff --git a/binutils/readelf.c b/binutils/readelf.c
-index 1f7a90e7..11ed67ce 100644
+index 1f7a90e7..aec1c314 100644
 --- a/binutils/readelf.c
 +++ b/binutils/readelf.c
 @@ -117,6 +117,7 @@
@@ -360,6 +360,242 @@ index 1f7a90e7..11ed67ce 100644
  
  	case EM_OLD_SPARCV9:
  	case EM_SPARC32PLUS:
+@@ -16109,6 +16114,8 @@ is_32bit_abs_reloc (Filedata * filedata, unsigned int reloc_type)
+       return reloc_type == 1; /* R_386_32.  */
+     case EM_68K:
+       return reloc_type == 1; /* R_68K_32.  */
++    case EM_8051:
++      return reloc_type == 15; /* R_I51_32.  */
+     case EM_860:
+       return reloc_type == 1; /* R_860_32.  */
+     case EM_960:
+@@ -16499,6 +16506,8 @@ is_16bit_abs_reloc (Filedata * filedata, unsigned int reloc_type)
+   /* Please keep this table alpha-sorted for ease of visual lookup.  */
+   switch (filedata->file_header.e_machine)
+     {
++    case EM_8051:
++      return reloc_type == 9; /* R_I51_16.  */
+     case EM_ARC:
+     case EM_ARC_COMPACT:
+     case EM_ARC_COMPACT2:
+@@ -16572,6 +16581,8 @@ is_8bit_abs_reloc (Filedata * filedata, unsigned int reloc_type)
+ {
+   switch (filedata->file_header.e_machine)
+     {
++    case EM_8051:
++      return reloc_type == 6; /* R_I51_8.  */
+     case EM_RISCV:
+       return reloc_type == 54; /* R_RISCV_SET8.  */
+     case EM_Z80:
+@@ -16786,6 +16797,7 @@ is_none_reloc (Filedata * filedata, unsigned int reloc_type)
+     {
+     case EM_386:     /* R_386_NONE.  */
+     case EM_68K:     /* R_68K_NONE.  */
++    case EM_8051:    /* R_I51_NONE.  */
+     case EM_ADAPTEVA_EPIPHANY:
+     case EM_ALPHA:   /* R_ALPHA_NONE.  */
+     case EM_ALTERA_NIOS2: /* R_NIOS2_NONE.  */
+diff --git a/binutils/testsuite/binutils-all/ar.exp b/binutils/testsuite/binutils-all/ar.exp
+index 7ea5f35e..3dc4c608 100644
+--- a/binutils/testsuite/binutils-all/ar.exp
++++ b/binutils/testsuite/binutils-all/ar.exp
+@@ -217,6 +217,8 @@ proc symbol_table { } {
+     }
+ 
+     set got [binutils_run $NM "--print-armap $archive"]
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if { ![string match "*text_symbol in bintest.${obj}*" $got] \
+ 	 || ![string match "*data_symbol in bintest.${obj}*" $got] \
+ 	 || ![string match "*common_symbol in bintest.${obj}*" $got] \
+@@ -275,6 +277,8 @@ proc thin_archive { bfdtests } {
+     }
+ 
+     set got [binutils_run $NM "--print-armap $archive"]
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if { ![string match "*text_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*data_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*common_symbol in *bintest.${obj}*" $got] \
+@@ -350,6 +354,8 @@ proc thin_archive_with_nested { bfdtests } {
+     }
+ 
+     set got [binutils_run $NM "--print-armap $archive"]
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if { ![string match "*text_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*data_symbol in *bintest.${obj}*" $got] \
+ 	 || ![string match "*common_symbol in *bintest.${obj}*" $got] \
+diff --git a/binutils/testsuite/binutils-all/multi-1.d b/binutils/testsuite/binutils-all/multi-1.d
+index 4cfdc61d..0df443d1 100644
+--- a/binutils/testsuite/binutils-all/multi-1.d
++++ b/binutils/testsuite/binutils-all/multi-1.d
+@@ -5,6 +5,8 @@
+ #objdump: --disassemble=func -wz
+ # ECOFF disassembly omits local symbols, for whatever reason.
+ #xfail: "alpha*-*-*ecoff" "alpha*-*-osf*"
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/binutils/testsuite/binutils-all/multi-2.d b/binutils/testsuite/binutils-all/multi-2.d
+index 791aa875..b0814528 100644
+--- a/binutils/testsuite/binutils-all/multi-2.d
++++ b/binutils/testsuite/binutils-all/multi-2.d
+@@ -5,6 +5,8 @@
+ #objdump: --disassemble=func2 -wz
+ # ECOFF disassembly omits local symbols, for whatever reason.
+ #xfail: "alpha*-*-*ecoff" "alpha*-*-osf*"
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/binutils/testsuite/binutils-all/multi-3.d b/binutils/testsuite/binutils-all/multi-3.d
+index bc6f7444..5880becc 100644
+--- a/binutils/testsuite/binutils-all/multi-3.d
++++ b/binutils/testsuite/binutils-all/multi-3.d
+@@ -5,6 +5,8 @@
+ #objdump: --disassemble=func --disassemble=func2 -wz
+ # ECOFF disassembly omits local symbols, for whatever reason.
+ #xfail: "alpha*-*-*ecoff" "alpha*-*-osf*"
++# The i51 assembler folds symbol names to upper case.
++#xfail: i51-*-*
+ 
+ .*: +file format .*
+ 
+diff --git a/binutils/testsuite/binutils-all/nm.exp b/binutils/testsuite/binutils-all/nm.exp
+index 367e8b61..ef0aa607 100644
+--- a/binutils/testsuite/binutils-all/nm.exp
++++ b/binutils/testsuite/binutils-all/nm.exp
+@@ -52,6 +52,9 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 	setup_xfail *-*-*
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set got [binutils_run $NM "$NMFLAGS $tempfile"]
+ 
+     if [info exists vars] then { unset vars }
+@@ -79,6 +82,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 
+     # Test nm -g
+ 
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS -g $tempfile"]
+ 
+     if [info exists vars] then { unset vars }
+@@ -110,6 +114,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 	setup_xfail *-*-*
+     }
+ 
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS -P $tempfile"]
+ 
+     set want "common_symbol C \[0\]*4.*data_symbol D \[0-9a-fA-F\]*.*external_symbol U.*static_data_symbol d \[0-9a-fA-F\]*.*static_text_symbol t \[0-9a-fA-F\]*.*text_symbol T \[0-9a-fA-F\]*"
+@@ -122,6 +127,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 
+     # Test nm -t d
+     # Look for leading zeroes and only the digits 0..9 in the actual value.
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS -t d $tempfile"]
+     if [regexp "0+\[1-9\]\[0-9\]* T text_symbol3" $got] then {
+ 	pass "nm -t d"
+@@ -131,6 +137,7 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+ 
+     # Test nm --format=posix
+     # ref: PR 24507 - no leading zeros.
++    setup_xfail "i51-*-*"
+     set got [binutils_run $NM "$NMFLAGS --format=posix $tempfile"]
+     if [regexp "text_symbol3 T \[1-9a-f\]\[0-9a-f\]*" $got] then {
+ 	pass "nm --format posix"
+diff --git a/binutils/testsuite/binutils-all/objdump.exp b/binutils/testsuite/binutils-all/objdump.exp
+index 734f9329..259ce5ff 100644
+--- a/binutils/testsuite/binutils-all/objdump.exp
++++ b/binutils/testsuite/binutils-all/objdump.exp
+@@ -173,6 +173,8 @@ proc test_objdump_t { testfile} {
+ 	set got $rest
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if {![info exists vars(text_symbol)] \
+ 	 || ![info exists vars(data_symbol)] \
+ 	 || ![info exists vars(common_symbol)] \
+@@ -198,6 +200,8 @@ proc test_objdump_r { testfile dumpfile } {
+ 
+     set want "${dumpfile}.*:\[ 	\]*file format.*RELOCATION RECORDS FOR \\\[\[^\]\]*(text|TEXT|P|\\\$CODE\\\$)\[^\]\]*\\\].*external_symbol"
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     if [regexp $want $got] then {
+ 	pass "objdump -r ($testfile, $dumpfile)"
+     } else {
+@@ -223,6 +227,8 @@ proc test_objdump_d { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     set want "${dumpfile}.*:.*00+0 <text_symbol>"
+     if ![regexp $want $got] then {
+ 	fail "objdump -d $testfile: Missing symbol name and address"
+@@ -279,6 +285,9 @@ proc test_objdump_d_sym { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set want "$dumpfile:.*00+0 <text_symbol>"
+     if [regexp $want $got] then {
+ 	fail "objdump --disassemble=text_symbol2 $testfile: First symbol displayed, when it should be absent"
+@@ -314,6 +323,9 @@ proc test_objdump_d_func_sym { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set want "$dumpfile:.*00+0 <start_of_text>"
+     if [regexp $want $got] then {
+ 	fail "objdump --disassemble=func $testfile: First symbol displayed, when it should be absent"
+@@ -353,6 +365,9 @@ proc test_objdump_d_non_func_sym { testfile dumpfile } {
+ 	return
+     }
+ 
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
++
+     set want "$dumpfile:.*00+0 <start_of_text>"
+     if [regexp $want $got] then {
+ 	fail "objdump --disassemble=non_func $testfile: First symbol displayed, when it should be absent"
+@@ -417,6 +432,8 @@ proc test_objdump_d_show_all_symbols { testfile dumpfile } {
+ # So they do not show up in this test.
+ setup_xfail "*-*-*aix*"
+ setup_xfail "*-*-*ecoff"
++# The i51 assembler folds symbol names to upper case.
++setup_xfail "i51-*-*"
+ test_objdump_d_show_all_symbols $testfile $testfile
+ 
+ # Test objdump -s
+diff --git a/binutils/testsuite/binutils-all/readelf.exp b/binutils/testsuite/binutils-all/readelf.exp
+index 6c5e63fb..47cbc194 100644
+--- a/binutils/testsuite/binutils-all/readelf.exp
++++ b/binutils/testsuite/binutils-all/readelf.exp
+@@ -366,7 +366,10 @@ if {![binutils_assemble $srcdir/$subdir/bintest.s tmpdir/bintest.o]} then {
+     readelf_test -h $tempfile readelf.h
+     readelf_test -S $tempfile readelf.s
+     setup_xfail "mips-*-*irix*"
++    # The i51 assembler folds symbol names to upper case.
++    setup_xfail "i51-*-*"
+     readelf_test -s $tempfile readelf.ss
++    setup_xfail "i51-*-*"
+     readelf_test -r $tempfile readelf.r
+ 
+     readelf_thin_archive_test
 diff --git a/config.sub b/config.sub
 index 3d35cde1..3872bd70 100755
 --- a/config.sub

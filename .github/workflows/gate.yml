@@ -32,7 +32,7 @@ name: gate
 # also where a stage is added; that is the only place those notes live.
 #
 # The build is not a stage and stays a step of its own, before the loop: if it
-# fails there is no toolchain, and sixteen stages each reporting `no toolchain'
+# fails there is no toolchain, and seventeen stages each reporting `no toolchain'
 # is noise. The artifact upload is not a stage either and keeps its own
 # `if: always()'.
 

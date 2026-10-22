@@ -108,9 +108,10 @@ TOOLS := mcs51-as:gas/as-new \
 # expected reading and not a finding. It is in the gate because the manual
 # is normative and nothing else checks it.
 #
-# GATE adds the two stages that use the ten projects: check, which compares
-# every www8051.rom against the reference base.7z ships, and oracle, which
-# compares it against the 2001 www8051.hex.
+# GATE adds the stages that use the ten projects: check, which compares every
+# www8051.rom against the reference base.7z ships, libsrc, which does the same
+# with lib/libw80.a assembled from source, and oracle, which compares it
+# against the 2001 www8051.hex.
 #
 # MUTGATE is what a mutant has to survive: TOOLGATE and check. It does not also
 # add oracle - oracle builds the same ten projects with the same tools and judges
@@ -118,7 +119,7 @@ TOOLS := mcs51-as:gas/as-new \
 # repeat what check already says, at twice the cost.
 TOOLGATE := isa roundtrip branch bits reloc guard sim defaultlink commons script disasm \
             doctruth dejagnu
-GATE     := $(TOOLGATE) check oracle
+GATE     := $(TOOLGATE) check libsrc oracle
 MUTGATE  := $(TOOLGATE) check
 
 # CIGATE is $(GATE) in the order gate.yml runs it, with check-canary spliced in
@@ -130,7 +131,7 @@ MUTGATE  := $(TOOLGATE) check
 # What is asserted instead is the set: `ci-list' refuses to print a list that is not
 # $(GATE) plus the canary, so a stage added above either reaches CI or reddens
 # it at the first step.
-CIGATE := $(TOOLGATE) check check-canary oracle
+CIGATE := $(TOOLGATE) check check-canary libsrc oracle
 
 # Every stage is phony, from the list itself rather than from a second copy of
 # the names: a stage cannot be added to the gate and forgotten here, and a file
@@ -262,6 +263,12 @@ check:
 		printf '#!/bin/sh\nexec %s/%s "$$@"\n' "$(BUILD)" "$$target" > $$name; \
 		chmod +x $$name; \
 	done
+	@if [ -n "$(LIBW_FROM_SOURCE)" ]; then \
+		echo "== lib/libw80.a from lib/*.asm"; \
+		( cd $(WORK)/tb/lib && rm -f libw.a && $(MAKE) -B libw.a \
+		  && cp libw.a libw80.a ) > $(WORK)/tb/libw.log 2>&1 \
+		|| { tail -n 15 $(WORK)/tb/libw.log; exit 1; }; \
+	fi
 	@echo "== building"
 # Each project gets its own log in $(WORK)/tb. Nothing here hides an exit status: a make
 # that fails, and a make that returns without leaving a www8051.rom, both count as
@@ -307,6 +314,14 @@ check:
 		echo "$$fail of $(words $(PROJECTS)) projects failed"; exit 1; \
 	fi; \
 	echo "all $(words $(PROJECTS)) projects match the reference"
+
+# ------------------------------------------------------------------ libsrc
+
+# check with lib/libw80.a assembled from lib/*.asm by the toolchain under test,
+# so the ten projects also link objects this assembler writes against the same
+# reference ROMs.  libk80.a has no sources in base.7z and stays the shipped one.
+libsrc:
+	@$(MAKE) --no-print-directory -f $(HERE)/Makefile check LIBW_FROM_SOURCE=1
 
 # ------------------------------------------------------------------ check frozen
 
