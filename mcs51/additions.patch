@@ -1,6 +1,6 @@
 diff --git a/bfd/cpu-i51.c b/bfd/cpu-i51.c
 new file mode 100644
-index 00000000..ab3d9f53
+index 00000000..4ac47a3e
 --- /dev/null
 +++ b/bfd/cpu-i51.c
 @@ -0,0 +1,42 @@
@@ -38,7 +38,7 @@ index 00000000..ab3d9f53
 +  0,				/* Machine number - 0 for default.  */
 +  "i51",			/* Architecture name.  */
 +  "i51",			/* Printable name.  */
-+  1,				/* Section alignment power.  */
++  0,				/* Section alignment power.  */
 +  true,				/* Is this the default architecture?  */
 +  bfd_default_compatible,	/* Architecture comparison function.  */
 +  bfd_default_scan,		/* String to architecture conversion.  */
@@ -48,10 +48,10 @@ index 00000000..ab3d9f53
 +};
 diff --git a/bfd/elf32-i51.c b/bfd/elf32-i51.c
 new file mode 100644
-index 00000000..db3ce5af
+index 00000000..ec3d83d0
 --- /dev/null
 +++ b/bfd/elf32-i51.c
-@@ -0,0 +1,1117 @@
+@@ -0,0 +1,1110 @@
 +/* MCS-51 specific support for 32-bit ELF.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -81,6 +81,10 @@ index 00000000..db3ce5af
 +#include "elf/i51.h"
 +#include "libiberty.h"
 +
++#define is_i51_elf(bfd)				\
++  (bfd_get_flavour (bfd) == bfd_target_elf_flavour	\
++   && bfd_get_arch (bfd) == bfd_arch_i51)
++
 +static reloc_howto_type elf_i51_howto_table[] =
 +{
 +  HOWTO (R_I51_NONE,		/* type */
@@ -97,13 +101,8 @@ index 00000000..db3ce5af
 +	 0,			/* dst_mask */
 +	 false),		/* pcrel_offset */
 +
-+  /* Never emitted; the number is reserved.  */
-+  HOWTO (R_I51_R1, 0, 0, 0, false, 0, complain_overflow_dont,
-+	 bfd_elf_generic_reloc, "R_I51_R1", false, 0, 0, false),
-+
-+  /* Never emitted; the number is reserved.  */
-+  HOWTO (R_I51_R3, 0, 0, 0, false, 0, complain_overflow_dont,
-+	 bfd_elf_generic_reloc, "R_I51_R3", false, 0, 0, false),
++  EMPTY_HOWTO (R_I51_R1),
++  EMPTY_HOWTO (R_I51_R3),
 +
 +  /* The 8-bit displacement of a relative branch.  It is measured from
 +     the following instruction, which starts right after the displacement
@@ -157,11 +156,9 @@ index 00000000..db3ce5af
 +	 0xff,			/* dst_mask */
 +	 false),		/* pcrel_offset */
 +
-+  /* A byte: a datum, a byte operand of .pcode, and every eight-bit
-+     operand of an object built before R_I51_8_DIR and R_I51_8_IMM
-+     existed.  Checked as an immediate is, by i51_final_link_relocate (),
-+     which also adds what the byte holds, as this entry's src_mask once
-+     made _bfd_relocate_contents () do.  */
++  /* A byte: a datum or a byte operand of .pcode.  Checked as an
++     immediate is, and added to what the byte holds, by
++     i51_final_link_relocate ().  */
 +  HOWTO (R_I51_8,		/* type */
 +	 0,			/* rightshift */
 +	 1,			/* size in bytes */
@@ -207,9 +204,9 @@ index 00000000..db3ce5af
 +	 0xff,			/* dst_mask */
 +	 false),		/* pcrel_offset */
 +
-+  /* A 16-bit number: MOV DPTR,#data16 and .word, and in an object built
-+     before R_I51_16_CODE existed an LJMP or LCALL target as well.
-+     Checked by i51_final_link_relocate (): -32768..65535.  */
++  /* A 16-bit number: MOV DPTR,#data16 and .word.  Checked by
++     i51_final_link_relocate (): -65536..65535, as gas checks a two-byte
++     datum.  */
 +  HOWTO (R_I51_16,		/* type */
 +	 0,			/* rightshift */
 +	 2,			/* size in bytes */
@@ -366,7 +363,8 @@ index 00000000..db3ce5af
 +  unsigned int i;
 +
 +  for (i = 0; i < ARRAY_SIZE (elf_i51_howto_table); i++)
-+    if (strcasecmp (elf_i51_howto_table[i].name, r_name) == 0)
++    if (elf_i51_howto_table[i].name != NULL
++	&& strcasecmp (elf_i51_howto_table[i].name, r_name) == 0)
 +      return &elf_i51_howto_table[i];
 +  return NULL;
 +}
@@ -546,7 +544,7 @@ index 00000000..db3ce5af
 +{
 +  bfd_signed_vma srel = relocation + rel->r_addend;
 +  bfd_vma x, pc;
-+  int bit;
++  long bit;
 +
 +  if (!bfd_reloc_offset_in_range (howto, input_bfd, input_section,
 +				  rel->r_offset))
@@ -562,36 +560,26 @@ index 00000000..db3ce5af
 +	    + rel->r_offset + 2);
 +      if (srel < 0 || srel > 0xffff || ((srel ^ pc) & ~(bfd_vma) 0x7ff) != 0)
 +	return bfd_reloc_overflow;
-+      x = bfd_getb16 (contents) & 0x1f00;
-+      bfd_putb16 (x | ((srel & 0x0700) << 5) | (srel & 0xff), contents);
++      bfd_putb16 (i51_addr11_insn (bfd_get_8 (input_bfd, contents) & 0x1f,
++				   srel), contents);
 +      return bfd_reloc_ok;
 +
 +    case R_I51_8_B2B:
 +      /* The byte holds the bit number inside the byte the symbol names.  */
-+      x = bfd_get_8 (input_bfd, contents);
-+      bit = -1;
-+      if (x <= 7 && srel >= 0x20 && srel <= 0x2f)
-+	bit = (srel - 0x20) * 8 + x;
-+      else if (x <= 7 && srel >= 0x80 && srel <= 0xf8 && (srel & 7) == 0)
-+	bit = srel + x;
++      bit = i51_bit_address (srel, bfd_get_8 (input_bfd, contents));
 +      if (bit < 0)
 +	return bfd_reloc_other;
 +      bfd_put_8 (input_bfd, bit, contents);
 +      return bfd_reloc_ok;
 +
 +    case R_I51_13_PCODE:
-+      if (srel < 0x100 || srel > 0x1fff)
++      if (srel < I51_PCODE_ADDR_MIN || srel > I51_PCODE_ADDR_MASK)
 +	return bfd_reloc_overflow;
-+      x = bfd_getb16 (contents) & 0xe000;
++      x = bfd_getb16 (contents) & I51_PCODE_FLAGS_MASK;
 +      bfd_putb16 (x | srel, contents);
 +      return bfd_reloc_ok;
 +
 +    case R_I51_8:
-+      /* An assembler before R_I51_8 carried its whole addend in r_addend
-+	 stored the -1 of a `.pcode @BYTE' operand in the byte itself and
-+	 relied on this relocation adding what the byte holds.  Objects of
-+	 that age are still linked, so the byte is added; the assembler of
-+	 today leaves it zero.  */
 +      srel += (signed char) bfd_get_8 (input_bfd, contents);
 +      /* Fall through.  */
 +    case R_I51_8_IMM:
@@ -607,7 +595,7 @@ index 00000000..db3ce5af
 +      return bfd_reloc_ok;
 +
 +    case R_I51_16:
-+      if (srel < -32768 || srel > 65535)
++      if (srel < -65536 || srel > 65535)
 +	return bfd_reloc_overflow;
 +      bfd_putb16 (srel, contents);
 +      return bfd_reloc_ok;
@@ -788,7 +776,7 @@ index 00000000..db3ce5af
 +  flagword flags;
 +
 +  if (! _bfd_elf_make_section_from_shdr (abfd, hdr, name, shindex))
-+    return 0;
++    return false;
 +
 +  newsect = hdr->bfd_section;
 +  flags = bfd_section_flags (newsect);
@@ -803,7 +791,7 @@ index 00000000..db3ce5af
 +
 +  bfd_set_section_flags (newsect, flags);
 +
-+  return 1;
++  return true;
 +}
 +
 +/* Refuse initialized data in a memory space that nothing loads.  The RAM
@@ -875,20 +863,16 @@ index 00000000..db3ce5af
 +   into a section of the space's own name, which is the name a linker
 +   script places it by.  */
 +
++#define I51_COMMON_SPACE(NAME, SHNDX) { SHNDX, NAME },
 +static const struct
 +{
 +  unsigned int shndx;
 +  const char *name;
 +} i51_common_spaces[] =
 +{
-+  { SHN_I51_REGBANK,	".regbank" },
-+  { SHN_I51_RDATA_C,	".rbss" },
-+  { SHN_I51_BDATA_C,	".bbss" },
-+  { SHN_I51_IDATA_C,	".ibss" },
-+  { SHN_I51_XDATA_C,	".xbss" },
-+  { SHN_I51_EDATA_C,	".ebss" },
-+  { SHN_I51_BITDATA_C,	".bitbss" },
++  I51_COMMON_SPACES (I51_COMMON_SPACE)
 +};
++#undef I51_COMMON_SPACE
 +
 +/* The entry of i51_common_spaces for section index SHNDX, or -1.  */
 +
@@ -1069,20 +1053,8 @@ index 00000000..db3ce5af
 +
 +/* Collect a memory-space common into the section that stands for its
 +   space, and hand over the value bfd keeps for a common, which is its
-+   size.  The size is in st_size; st_value carries the alignment, the
-+   way include/elf/i51.h says it does.
-+
-+   That alignment is not passed on, and is not honoured today.
-+   elf_link_add_object_symbols () reads st_value as an alignment only
-+   where elf_backend_common_definition () calls the symbol a common,
-+   which by default means st_shndx == SHN_COMMON.  None of the seven
-+   indices here is that, so the alignment the linker settles on comes
-+   from the alignment_power of the section returned below instead, and
-+   a section made by i51_elf_common_section () has none: a memory-space
-+   common is placed as though it had asked for byte alignment, whatever
-+   its .rcomm line said.  Honouring the request would move symbols in
-+   links that already work, so the field is documented rather than
-+   obeyed; what the object file records is right either way.  */
++   size.  st_value is the alignment, which an object of ABI generation 0
++   does not record: it is taken as 1.  */
 +
 +static bool
 +elf32_i51_add_symbol_hook (bfd *abfd, struct bfd_link_info *info,
@@ -1098,6 +1070,9 @@ index 00000000..db3ce5af
 +      if (*secp == NULL)
 +	return false;
 +      *valp = sym->st_size;
++      if ((elf_elfheader (abfd)->e_flags & EF_I51_ABI_MASK)
++	  < EF_I51_ABI_ALIGNED_COMMONS)
++	sym->st_value = 1;
 +    }
 +
 +  if (ELF_ST_BIND (sym->st_info) == STB_LOCAL)
@@ -1106,13 +1081,9 @@ index 00000000..db3ce5af
 +				       sym->st_size);
 +}
 +
-+/* Before the linker writes out a global symbol: a memory-space common
-+   reaches this point as a plain SHN_COMMON, because that is what the
-+   generic common_section_index hook returns.  Put back the
-+   processor-specific index that names its space - without it a
-+   relocatable link degrades every such common to an ordinary one, and
-+   the next link allocates it in byte-addressed .bss.  Mirrors
-+   _bfd_mips_elf_link_output_symbol_hook.  */
++/* A memory-space common reaches the output as SHN_COMMON, which the
++   generic common_section_index hook returns: put back the index that
++   names its space.  */
 +
 +static int
 +elf32_i51_link_output_symbol_hook (struct bfd_link_info *info ATTRIBUTE_UNUSED,
@@ -1121,16 +1092,52 @@ index 00000000..db3ce5af
 +				   asection *input_sec,
 +				   struct elf_link_hash_entry *h ATTRIBUTE_UNUSED)
 +{
-+  unsigned int i;
++  int i;
 +
-+  if (sym->st_shndx != SHN_COMMON || input_sec == NULL)
++  if (sym->st_shndx != SHN_COMMON)
 +    return 1;
-+
-+  for (i = 0; i < ARRAY_SIZE (i51_common_spaces); i++)
-+    if (strcmp (input_sec->name, i51_common_spaces[i].name) == 0)
-+      sym->st_shndx = i51_common_spaces[i].shndx;
-+
++  i = i51_common_by_section (input_sec);
++  if (i >= 0)
++    sym->st_shndx = i51_common_spaces[i].shndx;
 +  return 1;
++}
++
++/* A memory-space common is a common, as one of SHN_COMMON is.  */
++
++static bool
++elf32_i51_common_definition (Elf_Internal_Sym *sym)
++{
++  return (sym->st_shndx == SHN_COMMON
++	  || i51_common_by_shndx (sym->st_shndx) >= 0);
++}
++
++/* Refuse an object of an ABI generation, or with flags, this linker does
++   not know.  The output is of the current generation.  */
++
++static bool
++elf32_i51_merge_private_bfd_data (bfd *ibfd, struct bfd_link_info *info)
++{
++  bfd *obfd = info->output_bfd;
++  flagword flags;
++
++  if (!is_i51_elf (ibfd) || !is_i51_elf (obfd))
++    return true;
++
++  flags = elf_elfheader (ibfd)->e_flags;
++  if ((flags & ~EF_I51_ABI_MASK) != 0
++      || (flags & EF_I51_ABI_MASK) > EF_I51_ABI_CURRENT)
++    {
++      _bfd_error_handler
++	/* xgettext:c-format */
++	(_("%pB: unknown e_flags %#lx: this linker knows ABI generations "
++	   "0 to %d"), ibfd, (unsigned long) flags, EF_I51_ABI_CURRENT);
++      bfd_set_error (bfd_error_bad_value);
++      return false;
++    }
++
++  elf_elfheader (obfd)->e_flags = EF_I51_ABI_CURRENT;
++  elf_flags_init (obfd) = true;
++  return true;
 +}
 +
 +#define ELF_ARCH		bfd_arch_i51
@@ -1140,23 +1147,7 @@ index 00000000..db3ce5af
 +#define TARGET_BIG_SYM		i51_elf32_vec
 +#define TARGET_BIG_NAME		"elf32-i51"
 +
-+/* Relocations are SHT_RELA, in every section of every object this port
-+   writes and in every one it is prepared to read.  Each howto above sets
-+   partial_inplace false and takes its addend from the reloc, and
-+   i51_final_link_relocate () reads r_addend directly for the five
-+   relocations it applies itself, so there is nowhere for an in-place
-+   addend to come from.
-+
-+   elfxx-target.h would derive the three fields below from USE_REL,
-+   which this file leaves undefined; saying them here is what its own
-+   comment asks new code to do, and it puts the fact in the backend
-+   where a reader looks for it.  */
-+#define elf_backend_may_use_rel_p	     0
-+#define elf_backend_may_use_rela_p	     1
-+#define elf_backend_default_use_rela_p	     1
-+
 +#define elf_info_to_howto	             i51_info_to_howto_rela
-+#define elf_info_to_howto_rel	             NULL
 +#define bfd_elf32_bfd_final_link	     elf32_i51_final_link
 +#define elf_backend_relocate_section         elf32_i51_relocate_section
 +#define elf_backend_can_gc_sections          1
@@ -1168,13 +1159,15 @@ index 00000000..db3ce5af
 +#define elf_backend_section_from_bfd_section	elf32_i51_section_from_bfd_section
 +#define elf_backend_add_symbol_hook		elf32_i51_add_symbol_hook
 +#define elf_backend_link_output_symbol_hook	elf32_i51_link_output_symbol_hook
++#define elf_backend_common_definition		elf32_i51_common_definition
++#define bfd_elf32_bfd_merge_private_bfd_data	elf32_i51_merge_private_bfd_data
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..5fd1e489
+index 00000000..d273665f
 --- /dev/null
 +++ b/gas/config/tc-i51.c
-@@ -0,0 +1,2067 @@
+@@ -0,0 +1,2039 @@
 +/* tc-i51.c -- Assembler code for the MCS-51.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -1651,10 +1644,14 @@ index 00000000..5fd1e489
 +/* The fake common sections a memory-space common is a common of, made
 +   like bfd_com_section but named after the space: bfd turns the name into
 +   the space's reserved section index.  */
-+static asection i51_com_sections[I51_NSPACES];
-+static asymbol i51_com_symbols[I51_NSPACES];
-+static asection regbank_com_section;
-+static asymbol regbank_com_symbol;
++#define I51_COMMON_NAME(NAME, SHNDX) NAME,
++static const char *const i51_common_names[] =
++{
++  I51_COMMON_SPACES (I51_COMMON_NAME)
++};
++#undef I51_COMMON_NAME
++static asection i51_com_sections[ARRAY_SIZE (i51_common_names)];
++static asymbol i51_com_symbols[ARRAY_SIZE (i51_common_names)];
 +
 +int
 +md_estimate_size_before_relax (fragS *fragp ATTRIBUTE_UNUSED,
@@ -1705,16 +1702,18 @@ index 00000000..5fd1e489
 +  symbols_case_sensitive = 0;
 +}
 +
-+static void
-+i51_make_com_section (asection *sec, asymbol *sym, const char *name)
++/* The common section of the memory space whose commons the linker
++   collects in NAME, or bfd's own for .bss.  */
++
++static asection *
++i51_common_section (const char *name)
 +{
-+  *sec = *bfd_com_section_ptr;
-+  sec->name = name;
-+  sec->output_section = sec;
-+  sec->symbol = sym;
-+  *sym = *bfd_com_section_ptr->symbol;
-+  sym->name = name;
-+  sym->section = sec;
++  size_t i;
++
++  for (i = 0; i < ARRAY_SIZE (i51_common_names); i++)
++    if (strcmp (name, i51_common_names[i]) == 0)
++      return &i51_com_sections[i];
++  return bfd_com_section_ptr;
 +}
 +
 +void
@@ -1722,7 +1721,7 @@ index 00000000..5fd1e489
 +{
 +  const struct i51_opcode *opc;
 +  const struct i51_name *n;
-+  int i;
++  size_t i;
 +
 +  i51_opcode_hash = str_htab_create ();
 +  i51_name_hash = str_htab_create ();
@@ -1735,11 +1734,19 @@ index 00000000..5fd1e489
 +    if ((n->mcu & i51_mcu) != 0)
 +      str_hash_insert (i51_name_hash, n->name, n, 0);
 +
-+  i51_make_com_section (&regbank_com_section, &regbank_com_symbol,
-+			".regbank");
-+  for (i = I51_RBSS; i <= I51_BITBSS; i++)
-+    i51_make_com_section (&i51_com_sections[i], &i51_com_symbols[i],
-+			  i51_spaces[i].name);
++  for (i = 0; i < ARRAY_SIZE (i51_common_names); i++)
++    {
++      asection *sec = &i51_com_sections[i];
++      asymbol *sym = &i51_com_symbols[i];
++
++      *sec = *bfd_com_section_ptr;
++      sec->name = i51_common_names[i];
++      sec->output_section = sec;
++      sec->symbol = sym;
++      *sym = *bfd_com_section_ptr->symbol;
++      sym->name = sec->name;
++      sym->section = sec;
++    }
 +
 +  elf_elfheader (stdoutput)->e_flags |= EF_I51_ABI_CURRENT;
 +}
@@ -2805,7 +2812,7 @@ index 00000000..5fd1e489
 +  sym = symbol_find_or_make ("__RB__");
 +  S_SET_VALUE (sym, (valueT) (i51_regbank_max + 1) * 8);
 +  S_SET_EXTERNAL (sym);
-+  S_SET_SEGMENT (sym, &regbank_com_section);
++  S_SET_SEGMENT (sym, i51_common_section (".regbank"));
 +}
 +
 +/* The section of SPACE, made on first use.  A file may have made a
@@ -2849,92 +2856,50 @@ index 00000000..5fd1e489
 +  demand_empty_rest_of_line ();
 +}
 +
-+/* Allocate SIZE bytes for the local common SYMBOLP in the section of
-+   SPACE at an alignment of 2**ALIGN, as bss_alloc () does in .bss, which
-+   is the only section that takes.  Subsection 1 keeps them apart from
-+   the data a file put in the section itself.  */
-+
-+static void
-+i51_alloc_local (symbolS *symbolP, int space, addressT size, int align)
-+{
-+  segT current_seg = now_seg;
-+  subsegT current_subseg = now_subseg;
-+  segT sec = i51_space_section (space);
-+  char *pfrag;
-+
-+  subseg_set (sec, 1);
-+  if (align > 0)
-+    {
-+      record_alignment (sec, align);
-+      frag_align (align, 0, 0);
-+    }
-+  if (S_GET_SEGMENT (symbolP) == sec)
-+    symbol_get_frag (symbolP)->fr_symbol = NULL;
-+  symbol_set_frag (symbolP, frag_now);
-+  pfrag = frag_var (rs_org, 1, 1, 0, symbolP, size, NULL);
-+  *pfrag = 0;
-+  S_SET_SIZE (symbolP, size);
-+  S_SET_SEGMENT (symbolP, sec);
-+  S_CLEAR_EXTERNAL (symbolP);
-+  subseg_set (current_seg, current_subseg);
-+}
-+
-+/* Skip the rest of a statement s_comm_internal () reads: it ends the
-+   statement itself, so ignore_rest_of_line () - which parse_align () calls
-+   on an error - would take the next line with it.  */
-+
-+static symbolS *
-+i51_common_error (void)
-+{
-+  while (!is_end_of_stmt (*input_line_pointer))
-+    ++input_line_pointer;
-+  return NULL;
-+}
-+
 +/* The rest of a common directive of SPACE after the name and the size,
-+   for s_comm_internal ().  */
++   for s_comm_internal ().  A name is a common of one space only.  */
 +
 +static symbolS *
 +i51_common_parse (int space, symbolS *symbolP, addressT size)
 +{
-+  addressT alignment = 1;
-+  int align = 0;
++  asection *com = i51_common_section (i51_spaces[space].name);
++  int is_local = symbol_get_obj (symbolP)->local;
++  addressT align = 0;
 +
-+  /* A name is a common of one space.  */
-+  if (S_IS_COMMON (symbolP)
-+      && S_GET_SEGMENT (symbolP) != (space == I51_BSS
-+				     ? bfd_com_section_ptr
-+				     : &i51_com_sections[space]))
++  if (S_IS_COMMON (symbolP) && S_GET_SEGMENT (symbolP) != com)
 +    {
 +      as_bad (_("`%s' is already a common of another memory space"),
 +	      S_GET_NAME (symbolP));
-+      return i51_common_error ();
++      ignore_rest_of_line ();
++      return NULL;
 +    }
 +  if (space == I51_BSS)
 +    return elf_common_parse (0, symbolP, size);
 +
 +  if (*input_line_pointer == ',')
 +    {
-+      input_line_pointer++;
-+      alignment = get_absolute_expression ();
-+      if (alignment == 0 || alignment > 0x10000
-+	  || (alignment & (alignment - 1)) != 0)
++      align = parse_align (1);
++      if (align == (addressT) -1)
++	return NULL;
++      if (align > 16)
 +	{
-+	  as_bad (_("common alignment has to be a power of 2 up to 0x10000"));
-+	  return i51_common_error ();
++	  as_bad (_("alignment too large: 0x10000 is the most"));
++	  ignore_rest_of_line ();
++	  return NULL;
 +	}
-+      for (align = 0; alignment > ((addressT) 1 << align); align++)
-+	;
 +    }
 +
-+  if (symbol_get_obj (symbolP)->local)
-+    i51_alloc_local (symbolP, space, size, align);
++  if (is_local)
++    {
++      bss_alloc_section (symbolP, size, align, i51_space_section (space));
++      S_CLEAR_EXTERNAL (symbolP);
++    }
 +  else
 +    {
 +      S_SET_VALUE (symbolP, size);
-+      S_SET_ALIGN (symbolP, alignment);
++      S_SET_ALIGN (symbolP, (addressT) 1 << align);
 +      S_SET_EXTERNAL (symbolP);
-+      S_SET_SEGMENT (symbolP, &i51_com_sections[space]);
++      S_SET_SEGMENT (symbolP, com);
 +    }
 +  symbol_get_bfdsym (symbolP)->flags |= BSF_OBJECT;
 +  return symbolP;
@@ -3356,10 +3321,10 @@ index 00000000..8c8cbd58
 +#define tc_init_after_args() i51_init_after_args ()
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..23162ea8
+index 00000000..0fc91e71
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,825 @@
+@@ -0,0 +1,875 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -3398,11 +3363,19 @@ index 00000000..23162ea8
 +@node i51 Options
 +@section Options
 +
-+@cindex MCS-51 options (none)
-+@cindex options for MCS-51 (none)
-+@command{@value{AS}} has no machine-specific command-line options for the
-+MCS-51.  In particular there is no @option{-EB} or @option{-EL}: section
-+contents are always big endian.  @xref{i51 Byte Order}.
++@cindex MCS-51 options
++@cindex options for MCS-51
++@table @gcctabopt
++@cindex @option{-mmcu} command-line option, MCS-51
++@item -mmcu=@var{part}
++The part whose special function register and bit names the assembler knows
++(@pxref{i51-Regs}): @samp{8051}, @samp{8052}, which adds the timer 2
++names, or @samp{at89s8252}, which adds those of the Atmel AT89S8252 as
++well.  The default is @samp{at89s8252}.
++@end table
++
++There is no @option{-EB} or @option{-EL}: section contents are always big
++endian.  @xref{i51 Byte Order}.
 +
 +@cindex debugging information, MCS-51
 +@option{-g} produces DWARF line information, and @code{.file} and
@@ -3538,8 +3511,12 @@ index 00000000..23162ea8
 +and @samp{0x8C}.
 +
 +@code{DP0L} and @code{DP0H} are Atmel's spellings of @code{DPL} and
-+@code{DPH}.  @code{DP1L}, @code{DP1H}, @code{SPDR}, @code{SPSR},
-+@code{SPCR} and @code{WMCON} are AT89S8252 registers.
++@code{DPH}.  @code{T2CON}, @code{T2MOD}, @code{RCAP2L}, @code{RCAP2H},
++@code{TL2}, @code{TH2} and the bits @code{T2}, @code{T2EX}, @code{ET2},
++@code{PT2} and those of @code{T2CON} are 8052 names; @code{DP0L},
++@code{DP0H}, @code{DP1L}, @code{DP1H}, @code{SPDR}, @code{SPSR},
++@code{SPCR} and @code{WMCON} are AT89S8252 names.  @option{-mmcu} says
++which of the two groups the assembler knows.
 +
 +A special function register name, a bit name and @code{AR0} @dots{}
 +@code{AR7} may also be used in an ordinary expression, where each evaluates
@@ -3571,9 +3548,12 @@ index 00000000..23162ea8
 +
 +@c doctruth: diagnostic
 +@smallexample
-+Error: `ES' was used as the built-in register name before this file
-+defined it; declare it with .local before its first use
++Error: `ES' is used here as the built-in name and defined later as a
++symbol; declare it with .local first
 +@end smallexample
++
++@noindent
++The error is reported at the line that used the built-in name.
 +
 +@cindex bit of a symbol, MCS-51
 +A symbol of the program followed by a dot and a bit number names that bit
@@ -3593,8 +3573,27 @@ index 00000000..23162ea8
 +parenthesis.  They are operators of the expression language: when their
 +operand is a constant they yield a constant, which the rest of the
 +expression may use, so @samp{#HIGH (0x1234) + 1} is @code{#0x13}.  When
-+their operand is not yet known, the operator becomes a relocation, and has
-+to be the whole operand.
++their operand is not yet known, the operator becomes a relocation, so it
++has to be the whole operand of an instruction or of a one-byte datum:
++@samp{#HIGH (table) + 1} is an error, not the high byte of
++@code{table + 1}, and so is an operator applied to another one.
++
++@c doctruth: diagnostic
++@smallexample
++Error: HIGH(), LOW() and B2B() of a value not known here have to be the
++whole operand
++@end smallexample
++
++@noindent
++Where nothing becomes a relocation - in @code{.equ}, @code{.org},
++@code{.sleb128} or the address of @code{.pcode} - the operand has to be
++known:
++
++@c doctruth: diagnostic
++@smallexample
++Error: HIGH() of a value not known here is allowed only as an instruction
++operand or a one-byte datum
++@end smallexample
 +
 +@table @code
 +@item HIGH (@var{expression})
@@ -3756,10 +3755,10 @@ index 00000000..23162ea8
 +section and no common form.
 +
 +@item Register banks
-+@code{.regbank}.  No directive switches to it.  When a file uses
++@code{.regbank}.  No directive switches to it.  When the source uses
 +@code{.using}, the assembler emits a common symbol @code{__RB__} in this
-+space, sized to reach the end of the highest bank the file selected, so
-+that the link reserves the register area the program uses.
++space, sized to reach the end of the highest bank selected, so that the
++link reserves the register area the program uses.
 +@end table
 +
 +@cindex commons, MCS-51
@@ -3784,15 +3783,26 @@ index 00000000..23162ea8
 +The RAM of an MCS-51 starts undefined, and the linker script this port
 +installs loads nothing into it: the RAM spaces are emitted at their true
 +addresses but are not part of the program image.  Bytes a program writes
-+into a RAM section would therefore vanish, and the linker refuses them; a
-+zero byte is a reservation and is accepted.  A variable that needs an
-+initial value is reserved with @code{.space} and set from code.  The script
-+also always reserves register bank 0, which is in use from reset, keeps
-+@code{__STACK_SIZE} bytes of internal RAM free above the data for the stack
-+(16 by default; @code{STACK} is the first of them), and checks the internal
-+RAM against @code{__IRAM_SIZE} (@code{0x100}; give @code{0x80} for a part
-+with 128 bytes) and the EEPROM against @code{__EEPROM_SIZE}.  Each of the
-+three can be set with @option{--defsym}.
++into a RAM section - including @code{.bit 1} in @code{.bitdata}, and a
++byte a relocation fills in - would therefore vanish, and the linker
++refuses them.  A zero byte is accepted as a reservation; it does not make
++the RAM zero at reset.  A variable that needs an initial value is
++reserved with @code{.space} and set from code.  The check applies only
++where the output section is not loaded, so a linker script that loads a
++RAM space for a program that copies it into place is not affected.
++@code{.eeprom} is not checked: its contents are what a programmer writes
++into the part, extracted with @samp{objcopy -j .eeprom}.
++
++The script always reserves register bank 0, which is in use from reset,
++keeps @code{__STACK_SIZE} bytes of internal RAM free above the data for
++the stack (16 by default; @code{STACK} is the first of them), and checks
++the internal RAM against @code{__IRAM_SIZE} (@code{0x100}; give
++@code{0x80} for a part with 128 bytes) and the EEPROM against
++@code{__EEPROM_SIZE}, which is @code{0x10000} unless set and so limits
++nothing: give the part's size, @code{0x800} for the AT89S8252.  Each of
++the three can be set with @option{--defsym}; a program that needs all of
++its internal RAM for data and keeps no stack there links with
++@samp{--defsym __STACK_SIZE=0}.
 +
 +A linker script that places several spaces at the same load address, as one
 +that gives each its own @code{MEMORY} region at origin 0 does, needs
@@ -3801,8 +3811,9 @@ index 00000000..23162ea8
 +the whole file writes the spaces over one another.
 +
 +@command{nm} shows the symbols of the RAM spaces of a linked image as data,
-+@samp{d}, except that the generic symbol classes take @code{.idata} for the
-+import section of a PE file and show its symbols as @samp{i}.
++@samp{d} or @samp{D}, except that the generic symbol classes take
++@code{.idata} for the import section of a PE file and show its symbols as
++@samp{i}, or @samp{I} for a global one.
 +@command{size} counts the program image, which holds the code space only;
 +@samp{size -A} lists every space.
 +
@@ -3824,18 +3835,20 @@ index 00000000..23162ea8
 +
 +Each memory-space directive takes an optional subsection number, and each
 +common directive takes a symbol name, a length in the units of its space,
-+and an optional alignment which must be a power of two.
++and an optional alignment in bytes, a power of two.  A memory-space common
++may ask for at most @code{0x10000}.
 +
 +@cindex common alignment, MCS-51
-+The alignment is recorded in the object file, in the symbol's
-+@code{st_value}, which is where @sc{elf} keeps the alignment of a common
-+symbol rather than an address.  The linker honours it for @code{.comm}.
-+It does not yet honour it for the memory-space commons: those reach the
-+linker under a processor-specific section index rather than
-+@code{SHN_COMMON}, and the generic allocation reads @code{st_value} only
-+for @code{SHN_COMMON}, so such a symbol is placed at the next free
-+address in its space whatever alignment was asked for, and the assembler
-+warns when an alignment greater than one is given.
++@cindex ABI generation, MCS-51
++The alignment is recorded in the symbol's @code{st_value}, which is where
++@sc{elf} keeps the alignment of a common symbol, and the linker places the
++symbol at it.  The low four bits of the object's @code{e_flags} say that
++@code{st_value} means this: they are the generation of the ABI, 1 for
++objects this assembler writes.  In an object of generation 0 the field is
++not an alignment, and the linker places those commons at the next free
++byte.  A linker refuses an object of a generation newer than it knows, and
++a linker that predates the field places every memory-space common at the
++next free byte.
 +
 +@table @code
 +@cindex @code{bbss} directive, MCS-51
@@ -3886,7 +3899,8 @@ index 00000000..23162ea8
 +
 +A symbol declared @code{.local} before any of the common directives is not
 +a common: it is allocated in this file, in the uninitialized section of the
-+directive's space, the way @code{.lcomm} allocates in @code{.bss}.
++directive's space, the way @code{.lcomm} allocates in @code{.bss}.  Each
++file that does this has its own copy.
 +
 +@cindex @code{ebss} directive, MCS-51
 +@item .ebss [@var{subsection}]
@@ -3927,8 +3941,8 @@ index 00000000..23162ea8
 +
 +@cindex @code{pcode} directive, MCS-51
 +@item .pcode @var{address} [@var{operand}[, @var{operand}[, @var{operand}]]]
-+Assemble one entry of the byte-coded call format this port carries from its
-+2001 origin.  @var{address} is the code address to execute; it has
++Assemble one entry of a byte-coded call format.  @var{address} is the code
++address to execute; it has
 +thirteen bits, so it must be at least @code{0x100} and at most
 +@code{0x1FFF}.  It is separated from the first operand by white space, and
 +the operands from each other by commas.  Up to three
@@ -3994,10 +4008,11 @@ index 00000000..23162ea8
 +before any @code{.using} is an error.  The selection holds until the next
 +@code{.using}.
 +
-+A file that uses @code{.using} at all also gets a common symbol
++Source that uses @code{.using} at all also gets a common symbol
 +@code{__RB__} in the @code{.regbank} space, sized to reach the end of the
-+highest bank the file selected, so that the link reserves the register area
-+the program uses.
++highest bank any of its files selected, so that the link reserves the
++register area the program uses.  The name is the assembler's; a program
++that defines @code{__RB__} itself is refused.
 +
 +@cindex @code{xbss} directive, MCS-51
 +@item .xbss [@var{subsection}]
@@ -4118,10 +4133,9 @@ index 00000000..23162ea8
 +
 +@item R_I51_8
 +An eight-bit value whose operand kind is not recorded: a byte of data from
-+@code{.byte}, a byte operand of @code{.pcode}, and every eight-bit operand
-+in an object built before @code{R_I51_8_DIR} and @code{R_I51_8_IMM}
-+existed.  The linker accepts @minus{}128 through 255, as for an immediate,
-+and refuses anything else.
++@code{.byte}, or a byte operand of @code{.pcode}.  The value is added to
++the byte at the place.  The linker accepts @minus{}128 through 255, as for
++an immediate, and refuses anything else.
 +
 +@item R_I51_8_DIR
 +A direct address: one byte naming the internal RAM and special function
@@ -4160,11 +4174,12 @@ index 00000000..23162ea8
 +
 +@item R_I51_16
 +A sixteen-bit number: the operand of @code{mov dptr,#@var{data16}}, and a
-+symbol in @code{.word}.  An object built before @code{R_I51_16_CODE}
-+existed carries it for @code{ljmp} and @code{lcall} as well.
++symbol in @code{.word}.  The assembler and the linker accept
++@minus{}65536 through 65535, as for any two-byte datum.
 +
 +@item R_I51_16_CODE
-+A code address: the operand of @code{ljmp} and @code{lcall}.
++A code address: the operand of @code{ljmp} and @code{lcall}, 0 through
++@code{0xFFFF}.
 +
 +@item R_I51_32
 +A thirty-two-bit datum: a symbol in @code{.long}, and the addresses in
@@ -4328,26 +4343,33 @@ index 00000000..f069f3d0
 +#error_output: comm-bad.l
 diff --git a/gas/testsuite/gas/i51/comm-bad.l b/gas/testsuite/gas/i51/comm-bad.l
 new file mode 100644
-index 00000000..d2d7d7c8
+index 00000000..a804eae6
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/comm-bad.l
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,7 @@
 +.*: Assembler messages:
 +.*:3: Warning: size of "buf" is already 4; not changing to 8
 +.*:3: Error: `BUF' is already a common of another memory space
 +.*:4: Error: expected symbol name
-+.*:5: Error: common alignment has to be a power of 2 up to 0x10000
++.*:5: Error: alignment not a power of 2
++.*:6: Error: alignment too large: 0x10000 is the most
++.*:8: Error: alignment not a power of 2
 diff --git a/gas/testsuite/gas/i51/comm-bad.s b/gas/testsuite/gas/i51/comm-bad.s
 new file mode 100644
-index 00000000..1f056ba3
+index 00000000..9ffa314c
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/comm-bad.s
-@@ -0,0 +1,5 @@
-+; One name is a common of one space only.
+@@ -0,0 +1,10 @@
++; One name is a common of one space only.  An error ends with its own line.
 +	.xcomm	buf, 4
 +	.icomm	buf, 8
 +	.xcomm	, 4
 +	.icomm	buf2, 4, 3
++	.icomm	buf3, 4, 0x20000
++	.local	buf4
++	.icomm	buf4, 4, 3
++	.text
++	nop
 diff --git a/gas/testsuite/gas/i51/comm.d b/gas/testsuite/gas/i51/comm.d
 new file mode 100644
 index 00000000..e1c1b588
@@ -4378,6 +4400,28 @@ index 00000000..5dadebf2
 +	.local	lbuf
 +	.xcomm	lbuf, 3
 +	.comm	plain, 5
+diff --git a/gas/testsuite/gas/i51/eflags.d b/gas/testsuite/gas/i51/eflags.d
+new file mode 100644
+index 00000000..e8d333de
+--- /dev/null
++++ b/gas/testsuite/gas/i51/eflags.d
+@@ -0,0 +1,7 @@
++#name: i51 ABI generation in e_flags
++#as:
++#readelf: -h
++
++#...
++  Flags: +0x1
++#pass
+diff --git a/gas/testsuite/gas/i51/eflags.s b/gas/testsuite/gas/i51/eflags.s
+new file mode 100644
+index 00000000..6de23efe
+--- /dev/null
++++ b/gas/testsuite/gas/i51/eflags.s
+@@ -0,0 +1,3 @@
++; An object records the ABI generation it was written for.
++	.text
++	nop
 diff --git a/gas/testsuite/gas/i51/high-low.d b/gas/testsuite/gas/i51/high-low.d
 new file mode 100644
 index 00000000..7e1a5e78
@@ -4788,13 +4832,13 @@ index 00000000..3b4d5281
 +#error_output: ranges-bad.l
 diff --git a/gas/testsuite/gas/i51/ranges-bad.l b/gas/testsuite/gas/i51/ranges-bad.l
 new file mode 100644
-index 00000000..d0cc345d
+index 00000000..68ee56b0
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/ranges-bad.l
 @@ -0,0 +1,11 @@
 +.*: Assembler messages:
-+.*:11: Error: common alignment has to be a power of 2 up to 0x10000
-+.*:12: Error: common alignment has to be a power of 2 up to 0x10000
++.*:11: Error: alignment too large: 0x10000 is the most
++.*:12: Error: alignment too large: 0x10000 is the most
 +.*:3: Error: 16\-bit operand out of range: \-65537
 +.*:4: Error: 16\-bit operand out of range: 65536
 +.*:5: Error: code address out of range: \-1
@@ -5006,10 +5050,10 @@ index 00000000..77a2112f
 +	.byte	0x02, 0x12
 diff --git a/include/elf/i51.h b/include/elf/i51.h
 new file mode 100644
-index 00000000..0efe53b3
+index 00000000..3003c916
 --- /dev/null
 +++ b/include/elf/i51.h
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,134 @@
 +/* MCS-51 ELF support for BFD.
 +   Copyright (C) 2001-2026 Free Software Foundation, Inc.
 +   Contributed by Radek Benedikt <benedikt@lphard.cz>
@@ -5041,14 +5085,11 @@ index 00000000..0efe53b3
 +   instructions are; a little-endian datum is written per datum with
 +   R_I51_L and R_I51_H.  */
 +
-+/* Relocations.
-+
-+   R_I51_8 is a byte of data or of a .pcode operand, and in older objects
-+   any eight-bit operand; R_I51_8_DIR is a direct address and R_I51_8_IMM
-+   an immediate.  R_I51_16 is a sixteen-bit number - MOV DPTR,#data16 or a
-+   .word - and R_I51_16_CODE the target of an LJMP or LCALL; older objects
-+   carry R_I51_16 for both.  R_I51_32 is a .long or an address in debugging
-+   information.  R_I51_R1 and R_I51_R3 are reserved and relocate nothing.  */
++/* Relocations.  R_I51_8 is a byte, R_I51_8_DIR a direct address and
++   R_I51_8_IMM an immediate.  R_I51_16 is a sixteen-bit number and
++   R_I51_16_CODE the target of an LJMP or LCALL.  R_I51_32 is a .long or
++   an address in debugging information.  R_I51_R1 and R_I51_R3 are
++   reserved.  */
 +START_RELOC_NUMBERS (elf_i51_reloc_type)
 +     RELOC_NUMBER (R_I51_NONE,			0)
 +     RELOC_NUMBER (R_I51_R1,			1)
@@ -5330,24 +5371,23 @@ index 00000000..233beee8
 +
 diff --git a/ld/emulparams/elf32i51.sh b/ld/emulparams/elf32i51.sh
 new file mode 100644
-index 00000000..3cae5c02
+index 00000000..0426a2e9
 --- /dev/null
 +++ b/ld/emulparams/elf32i51.sh
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,7 @@
 +TEMPLATE_NAME=generic
 +EXTRA_EM_FILE=genelf
 +SCRIPT_NAME=elf32i51
 +OUTPUT_FORMAT="elf32-i51"
-+TEXT_START_ADDR=0x00000000
 +ARCH=i51
 +EMBEDDED=yes
 +MACHINE=
 diff --git a/ld/scripttempl/elf32i51.sc b/ld/scripttempl/elf32i51.sc
 new file mode 100644
-index 00000000..20ff8183
+index 00000000..6c383c06
 --- /dev/null
 +++ b/ld/scripttempl/elf32i51.sc
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,284 @@
 +# Copyright (C) 2014-2025 Free Software Foundation, Inc.
 +#
 +# Copying and distribution of this file, with or without modification,
@@ -5358,17 +5398,42 @@ index 00000000..20ff8183
 +#
 +# The 8051 is a Harvard machine with several disjoint address spaces:
 +# code, directly addressed internal RAM, indirectly addressed internal
-+# RAM, the bit space, external RAM (xdata, edata) and EEPROM.  The
-+# relocations of this port (R_I51_8_B2B in particular) need every RAM
-+# symbol to carry its true on-chip address, so the spaces cannot be
-+# spread over disjoint VMA windows of one flat address space.  Instead
-+# only the code sections are allocated; every RAM space is emitted as a
-+# non-alloc (INFO) section whose VMA is the real address inside its own
-+# space.  Sections of different spaces may then share VMA ranges without
-+# tripping the linker's overlap check, and objcopy -O ihex/binary
-+# extracts just the code image.
++# RAM, the bit space, external RAM (xdata, edata) and EEPROM.  A RAM
++# symbol has its address inside its own space, so only the code sections
++# are allocated; every other space is a non-alloc (INFO) section whose
++# VMA is that address.  Sections of different spaces may then share VMA
++# ranges, and objcopy -O ihex/binary extracts the code image.
 +
-+test -z "${RELOCATING}" && exit 0
++if test -z "${RELOCATING}"; then
++  cat <<EOF
++OUTPUT_FORMAT("${OUTPUT_FORMAT}")
++OUTPUT_ARCH(${ARCH})
++
++SECTIONS
++{
++  .text		0 : { *(.text) }
++  .regbank	0 : { *(.regbank) }
++  .rdata	0 : { *(.rdata) }
++  .rbss		0 : { *(.rbss) }
++  .bdata	0 : { *(.bdata) }
++  .bbss		0 : { *(.bbss) }
++  .bitdata	0 : { *(.bitdata) }
++  .bitbss	0 : { *(.bitbss) }
++  .data		0 : { *(.data) }
++  .bss		0 : { *(.bss) }
++  .idata	0 : { *(.idata) }
++  .ibss		0 : { *(.ibss) }
++  .xdata	0 : { *(.xdata) }
++  .xbss		0 : { *(.xbss) }
++  .edata	0 : { *(.edata) }
++  .ebss		0 : { *(.ebss) }
++  .eeprom	0 : { *(.eeprom) }
++  .comment	0 : { *(.comment) }
++EOF
++  source_sh $srcdir/scripttempl/DWARF.sc
++  echo "}"
++  exit 0
++fi
 +
 +cat <<EOF
 +/* Copyright (C) 2014-2025 Free Software Foundation, Inc.
@@ -5629,6 +5694,33 @@ index 00000000..310968c8
 +	.global	_START
 +_START:	sjmp	0x110
 +	sjmp	0
+diff --git a/ld/testsuite/ld-i51/align.d b/ld/testsuite/ld-i51/align.d
+new file mode 100644
+index 00000000..ac972cfc
+--- /dev/null
++++ b/ld/testsuite/ld-i51/align.d
+@@ -0,0 +1,8 @@
++#name: i51 alignment of a memory-space common
++#source: align.s
++#ld:
++#nm: -n
++
++#...
++0+4 D FOUR
++#pass
+diff --git a/ld/testsuite/ld-i51/align.s b/ld/testsuite/ld-i51/align.s
+new file mode 100644
+index 00000000..16d1f238
+--- /dev/null
++++ b/ld/testsuite/ld-i51/align.s
+@@ -0,0 +1,7 @@
++; A memory-space common is placed at the alignment its directive gave.
++	.text
++	.global	_START
++_START:	nop
++	.xdata
++	.byte	0
++	.xcomm	four, 4, 4
 diff --git a/ld/testsuite/ld-i51/b2b0.d b/ld/testsuite/ld-i51/b2b0.d
 new file mode 100644
 index 00000000..f6c492d3
@@ -5798,10 +5890,10 @@ index 00000000..42099dac
 +l2:	ljmp	l2
 diff --git a/ld/testsuite/ld-i51/i51.exp b/ld/testsuite/ld-i51/i51.exp
 new file mode 100644
-index 00000000..9af7ebd2
+index 00000000..f8202fc4
 --- /dev/null
 +++ b/ld/testsuite/ld-i51/i51.exp
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,84 @@
 +# Copyright (C) 2026 Free Software Foundation, Inc.
 +#
 +# This file is part of the GNU Binutils.
@@ -5829,6 +5921,62 @@ index 00000000..9af7ebd2
 +
 +foreach test [lsort [glob -nocomplain $srcdir/$subdir/*.d]] {
 +    run_dump_test [file rootname $test]
++}
++
++# Objects of another ABI generation.  The assembler writes the current
++# one, so the generation is set in the header of an assembled object.
++
++proc i51_generation_object { src gen obj } {
++    global as srcdir subdir
++
++    if { ![ld_assemble $as $srcdir/$subdir/$src $obj] } {
++	return 0
++    }
++    set f [open $obj r+]
++    fconfigure $f -translation binary
++    seek $f 36
++    puts -nonewline $f [binary format I $gen]
++    close $f
++    return 1
++}
++
++proc i51_run { prog args } {
++    set got [remote_exec host $prog $args]
++    return [lindex $got 1]
++}
++
++set test "i51 common alignment of ABI generation 0 is not read"
++if { ![i51_generation_object align.s 0 tmpdir/align0.o]
++     || ![ld_link $ld tmpdir/align0 tmpdir/align0.o] } {
++    fail $test
++} elseif { [regexp {(^|\s)0+1 D FOUR} [i51_run $NM -n tmpdir/align0]] } {
++    pass $test
++} else {
++    fail $test
++}
++
++set test "i51 ld -r writes the current ABI generation"
++if { ![ld_link $ld tmpdir/align0.r "-r tmpdir/align0.o"] } {
++    fail $test
++} else {
++    set out [i51_run $READELF -hs tmpdir/align0.r]
++    if { [regexp {Flags: +0x1\s} $out]
++	 && [regexp {00000001 +4 OBJECT +GLOBAL DEFAULT +PRC\[0xff04\] FOUR} $out] } {
++	pass $test
++    } else {
++	fail $test
++    }
++}
++
++set test "i51 unknown ABI generation is refused"
++if { ![i51_generation_object align.s 2 tmpdir/align2.o] } {
++    fail $test
++} elseif { [ld_link $ld tmpdir/align2 tmpdir/align2.o] } {
++    fail $test
++} elseif { [regexp {unknown e_flags 0x2} $link_output] } {
++    pass $test
++} else {
++    fail $test
 +}
 diff --git a/ld/testsuite/ld-i51/image.s b/ld/testsuite/ld-i51/image.s
 new file mode 100644
@@ -5945,13 +6093,13 @@ index 00000000..bde3d7e1
 +#pass
 diff --git a/ld/testsuite/ld-i51/overflow.d b/ld/testsuite/ld-i51/overflow.d
 new file mode 100644
-index 00000000..5c994b45
+index 00000000..598ca0ff
 --- /dev/null
 +++ b/ld/testsuite/ld-i51/overflow.d
 @@ -0,0 +1,4 @@
 +#name: i51 relocation overflow
 +#source: overflow.s
-+#ld: --defsym BS=0xff --defsym FAR=0x10 --defsym HI=0x12345 --defsym NEG=-40000 --defsym BIG=0x1234 --defsym PC=0x2345
++#ld: --defsym BS=0xff --defsym FAR=0x10 --defsym HI=0x12345 --defsym NEG=-70000 --defsym BIG=0x1234 --defsym PC=0x2345
 +#error_output: overflow.l
 diff --git a/ld/testsuite/ld-i51/overflow.l b/ld/testsuite/ld-i51/overflow.l
 new file mode 100644
@@ -5968,7 +6116,7 @@ index 00000000..36ef5f23
 +.*: relocation truncated to fit: R_I51_13_PCODE against symbol `PC'.*
 diff --git a/ld/testsuite/ld-i51/overflow.s b/ld/testsuite/ld-i51/overflow.s
 new file mode 100644
-index 00000000..5d309a37
+index 00000000..07b8b54a
 --- /dev/null
 +++ b/ld/testsuite/ld-i51/overflow.s
 @@ -0,0 +1,9 @@
@@ -5978,7 +6126,7 @@ index 00000000..5d309a37
 +_START:	clr	bs+1		; bit 0x100
 +	ljmp	far+0x10000	; past the code space
 +	mov	a,#high(hi)	; high byte of a 17-bit value
-+	mov	dptr,#neg	; below -32768
++	mov	dptr,#neg	; below -65536
 +	.byte	big		; not a byte
 +	.pcode	pc
 diff --git a/ld/testsuite/ld-i51/page.d b/ld/testsuite/ld-i51/page.d

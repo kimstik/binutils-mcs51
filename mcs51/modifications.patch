@@ -433,6 +433,18 @@ index 165e2336..fdb603d9 100644
  * New command line option --reloc-section-sym=[all|internal|none]
    controls whether relocations referencing local binding symbols are adjusted
    to use section symbols.
+diff --git a/gas/config/obj-elf.c b/gas/config/obj-elf.c
+index 2e15b251..e7a8d2ea 100644
+--- a/gas/config/obj-elf.c
++++ b/gas/config/obj-elf.c
+@@ -275,6 +275,7 @@ elf_common_parse (int ignore ATTRIBUTE_UNUSED, symbolS *symbolP, addressT size)
+ 	      *input_line_pointer = '\0';
+ 	      as_bad (_("bad .common segment %s"), p);
+ 	      *input_line_pointer = c;
++	      ignore_rest_of_line ();
+ 	      return NULL;
+ 	    }
+ 	  /* ??? Don't ask me why these are always global.  */
 diff --git a/gas/configure.tgt b/gas/configure.tgt
 index 7a5645fd..07546d74 100644
 --- a/gas/configure.tgt
@@ -508,6 +520,66 @@ index c0ce2661..2df5eee5 100644
  config/tc-ia64.c
  config/tc-ia64.h
  config/tc-ip2k.c
+diff --git a/gas/read.c b/gas/read.c
+index 1a7537ba..e0713185 100644
+--- a/gas/read.c
++++ b/gas/read.c
+@@ -1866,7 +1866,12 @@ s_comm_internal (int param,
+ 	     name, (long) size, (long) temp);
+ 
+   if (comm_parse_extra != NULL)
+-    symbolP = (*comm_parse_extra) (param, symbolP, size);
++    {
++      /* One that fails has skipped the rest of the line.  */
++      symbolP = (*comm_parse_extra) (param, symbolP, size);
++      if (symbolP == NULL)
++	goto out;
++    }
+   else
+     {
+       S_SET_VALUE (symbolP, size);
+@@ -2610,7 +2615,6 @@ s_linkonce (int ignore ATTRIBUTE_UNUSED)
+ void
+ bss_alloc (symbolS *symbolP, addressT size, unsigned int align)
+ {
+-  char *pfrag;
+   segT current_seg = now_seg;
+   subsegT current_subseg = now_subseg;
+   segT bss_seg = bss_section;
+@@ -2630,6 +2634,21 @@ bss_alloc (symbolS *symbolP, addressT size, unsigned int align)
+ 	}
+     }
+ #endif
++  bss_alloc_section (symbolP, size, align, bss_seg);
++  subseg_set (current_seg, current_subseg);
++}
++
++/* Allocate SIZE bytes for SYMBOLP at an alignment of 2**ALIGN in
++   subsection 1 of BSS_SEG.  */
++
++void
++bss_alloc_section (symbolS *symbolP, addressT size, unsigned int align,
++		   segT bss_seg)
++{
++  char *pfrag;
++  segT current_seg = now_seg;
++  subsegT current_subseg = now_subseg;
++
+   subseg_set (bss_seg, 1);
+ 
+   if (align > OCTETS_PER_BYTE_POWER)
+diff --git a/gas/read.h b/gas/read.h
+index 225a8748..0f7cd43a 100644
+--- a/gas/read.h
++++ b/gas/read.h
+@@ -164,6 +164,7 @@ extern void generate_lineno_debug (void);
+ extern void do_align (unsigned int align, char *fill, unsigned int length,
+ 		      unsigned int max);
+ extern void bss_alloc (symbolS *, addressT, unsigned);
++extern void bss_alloc_section (symbolS *, addressT, unsigned, segT);
+ extern offsetT parse_align (int);
+ extern symbolS *s_comm_internal (int, symbolS *(*) (int, symbolS *, addressT));
+ extern symbolS *s_lcomm_internal (int, symbolS *, addressT);
 diff --git a/ld/Makefile.am b/ld/Makefile.am
 index 3ae3d7f1..7d57bef0 100644
 --- a/ld/Makefile.am

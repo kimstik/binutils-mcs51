@@ -17,16 +17,16 @@ on trust:
                 md_pseudo_table.  Aliases are entries like any other:
                 .bcommon has to be documented because it exists.
   operands      the set of built-in operand names the manual lists in
-                i51-Regs is exactly the set of names in i51_directop, after
+                i51-Regs is exactly the set of names in i51_names, after
                 the `@code{R0} @dots{} @code{R7}' ranges are expanded; and
-                every i51_directop entry is listed under the manual group
+                every i51_names entry is listed under the manual group
                 that matches its kind - 'D' under the byte-addressable
                 special function registers, 'B' under the bit-addressable
                 names, 'U' under the register-bank byte addresses, the rest
                 under the registers and addressing modes.
   values        the two operand values the manual states outright, in
                 `@samp{.byte ACC} therefore assembles to @code{0xE0}', are
-                the values i51_directop gives those names.
+                the values i51_names gives those names.
   relocations   the set of R_I51_* names the manual uses anywhere is
                 exactly the set RELOC_NUMBERS declares in
                 include/elf/i51.h.
@@ -454,7 +454,7 @@ def initialiser(lines, opener):
 # ---------------------------------------------------------------- checks
 
 PSEUDO = re.compile(r'\{\s*"([^"]+)"')
-DIRECTOP = re.compile(r'\{\s*"((?:[^"\\]|\\.)*)"\s*,\s*\'(\\.|[^\'])\'\s*,'
+NAME_ROW = re.compile(r'\{\s*"((?:[^"\\]|\\.)*)"\s*,\s*\'(\\.|[^\'])\'\s*,'
                       r"\s*(0[xX][0-9a-fA-F]+|[0-9]+)")
 RELOC_NUMBER = re.compile(r"(?<![A-Z_])RELOC_NUMBER\s*\(\s*(R_I51_[A-Z0-9_]+)")
 RELOC_NAME = re.compile(r"\bR_I51_[A-Z0-9_]+")
@@ -506,21 +506,21 @@ def check_directives(ck, doc, gas):
     return not missing and not extra
 
 
-def directop(gas):
-    """[(name, ref, value)] for the i51_directop table."""
-    body = initialiser(gas, "i51_directop[] =")
+def names(gas):
+    """[(name, ref, value)] for the i51_names table."""
+    body = initialiser(gas, "i51_names[] =")
     if body is None:
         return None
     out = []
     for s in body:
-        m = DIRECTOP.match(s.strip())
+        m = NAME_ROW.match(s.strip())
         if m:
             out.append((m.group(1), m.group(2), int(m.group(3), 0)))
     return out
 
 
 def check_operands(ck, doc, ops):
-    """i51_directop against the operand names listed in i51-Regs."""
+    """i51_names against the operand names listed in i51-Regs."""
     node = doc.get("i51-Regs")
     if node is None:
         return ck.true("operands: no `i51-Regs' node in " + TEXI, False)
@@ -546,12 +546,12 @@ def check_operands(ck, doc, ops):
             continue
         want = {n for n, ref, _v in ops if wanted(ref)}
         absent = sorted(want - groups[head])
-        ck.true("operands: %s is in i51_directop but the manual does not "
+        ck.true("operands: %s is in i51_names but the manual does not "
                 "list it under `%s'" % (", ".join(absent), head), not absent)
 
 
 def check_values(ck, doc, ops):
-    """The operand values the manual states outright, against i51_directop."""
+    """The operand values the manual states outright, against i51_names."""
     node = doc.get("i51-Regs")
     if node is None:
         return
@@ -568,7 +568,7 @@ def check_values(ck, doc, ops):
         want = int(h.group(1), 16)
         got = value.get(name)
         ck.true("values: the manual has `.byte %s' assembling to 0x%02X, "
-                "i51_directop gives %s"
+                "i51_names gives %s"
                 % (name, want,
                    "no such name" if got is None else "0x%02X" % got),
                 got == want)
@@ -651,8 +651,8 @@ def main():
 
     ck = Check()
     check_directives(ck, doc, tree[GAS])
-    ops = directop(tree[GAS])
-    if ck.true("operands: no i51_directop table in " + GAS, ops is not None):
+    ops = names(tree[GAS])
+    if ck.true("operands: no i51_names table in " + GAS, ops is not None):
         check_operands(ck, doc, ops)
         check_values(ck, doc, ops)
     check_relocations(ck, texi, tree[ELFH])
