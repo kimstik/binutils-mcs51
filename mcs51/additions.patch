@@ -1196,7 +1196,7 @@ index 00000000..06acca07
 +#include "elf32-target.h"
 diff --git a/gas/config/tc-i51.c b/gas/config/tc-i51.c
 new file mode 100644
-index 00000000..7b0012cb
+index 00000000..5a911ebb
 --- /dev/null
 +++ b/gas/config/tc-i51.c
 @@ -0,0 +1,2210 @@
@@ -3100,13 +3100,13 @@ index 00000000..7b0012cb
 +
 +enum pcode_mode
 +{
-+  DIRECTWORD,
-+  DIRECTBYTE,
-+  DIRECTSWAP,
-+  DIRECTSHL8,
-+  INDIRECTWORD,
-+  INDIRECTBYTE,
-+  INDIRECTSWAP
++  PCODE_DIRECTWORD,
++  PCODE_DIRECTBYTE,
++  PCODE_DIRECTSWAP,
++  PCODE_DIRECTSHL8,
++  PCODE_INDIRECTWORD,
++  PCODE_INDIRECTBYTE,
++  PCODE_INDIRECTSWAP
 +};
 +
 +/* Match pcode keyword KW at input_line_pointer, ignoring case, and step
@@ -3139,13 +3139,13 @@ index 00000000..7b0012cb
 +    enum pcode_mode mode;
 +  } keywords[] =
 +  {
-+    { "#BYTE", DIRECTBYTE },   { "#SWAP", DIRECTSWAP },
-+    { "#SHL8", DIRECTSHL8 },   { "#WORD", DIRECTWORD },
-+    { "BYTE",  DIRECTBYTE },   { "SWAP",  DIRECTSWAP },
-+    { "SHL8",  DIRECTSHL8 },   { "WORD",  DIRECTWORD },
-+    { "@BYTE", INDIRECTBYTE }, { "@SWAP", INDIRECTSWAP },
-+    { "@WORD", INDIRECTWORD },
-+    { "#",     DIRECTWORD },   { "@",     INDIRECTWORD },
++    { "#BYTE", PCODE_DIRECTBYTE },   { "#SWAP", PCODE_DIRECTSWAP },
++    { "#SHL8", PCODE_DIRECTSHL8 },   { "#WORD", PCODE_DIRECTWORD },
++    { "BYTE",  PCODE_DIRECTBYTE },   { "SWAP",  PCODE_DIRECTSWAP },
++    { "SHL8",  PCODE_DIRECTSHL8 },   { "WORD",  PCODE_DIRECTWORD },
++    { "@BYTE", PCODE_INDIRECTBYTE }, { "@SWAP", PCODE_INDIRECTSWAP },
++    { "@WORD", PCODE_INDIRECTWORD },
++    { "#",     PCODE_DIRECTWORD },   { "@",     PCODE_INDIRECTWORD },
 +  };
 +  size_t i;
 +
@@ -3154,7 +3154,7 @@ index 00000000..7b0012cb
 +  if (is_end_of_stmt (*input_line_pointer))
 +    {
 +      ex->X_op = O_constant;
-+      *mode = DIRECTBYTE;
++      *mode = PCODE_DIRECTBYTE;
 +      return true;
 +    }
 +
@@ -3175,7 +3175,7 @@ index 00000000..7b0012cb
 +      return false;
 +    }
 +
-+  *mode = DIRECTWORD;
++  *mode = PCODE_DIRECTWORD;
 +  for (i = 0; i < ARRAY_SIZE (keywords); i++)
 +    if (pcode_keyword (keywords[i].kw))
 +      {
@@ -3264,20 +3264,20 @@ index 00000000..7b0012cb
 +{
 +  switch (mode)
 +    {
-+    case DIRECTBYTE:
-+    case DIRECTSHL8:
-+    case INDIRECTWORD:
-+    case INDIRECTSWAP:
++    case PCODE_DIRECTBYTE:
++    case PCODE_DIRECTSHL8:
++    case PCODE_INDIRECTWORD:
++    case PCODE_INDIRECTSWAP:
 +      pcode_byte (ex, 0);
 +      break;
-+    case INDIRECTBYTE:
++    case PCODE_INDIRECTBYTE:
 +      /* Stored decremented by one, through the addend for a symbol.  */
 +      pcode_byte (ex, -1);
 +      break;
-+    case DIRECTWORD:
++    case PCODE_DIRECTWORD:
 +      pcode_word (ex, false);
 +      break;
-+    case DIRECTSWAP:
++    case PCODE_DIRECTSWAP:
 +      pcode_word (ex, true);
 +      break;
 +    }
@@ -3291,45 +3291,45 @@ index 00000000..7b0012cb
 +{
 +  bool constant = ex->X_op == O_constant;
 +  offsetT v = ex->X_add_number;
-+  offsetT stored = mode == INDIRECTBYTE ? v - 1 : v;
-+  bool word = mode == DIRECTWORD || mode == DIRECTSWAP;
++  offsetT stored = mode == PCODE_INDIRECTBYTE ? v - 1 : v;
++  bool word = mode == PCODE_DIRECTWORD || mode == PCODE_DIRECTSWAP;
 +  unsigned int flags = 0;
 +
 +  if (constant && (word ? stored < -65535 || stored > 65535
 +		   : stored < -255 || stored > 255))
 +    as_bad (_("pcode operand out of range: %ld"), (long) v);
-+  if (!swapable && (mode == DIRECTSWAP || mode == INDIRECTSWAP))
++  if (!swapable && (mode == PCODE_DIRECTSWAP || mode == PCODE_INDIRECTSWAP))
 +    as_bad (_("this pcode operand cannot be swapped"));
 +
 +  switch (mode)
 +    {
-+    case DIRECTBYTE:
-+    case INDIRECTWORD:
-+    case INDIRECTBYTE:
-+    case INDIRECTSWAP:
++    case PCODE_DIRECTBYTE:
++    case PCODE_INDIRECTWORD:
++    case PCODE_INDIRECTBYTE:
++    case PCODE_INDIRECTSWAP:
 +      if (!constant || pcode_byte_present (v, stored - v))
 +	flags |= I51_PCODE_LO;
 +      break;
-+    case DIRECTSHL8:
++    case PCODE_DIRECTSHL8:
 +      if (!constant || (v & 0xff) != 0)
 +	flags |= I51_PCODE_HI;
 +      break;
-+    case DIRECTWORD:
++    case PCODE_DIRECTWORD:
 +      if (!constant || (v & 0xff00) != 0)
 +	flags |= I51_PCODE_HI;
 +      if (!constant || (v & 0x00ff) != 0)
 +	flags |= I51_PCODE_LO;
 +      break;
-+    case DIRECTSWAP:
++    case PCODE_DIRECTSWAP:
 +      if (!constant || (v & 0x00ff) != 0)
 +	flags |= I51_PCODE_HI;
 +      if (!constant || (v & 0xff00) != 0)
 +	flags |= I51_PCODE_LO;
 +      break;
 +    }
-+  if (mode == DIRECTSWAP || mode == INDIRECTSWAP)
++  if (mode == PCODE_DIRECTSWAP || mode == PCODE_INDIRECTSWAP)
 +    flags |= I51_PCODE_SWAP;
-+  if (mode == INDIRECTWORD || mode == INDIRECTBYTE || mode == INDIRECTSWAP)
++  if (mode == PCODE_INDIRECTWORD || mode == PCODE_INDIRECTBYTE || mode == PCODE_INDIRECTSWAP)
 +    flags |= I51_PCODE_INDIRECT;
 +  return flags;
 +}
