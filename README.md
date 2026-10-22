@@ -68,6 +68,10 @@ What this work changed:
   own space. Disjoint spaces may then share VMA ranges without tripping the
   linker's overlap check, and `objcopy -O ihex` extracts just the code image.
   `ASSERT`s bound the internal RAM, the bit space and the two external ones.
+  Register bank 0 is always reserved, `__STACK_SIZE` bytes are kept for the
+  stack under `__IRAM_SIZE`, directly addressed RAM ends at 0x7F, and the
+  EEPROM is bounded by `__EEPROM_SIZE`. Since nothing loads the RAM spaces,
+  the linker refuses initialized data in them rather than drop it.
 - Compiler-independent startup hooks, absent from all 235 lines of the 2001
   script: `.text` ends in `__I51_RET = . ; BYTE(0x22)`, and
   `__GSINIT_STARTUP`, `__EXTERNAL_STARTUP` and `__INIT_DATA` are PROVIDEd
@@ -85,6 +89,28 @@ What this work changed:
   `EM_I51` 0x7262.
 - The emulparams file adds `EXTRA_EM_FILE=genelf`, and the emulation is named
   `elf32i51` where 2001 spelled it `elf32_i51`.
+
+## Testing
+
+Two layers, each covering what the other cannot:
+
+- `gas/testsuite/gas/i51` and `ld/testsuite/ld-i51`, inside the patches: the
+  DejaGnu suites binutils itself runs. They hold a test for each defect the
+  reviews in the `reviews` branch found, and the tests of what has to be
+  refused - an operand form the instruction set does not have, a value that
+  does not fit, an operand in the wrong memory space.
+  `make -C tb dejagnu` runs them.
+- `tb/`: the ten projects built and compared byte for byte with reference
+  ROMs and with the 2001 images, the instruction set against third-party
+  tables, a simulator run, linker-script coverage and mutation testing.
+
+`make -C tb gate` runs all sixteen stages.
+
+## Upstream
+
+What still stands between these patches and binutils@sourceware.org:
+copyright assignment or a DCO sign-off from every author, the `config.sub`
+entry going through config-patches@gnu.org first, and review there.
 
 ## References
 
