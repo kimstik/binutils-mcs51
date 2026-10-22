@@ -103,7 +103,9 @@ CASE_LINE = {'relf': 'case EM_8051:'}
 
 def read(path):
     with open(path, encoding='latin-1') as f:
-        return f.read().splitlines()
+        # Lines as an editor numbers them: splitlines () would also split
+        # at the form feeds of readelf.c.
+        return f.read().split('\n')
 
 
 def mask_comments(lines):

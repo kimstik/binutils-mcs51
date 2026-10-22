@@ -80,10 +80,11 @@ Different in this port:
   because a reference from an object built by a tool that does not fold names
   is spelled that way and the upper-case definition would never bind it.
   The script names `ENTRY(_START)`; 2001 named no entry point.
-- The assembler folds symbol names to upper case, as MCS-51 assemblers do
-  (`symbols_case_sensitive = 0`, which 2001 never set). Every symbol the
-  script defines for use from code is spelled upper case accordingly -
-  `STACK` where 2001 provided `stack`.
+- The assembler folds symbol names to upper case, as MCS-51 assemblers do,
+  unless `-mcase-sensitive` is given; a name that starts with a dot (a
+  section name) keeps its case. 2001 did not fold. Every symbol the script
+  defines for use from code is spelled upper case accordingly - `STACK`
+  where 2001 provided `stack`.
 - `e_machine` is the registered `EM_8051` (165), not 2001's unregistered
   `EM_I51` 0x7262.
 - The emulparams file adds `EXTRA_EM_FILE=genelf`, and the emulation is named

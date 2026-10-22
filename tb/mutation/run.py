@@ -103,14 +103,15 @@ class Harness:
     def apply(self, m):
         path = os.path.join(self.tree, m['file'])
         with open(path, encoding='latin-1') as f:
-            lines = f.read().splitlines()
+            # Numbered as gen.py numbers them, form feeds included.
+            lines = f.read().split('\n')
         first = m['line'] - 1
         n = len(m['old'])
         if lines[first:first + n] != m['old']:
             return False
         lines[first:first + n] = m['new']
         with open(path, 'w', encoding='latin-1') as f:
-            f.write('\n'.join(lines) + '\n')
+            f.write('\n'.join(lines))
         for rel in self.ALSO_TOUCH.get(m['file'], ()):
             os.utime(os.path.join(self.tree, rel), None)
         return True

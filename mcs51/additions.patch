@@ -3666,10 +3666,10 @@ index 00000000..89e993a7
 +#define tc_canonicalize_symbol_name(NAME) i51_canonicalize_symbol_name (NAME)
 diff --git a/gas/doc/c-i51.texi b/gas/doc/c-i51.texi
 new file mode 100644
-index 00000000..09bd763e
+index 00000000..693c0cf6
 --- /dev/null
 +++ b/gas/doc/c-i51.texi
-@@ -0,0 +1,906 @@
+@@ -0,0 +1,911 @@
 +@c Copyright (C) 2026 Free Software Foundation, Inc.
 +@c This is part of the GAS manual.
 +@c For copying conditions, see the file as.texinfo.
@@ -4511,7 +4511,9 @@ index 00000000..09bd763e
 +An eight-bit value whose operand kind is not recorded: a byte of data from
 +@code{.byte}, or a byte operand of @code{.pcode}.  The value is added to
 +the byte at the place.  The assembler and the linker accept @minus{}255
-+through 255, as for any one-byte datum.
++through 255, as for any one-byte datum; a constant outside that range in
++@code{.byte} draws the generic warning and is truncated, as on every
++target.
 +
 +@item R_I51_8_DIR
 +A direct address: one byte naming the internal RAM and special function
@@ -4527,7 +4529,10 @@ index 00000000..09bd763e
 +@item R_I51_L
 +@itemx R_I51_H
 +The low and the high byte of a sixteen-bit value, from @code{LOW ()} and
-+@code{HIGH ()}.
++@code{HIGH ()}; also the two bytes of a @code{#SWAP} operand of
++@code{.pcode}.  The value may be @minus{}32768 through 65535 for
++@code{R_I51_H}, as for a constant operand of @code{HIGH ()} and for
++@code{#SWAP}; @code{R_I51_L} takes any value.
 +
 +@item R_I51_8_BIT
 +A bit address, in the bit operand of @code{setb}, @code{clr}, @code{cpl},
@@ -4605,6 +4610,32 @@ index 00000000..8a5a0377
 +	.bit	k
 +	.bit	2
 +	.equ	k, 1
+diff --git a/gas/testsuite/gas/i51/bitedge.d b/gas/testsuite/gas/i51/bitedge.d
+new file mode 100644
+index 00000000..90b39d5b
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bitedge.d
+@@ -0,0 +1,8 @@
++#name: i51 edges of bit addressability
++#as:
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 d27fd2ff d27fd2ff +.*
+diff --git a/gas/testsuite/gas/i51/bitedge.s b/gas/testsuite/gas/i51/bitedge.s
+new file mode 100644
+index 00000000..64a06d55
+--- /dev/null
++++ b/gas/testsuite/gas/i51/bitedge.s
+@@ -0,0 +1,6 @@
++; The edges of bit addressability: RAM 0x2F and the SFR at 0xF8.
++	.text
++	setb	b2b(0x2f,7)
++	setb	b2b(0xf8,7)
++	setb	0x2f.7
++	setb	0xf8.7
 diff --git a/gas/testsuite/gas/i51/bitnames.d b/gas/testsuite/gas/i51/bitnames.d
 new file mode 100644
 index 00000000..e3b4c1d0
@@ -4810,21 +4841,25 @@ index 00000000..c3785a39
 +#error_output: builtin-global.l
 diff --git a/gas/testsuite/gas/i51/builtin-global.l b/gas/testsuite/gas/i51/builtin-global.l
 new file mode 100644
-index 00000000..ce046fe1
+index 00000000..fad7bc05
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/builtin-global.l
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,9 @@
 +.*: Assembler messages:
 +.*:9: Error: pcode operand out of range: \-9223372036854775808
++.*:13: Error: pcode operand out of range: \-32769
++.*:14: Error: pcode operand out of range: 65536
++.*:15: Error: a bit value is a constant 0 or 1
 +.*:3: Error: `EA' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
 +.*:5: Error: `ACC' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
 +.*:7: Error: `SWAP' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
++.*:10: Error: `ES' is used here as the built\-in name and defined later as a symbol; declare it with \.local first
 diff --git a/gas/testsuite/gas/i51/builtin-global.s b/gas/testsuite/gas/i51/builtin-global.s
 new file mode 100644
-index 00000000..796f830d
+index 00000000..a11bad25
 --- /dev/null
 +++ b/gas/testsuite/gas/i51/builtin-global.s
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,15 @@
 +; A built-in name used as such cannot become a global symbol afterwards.
 +	.text
 +	setb	ea
@@ -4834,6 +4869,12 @@ index 00000000..796f830d
 +	.pcode	0x200 swap-1
 +	.equ	swap,7
 +	.pcode	0x200 @BYTE 0x8000000000000000
++	setb	es
++	.weak	es
++	ljmp	es
++	.pcode	0x200 #SWAP -32769
++	.pcode	0x200 #SWAP 65536
++	.bit	-1
 diff --git a/gas/testsuite/gas/i51/case-bad.d b/gas/testsuite/gas/i51/case-bad.d
 new file mode 100644
 index 00000000..a6d0073c
@@ -5025,6 +5066,29 @@ index 00000000..1412230b
 +	.text
 +l:	sjmp	.-y
 +	djnz	r0,l-y
+diff --git a/gas/testsuite/gas/i51/dbg8.d b/gas/testsuite/gas/i51/dbg8.d
+new file mode 100644
+index 00000000..062fe130
+--- /dev/null
++++ b/gas/testsuite/gas/i51/dbg8.d
+@@ -0,0 +1,6 @@
++#name: i51 readelf applies R_I51_8 in debugging sections
++#as:
++#readelf: --relocated-dump=.debug_info
++
++#...
++ +0x0+ 05 +.*
+diff --git a/gas/testsuite/gas/i51/dbg8.s b/gas/testsuite/gas/i51/dbg8.s
+new file mode 100644
+index 00000000..a00a9eb1
+--- /dev/null
++++ b/gas/testsuite/gas/i51/dbg8.s
+@@ -0,0 +1,5 @@
++; readelf applies R_I51_8 in a debugging section.
++	.section .debug_info,"",@progbits
++	.byte	k
++	.equ	k, 5
++	.global	k
 diff --git a/gas/testsuite/gas/i51/direct-bad.d b/gas/testsuite/gas/i51/direct-bad.d
 new file mode 100644
 index 00000000..891f1edc
@@ -5771,6 +5835,30 @@ index 00000000..16826d92
 +; A pcode byte of an external symbol is checked by the linker.
 +	.text
 +	.pcode	0x200 @k-256
+diff --git a/gas/testsuite/gas/i51/pcode-op.d b/gas/testsuite/gas/i51/pcode-op.d
+new file mode 100644
+index 00000000..9a7f4b8e
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode-op.d
+@@ -0,0 +1,8 @@
++#name: i51 .pcode address before a parenthesis
++#as:
++#objdump: -s -j .text
++
++.*: +file format elf32-i51
++
++Contents of section .text:
++ 0000 03008002 +.*
+diff --git a/gas/testsuite/gas/i51/pcode-op.s b/gas/testsuite/gas/i51/pcode-op.s
+new file mode 100644
+index 00000000..203e0421
+--- /dev/null
++++ b/gas/testsuite/gas/i51/pcode-op.s
+@@ -0,0 +1,4 @@
++; A name before a parenthesis is the .pcode address unless it is an operator.
++	.text
++	.equ	h, 0x300
++	.pcode	h(0x200)
 diff --git a/gas/testsuite/gas/i51/pcode.d b/gas/testsuite/gas/i51/pcode.d
 new file mode 100644
 index 00000000..7fe07bb8
@@ -7941,6 +8029,28 @@ index 00000000..dce29937
 +_START:	nop
 +	.ibss
 +	.space	0x70
+diff --git a/ld/testsuite/ld-i51/linkr.d b/ld/testsuite/ld-i51/linkr.d
+new file mode 100644
+index 00000000..539a2443
+--- /dev/null
++++ b/ld/testsuite/ld-i51/linkr.d
+@@ -0,0 +1,4 @@
++#name: i51 .gnu.linkonce.r is code
++#source: linkr.s
++#ld:
++#error: .*a direct address cannot name code memory.*
+diff --git a/ld/testsuite/ld-i51/linkr.s b/ld/testsuite/ld-i51/linkr.s
+new file mode 100644
+index 00000000..0bf7ac7e
+--- /dev/null
++++ b/ld/testsuite/ld-i51/linkr.s
+@@ -0,0 +1,6 @@
++; .gnu.linkonce.r.* is code, as .rodata is.
++	.text
++	.global	_START
++_START:	mov	a,t
++	.section .gnu.linkonce.r.tab,"a"
++t:	.byte	1
 diff --git a/ld/testsuite/ld-i51/load.d b/ld/testsuite/ld-i51/load.d
 new file mode 100644
 index 00000000..d8f82158
@@ -8413,6 +8523,37 @@ index 00000000..bd06bdd6
 +_START:	mov	a,t
 +	.section .rodata
 +t:	.byte	1
+diff --git a/ld/testsuite/ld-i51/rvi.d b/ld/testsuite/ld-i51/rvi.d
+new file mode 100644
+index 00000000..74593517
+--- /dev/null
++++ b/ld/testsuite/ld-i51/rvi.d
+@@ -0,0 +1,5 @@
++#name: i51 .rcomm against an .idata definition
++#source: rvi1.s
++#source: rvi2.s
++#ld:
++#error: .*symbol `BUF' is in indirectly addressed internal RAM \(.idata\) here and in internal RAM \(.rbss\).*
+diff --git a/ld/testsuite/ld-i51/rvi1.s b/ld/testsuite/ld-i51/rvi1.s
+new file mode 100644
+index 00000000..d96c116d
+--- /dev/null
++++ b/ld/testsuite/ld-i51/rvi1.s
+@@ -0,0 +1,5 @@
++; A register-area common is not satisfied by an indirect RAM definition.
++	.rcomm	buf,1
++	.text
++	.global	_START
++_START:	mov	buf,a
+diff --git a/ld/testsuite/ld-i51/rvi2.s b/ld/testsuite/ld-i51/rvi2.s
+new file mode 100644
+index 00000000..8d57d2bb
+--- /dev/null
++++ b/ld/testsuite/ld-i51/rvi2.s
+@@ -0,0 +1,3 @@
++	.idata
++	.global	buf
++buf:	.byte	0
 diff --git a/ld/testsuite/ld-i51/shf.d b/ld/testsuite/ld-i51/shf.d
 new file mode 100644
 index 00000000..f058ccc2
